@@ -59,12 +59,15 @@ def get_signal_history(
 
 @router.get("/strategies")
 def list_strategies():
+    from app.core.risk_classifier import get_risk_info
+    
     return {
         "active_strategies": [
             {
                 "name": s.name,
                 "description": s.description,
-                "risk_level": s.risk_level
+                "risk_level": s.risk_level,
+                "risk_info": get_risk_info(s.name)
             } 
             for s in scanner.strategies
         ]

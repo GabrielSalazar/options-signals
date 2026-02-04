@@ -79,7 +79,11 @@ class SignalScanner:
                     if not signal_df.empty:
                         # Converte de volta para lista de dicts para o AlertService / API
                         # Iteramos apenas sobre os sinais encontrados (muito rápido)
+                        from app.core.risk_classifier import get_risk_info
+                        
                         for _, row in signal_df.iterrows():
+                            risk_info = get_risk_info(strategy.name)
+                            
                             signal_dict = {
                                 "strategy": row.get('strategy', strategy.name),
                                 "ticker": ticker,
@@ -89,7 +93,8 @@ class SignalScanner:
                                 "reason": row.get('reason', 'Sinal detectado'),
                                 "timestamp": "Now",
                                 "recommendation": row.get('recommended_action', ''),
-                                "risk_level": row.get('risk_level', strategy.risk_level)
+                                "risk_level": row.get('risk_level', strategy.risk_level),
+                                "risk_info": risk_info
                             }
                             
                             all_signals.append(signal_dict)
