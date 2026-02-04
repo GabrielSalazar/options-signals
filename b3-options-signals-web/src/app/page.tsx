@@ -1,31 +1,11 @@
 "use client"
 
-import { useState } from "react"
-import { ScanResponse, Signal } from "@/types/signals"
-import { fetchScan } from "@/lib/api"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import Link from "next/link"
+import { Activity, BarChart2, BookOpen, ChevronRight, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Activity, Search, TrendingUp, AlertTriangle } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function Dashboard() {
-    const [ticker, setTicker] = useState("PETR4")
-    const [results, setResults] = useState<Signal[]>([])
-    const [loading, setLoading] = useState(false)
-
-    const handleScan = async () => {
-        setLoading(true)
-        try {
-            const data: ScanResponse = await fetchScan(ticker)
-            setResults(data.results)
-        } catch (error) {
-            console.error("Scan failed", error)
-        } finally {
-            setLoading(false)
-        }
-    }
-
     return (
         <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
             {/* Header */}
@@ -38,97 +18,97 @@ export default function Dashboard() {
                         </h1>
                     </div>
                     <nav className="flex gap-4 text-sm text-slate-400">
-                        <a href="#" className="hover:text-emerald-400">Dashboard</a>
-                        <a href="#" className="hover:text-emerald-400">Estratégias</a>
-                        <a href="#" className="hover:text-emerald-400">Alertas</a>
+                        <span className="text-emerald-400">Dashboard</span>
+                        <Link href="/strategies" className="hover:text-emerald-400 transition-colors">Strategies</Link>
+                        <Link href="/scanner" className="hover:text-emerald-400 transition-colors">Scanner</Link>
+                        <Link href="/alerts" className="hover:text-emerald-400 transition-colors">History</Link>
                     </nav>
                 </div>
             </header>
 
-            <main className="flex-1 container mx-auto px-4 py-8">
-                {/* Search Section */}
-                <section className="mb-12 flex flex-col items-center justify-center space-y-4">
-                    <h2 className="text-3xl font-light text-center">
-                        Encontre oportunidades de <span className="font-semibold text-emerald-400">Opções</span> em segundos.
-                    </h2>
-                    <div className="flex w-full max-w-md items-center space-x-2">
-                        <Input
-                            type="text"
-                            placeholder="Digite o ativo (ex: PETR4, VALE3)"
-                            className="bg-slate-900 border-slate-700 text-white"
-                            value={ticker}
-                            onChange={(e) => setTicker(e.target.value.toUpperCase())}
-                        />
-                        <Button onClick={handleScan} disabled={loading} className="bg-emerald-600 hover:bg-emerald-500 text-white">
-                            {loading ? "Escaneando..." : <><Search className="mr-2 h-4 w-4" /> Buscar</>}
-                        </Button>
-                    </div>
-                </section>
+            <main className="flex-1 container mx-auto px-4 py-12">
+                <div className="text-center mb-16 space-y-4">
+                    <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+                        Advanced Options Analytics
+                    </h1>
+                    <p className="text-xl text-slate-400 max-w-2xl mx-auto">
+                        Automated volatility scanning and backtesting for the Brazilian Market.
+                    </p>
+                </div>
 
-                {/* Results Grid */}
-                <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {results.map((signal, index) => (
-                        <Card key={index} className="bg-slate-900 border-slate-800 hover:border-emerald-500/50 transition-colors">
-                            <CardHeader className="pb-2">
-                                <div className="flex justify-between items-start">
-                                    <Badge variant={signal.strategy.includes("High IV") ? "destructive" : "default"} className="mb-2">
-                                        {signal.strategy}
-                                    </Badge>
-                                    <span className="text-xs text-slate-500 font-mono">{signal.ticker}</span>
-                                </div>
-                                <CardTitle className="text-lg flex items-center gap-2">
-                                    {signal.option_symbol}
-                                    <span className="text-sm font-normal text-slate-400">(Strike: R$ {signal.strike.toFixed(2)})</span>
-                                </CardTitle>
-                                <CardDescription className="text-slate-400 pt-1">
-                                    {signal.reason}
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    <div className="flex justify-between text-sm py-2 border-b border-slate-800">
-                                        <span className="text-slate-400">Spot Price</span>
-                                        <span className="font-medium text-white">R$ {signal.spot_price.toFixed(2)}</span>
-                                    </div>
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {/* Tool 1: Scanner */}
+                    <Card className="bg-slate-900 border-slate-800 hover:border-emerald-500/50 transition-all hover:shadow-[0_0_20px_rgba(16,185,129,0.1)] group">
+                        <CardHeader>
+                            <TrendingUp className="w-10 h-10 text-emerald-400 mb-2 group-hover:scale-110 transition-transform" />
+                            <CardTitle className="text-white">Live Scanner</CardTitle>
+                            <CardDescription className="text-slate-400">
+                                Real-time scan for High IV, RSI Reversions, and Gamma Squeezes.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Link href="/scanner">
+                                <Button className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium group-hover:pl-4 transition-all">
+                                    Open Scanner <ChevronRight className="ml-2 w-4 h-4" />
+                                </Button>
+                            </Link>
+                        </CardContent>
+                    </Card>
 
-                                    {signal.greeks && (
-                                        <div className="grid grid-cols-2 gap-2 text-xs">
-                                            <div className="bg-slate-950 p-2 rounded">
-                                                <span className="block text-slate-500">Delta</span>
-                                                <span className="font-mono text-emerald-400">{signal.greeks.delta.toFixed(3)}</span>
-                                            </div>
-                                            <div className="bg-slate-950 p-2 rounded">
-                                                <span className="block text-slate-500">Gamma</span>
-                                                <span className="font-mono text-cyan-400">{signal.greeks.gamma.toFixed(3)}</span>
-                                            </div>
-                                            <div className="bg-slate-950 p-2 rounded">
-                                                <span className="block text-slate-500">Theta</span>
-                                                <span className="font-mono text-amber-400">{signal.greeks.theta.toFixed(3)}</span>
-                                            </div>
-                                            <div className="bg-slate-950 p-2 rounded">
-                                                <span className="block text-slate-500">Vega</span>
-                                                <span className="font-mono text-purple-400">{signal.greeks.vega.toFixed(3)}</span>
-                                            </div>
-                                        </div>
-                                    )}
+                    {/* Tool 2: Backtest */}
+                    <Card className="bg-slate-900 border-slate-800 hover:border-cyan-500/50 transition-all hover:shadow-[0_0_20px_rgba(6,182,212,0.1)] group">
+                        <CardHeader>
+                            <BarChart2 className="w-10 h-10 text-cyan-400 mb-2 group-hover:scale-110 transition-transform" />
+                            <CardTitle className="text-white">Backtesting</CardTitle>
+                            <CardDescription className="text-slate-400">
+                                Simulate strategies with historical Black-Scholes pricing.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Link href="/backtest">
+                                <Button className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-medium group-hover:pl-4 transition-all">
+                                    Run Simulation <ChevronRight className="ml-2 w-4 h-4" />
+                                </Button>
+                            </Link>
+                        </CardContent>
+                    </Card>
 
-                                    <div className="pt-2">
-                                        <Button variant="outline" className="w-full border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300">
-                                            <TrendingUp className="mr-2 h-4 w-4" /> Analisar Gráfico
-                                        </Button>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
+                    {/* Tool 3: Strategies */}
+                    <Card className="bg-slate-900 border-slate-800 hover:border-purple-500/50 transition-all hover:shadow-[0_0_20px_rgba(168,85,247,0.1)] group">
+                        <CardHeader>
+                            <BookOpen className="w-10 h-10 text-purple-400 mb-2 group-hover:scale-110 transition-transform" />
+                            <CardTitle className="text-white">Strategy Library</CardTitle>
+                            <CardDescription className="text-slate-400">
+                                Browse available algorithms and their risk profiles.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Link href="/strategies">
+                                <Button variant="outline" className="w-full border-slate-700 text-slate-300 hover:bg-slate-800 group-hover:text-purple-400">
+                                    View Library
+                                </Button>
+                            </Link>
+                        </CardContent>
+                    </Card>
 
-                    {results.length === 0 && !loading && (
-                        <div className="col-span-full text-center py-20 text-slate-600">
-                            <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                            <p>Nenhum sinal encontrado ainda. Tente buscar por um ativo.</p>
-                        </div>
-                    )}
-                </section>
+                    {/* Tool 4: History/Alerts */}
+                    <Card className="bg-slate-900 border-slate-800 hover:border-amber-500/50 transition-all hover:shadow-[0_0_20px_rgba(245,158,11,0.1)] group">
+                        <CardHeader>
+                            <Activity className="w-10 h-10 text-amber-400 mb-2 group-hover:scale-110 transition-transform" />
+                            <CardTitle className="text-white">Signal History</CardTitle>
+                            <CardDescription className="text-slate-400">
+                                Log of all past generated alerts and opportunities.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Link href="/alerts">
+                                <Button variant="outline" className="w-full border-slate-700 text-slate-300 hover:bg-slate-800 group-hover:text-amber-400">
+                                    View History
+                                </Button>
+                            </Link>
+                        </CardContent>
+                    </Card>
+                </div>
             </main>
         </div>
     )

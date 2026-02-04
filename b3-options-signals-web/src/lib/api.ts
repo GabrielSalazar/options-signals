@@ -14,4 +14,26 @@ export const fetchStrategies = async () => {
     return response.data;
 };
 
+export interface BacktestParams {
+    ticker: string;
+    strategy_name: string;
+    days: number;
+    initial_capital: number;
+}
+
+export const runBacktest = async (params: BacktestParams) => {
+    const response = await api.post('/backtest/run', params);
+    return response.data;
+};
+
+export const fetchBacktestStrategies = async () => {
+    const response = await api.get('/backtest/strategies');
+    return response.data;
+};
+
+export const fetchSignalHistory = async (limit: number = 50) => {
+    const response = await api.get(`/signals/history?limit=${limit}`);
+    return response.data;
+};
+
 export default api;
