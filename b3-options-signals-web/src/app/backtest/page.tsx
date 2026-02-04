@@ -29,11 +29,31 @@ export default function BacktestPage() {
     useEffect(() => {
         async function loadStrategies() {
             try {
-                const list = await fetchBacktestStrategies();
-                setStrategies(list);
-                if (list.length > 0) setSelectedStrategy(list[0]);
-            } catch (err) {
+                console.log("Fetching strategies...");
+                let list = await fetchBacktestStrategies();
+
+                // Fallback if empty or failed (try the other endpoint)
+                if (!Array.isArray(list) || list.length === 0) {
+                    console.log("Backtest strategies empty, trying signal strategies...");
+                    const signalData = await import('@/lib/api').then(m => m.fetchStrategies());
+                    if (signalData && signalData.active_strategies) {
+                        list = signalData.active_strategies.map((s: any) => s.name);
+                    }
+                }
+
+                console.log("Strategies loaded:", list);
+                if (Array.isArray(list)) {
+                    setStrategies(list);
+                    if (list.length > 0) setSelectedStrategy(list[0]);
+                } else {
+                    console.error("Strategies is not an array:", list);
+                    setError("Failed to load strategies list.");
+                    setStrategies([]);
+                }
+            } catch (err: any) {
                 console.error("Failed to load strategies", err);
+                setError(`Failed to load strategies: ${err.message || 'Unknown error'}`);
+                setStrategies([]);
             }
         }
         loadStrategies();
@@ -127,8 +147,8 @@ export default function BacktestPage() {
                                         value={days}
                                         onValueChange={setDays}
                                         max={500}
-                                        min={30}
-                                        step={10}
+                                        min={7}
+                                        step={1}
                                         className="py-2"
                                     />
                                 </div>
