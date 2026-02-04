@@ -38,31 +38,58 @@ class MultiChannelAlertService:
             await asyncio.gather(*tasks)
 
     async def _send_telegram(self, signal_data: dict):
-        try:
-            type_emoji = "🟢" if signal_data.get('type') == 'CALL' else "🔴"
-            message = (
-                f"<b>🚨 SINAL DETECTADO {type_emoji}</b>\n\n"
-                f"📈 <b>Ativo:</b> {signal_data['ticker']}\n"
-                f"🎯 <b>Estratégia:</b> {signal_data['strategy']}\n"
-                f"🏷️ <b>Opção:</b> <code>{signal_data['option_symbol']}</code>\n"
-                f"💰 <b>Strike:</b> R$ {signal_data['strike']:.2f}\n"
-                f"💵 <b>Preço Spot:</b> R$ {signal_data['spot_price']:.2f}\n\n"
-                f"💡 <b>Recomendação:</b> {signal_data.get('recommended_action', 'N/A')}\n"
-                f"⚠️ <b>Sugestão de Entrada:</b> R$ {signal_data.get('entry_price', 0):.2f}\n\n"
-                f"<i>{signal_data.get('explanation', '')}</i>"
-            )
+        """
+        Send signal to Telegram with retry logic (3 attempts, exponential backoff).
+        """
+        max_retries = 3
+        retry_delay = 1  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                # Get risk info
+                risk_info = signal_data.get('risk_info', {})
+                risk_icon = risk_info.get('icon', '🟡')
+                risk_level = risk_info.get('level', 'MEDIUM')
+                max_loss = risk_info.get('max_loss', 'Consultar')
+                
+                # Rich HTML message
+                message = (
+                    f"<b>🚨 SINAL DETECTADO</b>\n\n"
+                    f"📊 <b>Ativo:</b> {signal_data['ticker']} (R$ {signal_data['spot_price']:.2f})\n"
+                    f"📈 <b>Estratégia:</b> {signal_data['strategy']}\n"
+                    f"🏷️ <b>Opção:</b> <code>{signal_data['option_symbol']}</code>\n"
+                    f"{risk_icon} <b>Risco:</b> {risk_level}\n"
+                    f"💰 <b>Perda Máxima:</b> {max_loss}\n\n"
+                    f"📝 <b>Recomendação:</b> {signal_data.get('recommendation', 'Avaliar')}\n"
+                    f"💡 <b>Motivo:</b> {signal_data.get('reason', 'Sinal detectado')}\n\n"
+                    f"<i>⏰ {signal_data.get('timestamp', 'Agora')}</i>"
+                )
 
-            url = f"https://api.telegram.org/bot{self.telegram_token}/sendMessage"
-            payload = {"chat_id": self.telegram_chat_id, "text": message, "parse_mode": "HTML"}
+                url = f"https://api.telegram.org/bot{self.telegram_token}/sendMessage"
+                payload = {
+                    "chat_id": self.telegram_chat_id, 
+                    "text": message, 
+                    "parse_mode": "HTML"
+                }
 
-            async with httpx.AsyncClient() as client:
-                res = await client.post(url, json=payload, timeout=10.0)
-                if res.status_code == 200:
-                    print(f"[TELEGRAM SENT]: {signal_data['ticker']}")
-                else:
-                    print(f"[TELEGRAM ERROR]: {res.text}")
-        except Exception as e:
-            self.logger.error(f"Telegram failed: {e}")
+                async with httpx.AsyncClient() as client:
+                    res = await client.post(url, json=payload, timeout=10.0)
+                    if res.status_code == 200:
+                        print(f"✅ [TELEGRAM SENT]: {signal_data['ticker']} - {signal_data['strategy']}")
+                        return  # Success, exit retry loop
+                    else:
+                        print(f"⚠️ [TELEGRAM ERROR {attempt+1}/{max_retries}]: {res.status_code}")
+                        
+            except Exception as e:
+                self.logger.error(f"Telegram attempt {attempt+1}/{max_retries} failed: {e}")
+            
+            # Exponential backoff (1s, 2s, 4s)
+            if attempt < max_retries - 1:
+                await asyncio.sleep(retry_delay)
+                retry_delay *= 2
+        
+        # All retries failed
+        print(f"❌ [TELEGRAM FAILED]: {signal_data['ticker']} after {max_retries} attempts")
 
     async def _send_whatsapp(self, signal_data: dict):
         try:

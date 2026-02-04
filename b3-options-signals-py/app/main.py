@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import options, signals, backtest
+from app.routers import options, signals, backtest, admin
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -40,6 +40,7 @@ app.add_middleware(
 app.include_router(options.router)
 app.include_router(signals.router)
 app.include_router(backtest.router)
+app.include_router(admin.router)
 
 @app.get("/")
 def read_root():
