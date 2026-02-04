@@ -9,6 +9,9 @@ import asyncio
 
 router = APIRouter(prefix="/signals", tags=["Signals"])
 
+# Note: Rate limiting is applied via @limiter.limit() decorators in main.py
+# We don't import limiter here to avoid circular imports
+
 @router.post("/scan/{ticker}")
 async def trigger_scan(
     request: Request,
@@ -25,10 +28,6 @@ async def trigger_scan(
     **Rate Limit**: 10 requests/minute
     **Auth**: Requires Bearer token
     """
-    # Rate limiting is handled by decorator in main.py via limiter
-    from app.main import limiter
-    limiter.limit("10/minute")(request)
-    
     results = await scanner.scan_ticker(ticker.upper())
     
     # Save to DB
@@ -54,9 +53,6 @@ async def batch_scan(
     **Rate Limit**: 5 requests/minute
     **Auth**: Requires Bearer token
     """
-    from app.main import limiter
-    limiter.limit("5/minute")(request)
-    
     # Scan all tickers in parallel
     results = await asyncio.gather(*[scanner.scan_ticker(t.upper()) for t in tickers])
     
@@ -97,23 +93,36 @@ def get_signal_history(
     **Rate Limit**: 30 requests/minute
     **Auth**: Requires Bearer token
     """
-    from app.main import limiter
-    limiter.limit("30/minute")(request)
-    
     return crud.get_recent_signals(db, limit)
 
 @router.get("/strategies")
 def list_strategies():
-    from app.core.risk_classifier import get_risk_info
-    
-    return {
-        "active_strategies": [
-            {
-                "name": s.name,
-                "description": s.description,
-                "risk_level": s.risk_level,
-                "risk_info": get_risk_info(s.name)
-            } 
-            for s in scanner.strategies
-        ]
-    }
+    try:
+        from app.core.risk_classifier import get_risk_info
+        
+        strategies_list = []
+        for s in scanner.strategies:
+            try:
+                risk_info = get_risk_info(s.name)
+                strategies_list.append({
+                    "name": s.name,
+                    "description": s.description,
+                    "risk_level": s.risk_level,
+                    "risk_info": risk_info
+                })
+            except Exception as e:
+                print(f"Error processing strategy {s.name}: {e}")
+                # Add without risk_info if it fails
+                strategies_list.append({
+                    "name": s.name,
+                    "description": s.description,
+                    "risk_level": s.risk_level,
+                    "risk_info": {"level": "MEDIUM", "icon": "🟡", "max_loss": "N/A", "description": "Error loading risk info"}
+                })
+        
+        return {"active_strategies": strategies_list}
+    except Exception as e:
+        print(f"FATAL ERROR in list_strategies: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
