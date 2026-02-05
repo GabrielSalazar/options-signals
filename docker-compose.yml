@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./b3-options-signals-py
+      dockerfile: Dockerfile
+    container_name: b3-options-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - ALLOWED_ORIGINS=http://localhost:3000
+      - REDIS_URL=redis://redis:6379
+      - REDIS_ENABLED=true
+    networks:
+      - b3-network
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./b3-options-signals-web
+      dockerfile: Dockerfile
+    container_name: b3-options-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    networks:
+      - b3-network
+    depends_on:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    container_name: b3-options-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - b3-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    command: redis-server --appendonly yes
+
+networks:
+  b3-network:
+    driver: bridge
+
+volumes:
+  redis_data:
