@@ -17,8 +17,8 @@ async def trigger_scan(
     request: Request,
     ticker: str, 
     background_tasks: BackgroundTasks, 
-    db: Session = Depends(get_db),
-    token: str = Depends(verify_token)
+    db: Session = Depends(get_db)
+    # token: str = Depends(verify_token)  # Disabled for local development
 ):
     """
     Trigger a manual scan for a specific ticker (e.g., PETR4).
@@ -26,7 +26,7 @@ async def trigger_scan(
     Persists results to database.
     
     **Rate Limit**: 10 requests/minute
-    **Auth**: Requires Bearer token
+    **Auth**: Public endpoint (auth disabled for development)
     """
     results = await scanner.scan_ticker(ticker.upper())
     
@@ -44,14 +44,14 @@ async def trigger_scan(
 async def batch_scan(
     request: Request,
     tickers: List[str],
-    db: Session = Depends(get_db),
-    token: str = Depends(verify_token)
+    db: Session = Depends(get_db)
+    # token: str = Depends(verify_token)  # Disabled for local development
 ):
     """
     Scan multiple tickers simultaneously (batch operation).
     
     **Rate Limit**: 5 requests/minute
-    **Auth**: Requires Bearer token
+    **Auth**: Public endpoint (auth disabled for development)
     """
     # Scan all tickers in parallel
     results = await asyncio.gather(*[scanner.scan_ticker(t.upper()) for t in tickers])
@@ -84,14 +84,14 @@ def get_watchlist():
 def get_signal_history(
     request: Request,
     limit: int = 50, 
-    db: Session = Depends(get_db),
-    token: str = Depends(verify_token)
+    db: Session = Depends(get_db)
+    # token: str = Depends(verify_token)  # Disabled for local development
 ):
     """
     Retrieve recent signals stored in the database.
     
     **Rate Limit**: 30 requests/minute
-    **Auth**: Requires Bearer token
+    **Auth**: Public endpoint (auth disabled for development)
     """
     return crud.get_recent_signals(db, limit)
 
