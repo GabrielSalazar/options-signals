@@ -16,17 +16,16 @@ class BacktestRequest(BaseModel):
 @router.post("/run")
 async def run_backtest(
     request: Request,
-    req: BacktestRequest,
-    token: str = Depends(verify_token)
+    req: BacktestRequest
+    # token: str = Depends(verify_token)  # Disabled for local development
 ):
     """
     Runs a backtest simulation for a specific strategy and ticker.
     
     **Rate Limit**: 5 requests/minute (computationally expensive)
-    **Auth**: Requires Bearer token
+    **Auth**: Public endpoint (auth disabled for development)
     """
-    from app.main import limiter
-    limiter.limit("5/minute")(request)
+    # Rate limiting is handled via decorators in main.py
     
     # 1. Find the strategy instance
     # Normalizes name comparison
