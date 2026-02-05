@@ -4,6 +4,7 @@ import Link from "next/link"
 import { Activity, BarChart2, BookOpen, ChevronRight, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import LiveFeed from "@/components/LiveFeed"
 
 export default function Dashboard() {
     return (
@@ -16,6 +17,9 @@ export default function Dashboard() {
                         <h1 className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
                             B3 Option Signals
                         </h1>
+                        <span className="ml-2 px-2 py-0.5 bg-emerald-900/30 border border-emerald-500/30 rounded text-[10px] font-bold text-emerald-400 tracking-wider">
+                            DADOS REAIS B3
+                        </span>
                     </div>
                     <nav className="flex gap-4 text-sm text-slate-400">
                         <span className="text-emerald-400">Dashboard</span>
@@ -109,7 +113,12 @@ export default function Dashboard() {
                         </CardContent>
                     </Card>
                 </div>
+
+                <div className="mt-16">
+                    <LiveFeed />
+                </div>
             </main>
         </div>
     )
 }
+
