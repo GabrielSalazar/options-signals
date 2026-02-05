@@ -1,16 +1,59 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, Query
 from sqlalchemy.orm import Session
 from app.services.scanner import scanner
 from app.core.database import get_db
 from app.services import crud
 from app.core.auth import verify_token
-from typing import List
+from typing import List, Optional
 import asyncio
 
 router = APIRouter(prefix="/signals", tags=["Signals"])
 
-# Note: Rate limiting is applied via @limiter.limit() decorators in main.py
-# We don't import limiter here to avoid circular imports
+@router.get("")
+async def get_signals(
+    request: Request,
+    ativos: List[str] = Query(default=["PETR4", "VALE3", "BOVA11"]),
+    min_confidence: float = Query(default=60.0, ge=0, le=100),
+    db: Session = Depends(get_db)
+):
+    """
+    Endpoint principal para buscar sinais filtrados com DADOS REAIS.
+    
+    - Busca cotações e cadeias de opções reais
+    - Calcula indicadores técnicos
+    - Aplica todas as estratégias
+    - Filtra por confiança mínima
+    """
+    # Executa scan para todos os ativos em paralelo
+    results = await asyncio.gather(*[scanner.scan_ticker(t.upper()) for t in ativos])
+    
+    # Flatten results
+    all_signals = []
+    for ticker_res in results:
+        all_signals.extend(ticker_res)
+    
+    # Filtra por score de confiabilidade
+    filtered_signals = [
+        s for s in all_signals 
+        if s.get('confidence_score', 0) >= min_confidence
+    ]
+    
+    # Persiste sinais encontrados
+    for signal in filtered_signals:
+        try:
+            crud.create_signal(db, signal)
+        except Exception as e:
+            print(f"Erro ao salvar sinal no DB: {e}")
+
+    return {
+        "metadata": {
+            "data_source": "real",
+            "tickers_scanned": ativos,
+            "total_signals": len(filtered_signals),
+            "min_confidence": min_confidence
+        },
+        "signals": filtered_signals
+    }
 
 @router.post("/scan/{ticker}")
 async def trigger_scan(
@@ -18,15 +61,9 @@ async def trigger_scan(
     ticker: str, 
     background_tasks: BackgroundTasks, 
     db: Session = Depends(get_db)
-    # token: str = Depends(verify_token)  # Disabled for local development
 ):
     """
     Trigger a manual scan for a specific ticker (e.g., PETR4).
-    Runs strategies and sends alerts if opportunities are found.
-    Persists results to database.
-    
-    **Rate Limit**: 10 requests/minute
-    **Auth**: Public endpoint (auth disabled for development)
     """
     results = await scanner.scan_ticker(ticker.upper())
     
@@ -45,18 +82,12 @@ async def batch_scan(
     request: Request,
     tickers: List[str],
     db: Session = Depends(get_db)
-    # token: str = Depends(verify_token)  # Disabled for local development
 ):
     """
     Scan multiple tickers simultaneously (batch operation).
-    
-    **Rate Limit**: 5 requests/minute
-    **Auth**: Public endpoint (auth disabled for development)
     """
-    # Scan all tickers in parallel
     results = await asyncio.gather(*[scanner.scan_ticker(t.upper()) for t in tickers])
     
-    # Flatten and save to DB
     all_signals = []
     for ticker_results in results:
         for signal in ticker_results:
@@ -85,13 +116,9 @@ def get_signal_history(
     request: Request,
     limit: int = 50, 
     db: Session = Depends(get_db)
-    # token: str = Depends(verify_token)  # Disabled for local development
 ):
     """
     Retrieve recent signals stored in the database.
-    
-    **Rate Limit**: 30 requests/minute
-    **Auth**: Public endpoint (auth disabled for development)
     """
     return crud.get_recent_signals(db, limit)
 
@@ -106,16 +133,15 @@ def list_strategies():
                 risk_info = get_risk_info(s.name)
                 strategies_list.append({
                     "name": s.name,
-                    "description": s.description,
+                    "description": getattr(s, 'description', s.name), # Fallback seguro
                     "risk_level": s.risk_level,
                     "risk_info": risk_info
                 })
             except Exception as e:
                 print(f"Error processing strategy {s.name}: {e}")
-                # Add without risk_info if it fails
                 strategies_list.append({
                     "name": s.name,
-                    "description": s.description,
+                    "description": s.name,
                     "risk_level": s.risk_level,
                     "risk_info": {"level": "MEDIUM", "icon": "🟡", "max_loss": "N/A", "description": "Error loading risk info"}
                 })

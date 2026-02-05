@@ -147,13 +147,14 @@ class VectorizedBacktester:
         return metrics
 
     async def _fetch_historical_data(self, ticker: str, days: int) -> pd.DataFrame:
-        import yfinance as yf
+        from app.data import B3RealData
+        client = B3RealData()
         try:
             # Baixa mais dias para garantir indicadores (buffer)
-            print(f"DEBUG: Downloading {ticker} for {days} days...")
-            start_date = datetime.now() - timedelta(days=days+100)
-            df = yf.download(ticker + ".SA", start=start_date, progress=False, threads=False)
-            print(f"DEBUG: Downloaded {len(df)} rows.")
+            print(f"DEBUG: Fetching historical data for {ticker} via B3RealData...")
+            df = await client.get_historico(ticker, days=days+100)
+            
+            print(f"DEBUG: Fetched {len(df)} rows.")
             if df.empty: return pd.DataFrame()
             
             # Ajuste de colunas para minúsculo
@@ -163,7 +164,12 @@ class VectorizedBacktester:
                 df.columns = df.columns.get_level_values(0)
                 
             # Rename se necessario (Close -> close)
-            df.rename(columns={'close': 'close', 'open': 'open', 'high': 'high', 'low': 'low', 'volume': 'volume'}, inplace=True)
+            # Garante que temos as colunas necessárias
+            rename_map = {
+                'close': 'close', 'adj close': 'close', 
+                'open': 'open', 'high': 'high', 'low': 'low', 'volume': 'volume'
+            }
+            df.rename(columns=rename_map, inplace=True)
             return df
         except Exception as e:
             print(f"Erro download: {e}")
