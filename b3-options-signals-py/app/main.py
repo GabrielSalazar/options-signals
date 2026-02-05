@@ -12,10 +12,21 @@ load_dotenv()
 # Rate Limiter Configuration
 limiter = Limiter(key_func=get_remote_address)
 
+from contextlib import asynccontextmanager
+from app.worker import start_worker
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Inicia o worker de agendamento em background
+    start_worker()
+    yield
+    # Shutdown logic if needed
+
 app = FastAPI(
     title="B3 Option Signals Platform",
     description="API for analyzing and alerting on B3 Stock Options using Black-Scholes and Greeks.",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan
 )
 
 # Add rate limiter to app state
