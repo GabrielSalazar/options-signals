@@ -1,5 +1,11 @@
 # B3 Options Signals - Frontend
 
+![Next JS](https://img.shields.io/badge/Next-black?style=for-the-badge&logo=next.js&logoColor=white)
+![TypeScript](https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)
+![TailwindCSS](https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![Shadcn UI](https://img.shields.io/badge/shadcn%2Fui-000000?style=for-the-badge&logo=shadcnui&logoColor=white)
+![SWR](https://img.shields.io/badge/SWR-black?style=for-the-badge&logo=vercel&logoColor=white)
+
 Modern Dashboard for Options Analytics, built with **Next.js 15**, **Tailwind CSS**, and **Shadcn/UI**.
 
 ## ✨ Features
