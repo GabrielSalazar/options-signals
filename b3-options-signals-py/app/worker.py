@@ -64,13 +64,13 @@ def start_worker():
     scheduler.add_job(
         scheduled_scan, 
         'interval', 
-        minutes=5, 
+        seconds=30, 
         id='market_scanner',
         replace_existing=True
     )
     
     scheduler.start()
-    logger.info("🚀 B3 Worker Iniciado (Agendamento: 5 min)")
+    logger.info("🚀 B3 Worker Iniciado (Agendamento: 30 seg)")
 
 if __name__ == "__main__":
     # Modo Standalone para testes
