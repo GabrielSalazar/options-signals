@@ -10,6 +10,7 @@ from app.core.strategies_vectorized import (
     ProtectivePutStrategy, JadeLizardStrategy, ShortStrangleStrategy
 )
 from app.core.risk_classifier import get_risk_info
+from app.core.filters import ScoreCalculator, RiskManager
 import pandas as pd
 import numpy as np
 import logging
@@ -109,6 +110,7 @@ class SignalScanner:
 
         all_signals = []
         
+
         # 4. Aplica Estratégias
         for strategy in self.strategies:
             try:
@@ -119,14 +121,13 @@ class SignalScanner:
                     for _, row in signal_df.iterrows():
                         risk_info = get_risk_info(strategy.name)
                         
-                        # Calcula score de confiança básico (será aprimorado no filters.py)
-                        confidence = 60
-                        if rsi < 30 or rsi > 70: confidence += 20
-                        if row.get('iv', 0) > 0.5: confidence += 10
+                        # Prepara dados para o ScoreCalculator
+                        # O row (series) contem dados da opção, technicals vem do signal_dict ou context
                         
+                        # Constrói o dicionário preliminar do sinal
                         signal_dict = {
                             "strategy": row.get('strategy', strategy.name),
-                            "ticker": row.get('symbol', 'ESTRUTURA'), # Opção ou Estrutura
+                            "ticker": row.get('symbol', 'ESTRUTURA'),
                             "underlying": ticker,
                             "spot_price": spot_price,
                             "signal_type": row.get('signal_type', 'SIGNAL'),
@@ -135,21 +136,34 @@ class SignalScanner:
                             "recommendation": row.get('recommended_action', ''),
                             "risk_level": row.get('risk_level', strategy.risk_level),
                             "risk_info": risk_info,
-                            "confidence_score": min(confidence, 100),
                             "technicals": {
                                 "rsi": rsi,
                                 "iv": row.get('iv', 0)
                             },
-                            "legs": [
-                                # Simplificação: por enquanto retorna a própria opção como leg
+                             "legs": [
                                 {
                                     "symbol": row.get('symbol'),
                                     "strike": row.get('strike'),
                                     "type": row.get('type'),
-                                    "action": row.get('signal_type', '').split(' ')[0] # SELL ou BUY
+                                    "action": row.get('signal_type', '').split(' ')[0],
+                                    "bid": row.get('bid', 0),
+                                    "ask": row.get('ask', 0),
+                                    "volume": row.get('volume', 0),
+                                    "delta": row.get('delta', 0),
+                                    "time_to_expiry": row.get('time_to_expiry', 0)
                                 }
                             ]
                         }
+                        
+                        # Calcula Score e Risk Flags usando o módulo filters
+                        # Passamos o row (que atua como chain_row) para dados de liquidez/gregas
+                        # Converter row p/ dict para segurança
+                        chain_row_dict = row.to_dict()
+                        score = ScoreCalculator.calculate_score(signal_dict, chain_row_dict)
+                        flags = RiskManager.get_risk_flags(signal_dict, chain_row_dict)
+                        
+                        signal_dict['confidence_score'] = score
+                        signal_dict['risk_flags'] = flags
                         
                         all_signals.append(signal_dict)
                         # Fire and forget alert
