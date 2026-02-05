@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+httpx
+yfinance
+py_vollib
+pandas
+numpy
+python-dotenv
+pandas_ta
+quantstats
