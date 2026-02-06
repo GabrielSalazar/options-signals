@@ -48,7 +48,7 @@ export default function EquityChart({ data }: EquityChartProps) {
                             <Tooltip
                                 contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f1f5f9' }}
                                 itemStyle={{ color: '#10b981' }}
-                                formatter={(value: number) => [`R$ ${value.toFixed(2)}`, "Equity"]}
+                                formatter={(value: number | undefined) => [`R$ ${value?.toFixed(2) ?? "0.00"}`, "Equity"]}
                                 labelFormatter={(label) => `Day ${label}`}
                             />
                             <Line
