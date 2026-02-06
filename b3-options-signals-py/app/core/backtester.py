@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-import pandas_ta as ta
+import pandas_ta_classic as ta
 # import quantstats as qs # Lazy import
 from app.core.strategies_vectorized import VectorizedStrategy
 from app.services.math_service import OptionMath

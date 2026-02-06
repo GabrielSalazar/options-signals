@@ -10,7 +10,7 @@ Usa TA-lib e pandas_ta para calcular:
 """
 
 import pandas as pd
-import pandas_ta as ta
+import pandas_ta_classic as ta
 from typing import Dict, Optional
 import logging
 from datetime import datetime
