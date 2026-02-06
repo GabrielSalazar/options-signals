@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request
+import os
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import options, signals, backtest, admin, health
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -38,14 +39,11 @@ from app.core.database import engine, Base
 Base.metadata.create_all(bind=engine)
 
 # CORS Configuration
-origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
