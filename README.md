@@ -1,12 +1,12 @@
 # 🚀 B3 Options Signals (Scanner & Backtester)
 
-![Next JS](https://img.shields.io/badge/Next.js-16.1.x-black?style=for-the-badge&logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
-![Prisma](https://img.shields.io/badge/Prisma-ORM-2D3748?style=for-the-badge&logo=prisma)
-![Supabase](https://img.shields.io/badge/Supabase-Postgres-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
-![Auth](https://img.shields.io/badge/Auth.js-Enabled-22c55e?style=for-the-badge)
-![Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-000000?style=for-the-badge&logo=vercel)
-![Mobile](https://img.shields.io/badge/Mobile-Optimized-16a34a?style=for-the-badge)
+![Next JS](https://img.shields.io/badge/Next.js-black?logo=next.js&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?logo=supabase&logoColor=white)
+![Fly.io](https://img.shields.io/badge/Fly.io-853bce?logo=flydotio&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white)
 
 Plataforma profissional para identificação, análise e backtesting de oportunidades no mercado de Opções da B3 (Brasil).
 
