@@ -94,7 +94,7 @@ export default function AlertsPage() {
                                                     {signal.strategy}
                                                 </td>
                                                 <td className={`px-4 py-3 font-semibold ${signal.signal_type.includes('BUY') ? 'text-green-400' :
-                                                        signal.signal_type.includes('SELL') ? 'text-red-400' : 'text-blue-400'
+                                                    signal.signal_type.includes('SELL') ? 'text-red-400' : 'text-blue-400'
                                                     }`}>
                                                     {signal.signal_type}
                                                 </td>
@@ -103,8 +103,8 @@ export default function AlertsPage() {
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <Badge variant="outline" className={`
-                                                        ${signal.risk_level === 'Alto' ? 'border-red-500/50 text-red-500' :
-                                                            signal.risk_level === 'Médio' ? 'border-yellow-500/50 text-yellow-500' :
+                                                        ${signal.risk_level === 'HIGH' ? 'border-red-500/50 text-red-500' :
+                                                            signal.risk_level === 'MEDIUM' ? 'border-yellow-500/50 text-yellow-500' :
                                                                 'border-green-500/50 text-green-500'}
                                                     `}>
                                                         {signal.risk_level}
