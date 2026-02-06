@@ -1,5 +1,5 @@
 # Stage 1: Build & Install Dependencies
-FROM python:3.10-slim as builder
+FROM python:3.11-slim as builder
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ RUN pip install --upgrade pip && \
     pip install --user --no-cache-dir -r requirements.txt
 
 # Stage 2: Runtime
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
