@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: b3-options-signals-backend
+    runtime: docker
+    rootDirectory: b3-options-signals-py
+    plan: free
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: ALLOWED_ORIGINS
+        generate: true # Placeholder for user to fill
+      - key: TELEGRAM_BOT_TOKEN
+        generate: true # Placeholder for user to fill
