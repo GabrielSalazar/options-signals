@@ -1,83 +1,80 @@
 # 🚀 Guia de Deploy em Produção
 
-Este guia descreve o passo-a-passo para colocar o **B3 Options Signals** no ar (Live) utilizando serviços modernos de nuvem.
+Este guia descreve opções para colocar o **B3 Options Signals** no ar.
 
 ---
 
-## 🏗️ 1. Backend (Railway)
+## 🛠️ Opção 1: Render (Recomendado - Grátis)
 
-O Backend será hospedado no **Railway**, que oferece suporte nativo a FastAPI, Docker e Redis.
+O **Render** possui um plano gratuito ("Free Instance") que suporta Docker e Python, ideal para testes sem cartão de crédito.
 
-### Passos:
+### 1. Backend (Python) no Render:
 
-1.  Crie uma conta em [railway.app](https://railway.app).
-2.  Clique em **"New Project"** -> **"Deploy from GitHub repo"**.
-3.  Selecione o repositório `options-signals`.
-4.  O Railway detectará automaticamente o `Dockerfile` na pasta `b3-options-signals-py`.
-    *   *Nota*: Se ele não detectar a pasta raiz, configure o **Root Directory** nas configurações do serviço para `/b3-options-signals-py`.
+1.  Crie conta em [render.com](https://render.com).
+2.  Clique **New +** -> **Web Service**.
+3.  Conecte seu GitHub e selecione o repositório `options-signals`.
+4.  Configure:
+    *   **Name**: `b3-backend`
+    *   **Root Directory**: `b3-options-signals-py` (⚠️ IMPORTANTE)
+    *   **Runtime**: **Docker** (Ele usará o Dockerfile que criamos)
+    *   **Free Instance Type**: Selecione a opção Free.
+5.  **Environment Variables** (Advanced):
+    *   `PORT`: `8000`
+    *   `ALLOWED_ORIGINS`: `https://seu-frontend.vercel.app` (Preencha depois de criar o frontend)
+    *   `TELEGRAM_BOT_TOKEN`: `...`
+6.  Clique em **Create Web Service**.
 
-### Variáveis de Ambiente (Railway):
+> *Nota: O plano free do Render "dorme" após inatividade. O primeiro request pode levar 50s para acordar.*
 
-Configure as seguintes variáveis na aba **Variables**:
+---
 
-| Variável | Valor Exemplo | Descrição |
+## 🚂 Opção 2: Railway (Melhor Performance)
+
+Se você preferir o Railway (que deu erro de *Railpack*), o problema é a **pasta raiz**. Como temos backend e frontend no mesmo repositório, precisamos indicar onde está o código.
+
+### Correção do Erro "Fail to create build plan":
+
+1.  No seu projeto Railway, clique no serviço `options-signals`.
+2.  Vá em **Settings**.
+3.  Procure por **Root Directory**.
+4.  Mude de `/` para `/b3-options-signals-py`.
+5.  O Railway vai disparar um novo deploy automaticamente e deve funcionar!
+
+---
+
+## 🎨 Frontend (Vercel)
+
+O Frontend deve ser hospedado na **Vercel** (Melhor opção para Next.js).
+
+1.  Crie conta em [vercel.com](https://vercel.com).
+2.  **Add New Project** -> Importe `options-signals`.
+3.  **Framework Preset**: Next.js.
+4.  **Root Directory**: Clique em Edit e selecione `b3-options-signals-web`.
+5.  **Environment Variables**:
+    *   `NEXT_PUBLIC_API_URL`: A URL do seu backend (ex: `https://b3-backend.onrender.com` ou Railway URL).
+6.  Clique em **Deploy**.
+
+---
+
+## 🔄 Resumo das Variáveis
+
+| Serviço | Variável | Valor |
 | :--- | :--- | :--- |
-| `PORT` | `8000` | Porta interna do container |
-| `ALLOWED_ORIGINS` | `https://seu-frontend.vercel.app` | URL do frontend (após deploy) |
-| `TELEGRAM_BOT_TOKEN` | `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11` | Seu token do BotFather |
-| `TELEGRAM_CHAT_ID` | `-100123456789` | ID do canal/grupo de alertas |
-| `REDIS_ENABLED` | `true` | Ativar cache |
-
-> **Dica**: Adicione um serviço **Redis** no mesmo projeto do Railway. O Railway injetará automaticamente a variável `REDIS_URL`.
+| **Backend** | `ALLOWED_ORIGINS` | URL do Frontend (sem a barra final `/`) |
+| **Backend** | `TELEGRAM_BOT_TOKEN` | Seu token do BotFather |
+| **Frontend** | `NEXT_PUBLIC_API_URL` | URL do Backend (ex: `https://...`) |
 
 ---
 
-## 🎨 2. Frontend (Vercel)
+## ⚠️ Troubleshooting Comum
 
-O Frontend será hospedado na **Vercel**, otimizada para Next.js.
+1.  **Erro de CORS (Bloqueio no navegador)**:
+    *   Acesse os logs do Backend. Se vir algo como "Origin ... not allowed", adicione a URL exata do frontend na variável `ALLOWED_ORIGINS` do backend.
 
-### Passos:
+2.  **Frontend Quebrado (404/500)**:
+    *   Verifique se `NEXT_PUBLIC_API_URL` não tem uma barra `/` no final.
+    *   Certo: `https://api.com`
+    *   Errado: `https://api.com/`
 
-1.  Crie uma conta em [vercel.com](https://vercel.com).
-2.  Clique em **"Add New..."** -> **"Project"**.
-3.  Importe o repositório `options-signals`.
-4.  Nas configurações de **Build & Output Settings**:
-    *   **Root Directory**: Selecione `b3-options-signals-web` (clique em Edit).
-    *   **Framework Preset**: Next.js (automático).
-
-### Variáveis de Ambiente (Vercel):
-
-| Variável | Valor | Descrição |
-| :--- | :--- | :--- |
-| `NEXT_PUBLIC_API_URL` | `https://web-production-xxxx.up.railway.app` | URL do seu backend no Railway |
-
-> **Importante**: O deploy do Backend deve ser feito **antes** para que você tenha a URL para colocar aqui.
-
----
-
-## 🔄 3. Fluxo de Atualização (CI/CD)
-
-Como o projeto está conectado ao GitHub:
-
-1.  Qualquer **push** para a branch `main` disparará automaticamente um novo deploy no Railway e na Vercel.
-2.  Você pode monitorar os logs de build diretamente nos painéis de controle de cada serviço.
-
----
-
-## 🩺 4. Verificação Pós-Deploy
-
-Após o deploy, teste se tudo está funcionando:
-
-1.  **Backend Health**: Acesse `https://seu-backend.up.railway.app/health`
-    *   Deve retornar `{"status": "healthy", ...}`.
-2.  **Frontend**: Acesse `https://seu-frontend.vercel.app`
-    *   Verifique se o badge **"DADOS REAIS B3"** aparece.
-    *   Teste o **Scanner** com o ticker `PETR4`.
-
----
-
-## ⚠️ Troubleshooting
-
-*   **Erro de CORS**: Verifique se a variável `ALLOWED_ORIGINS` no Backend contém EXATAMENTE a URL do Frontend (sem barra no final).
-*   **Erro de Build no Vercel**: Verifique se o comando de build está rodando `npm install` e `npm run build` corretamente na pasta certa.
-*   **Telegram não envia**: Verifique se o bot foi iniciado (`/start`) e se o `CHAT_ID` está correto e o bot é administrador do canal.
+3.  **Render lento**:
+    *   No plano free, o servidor desliga se ninguém usar. Mande um comando `/start` no Telegram para "acordar" ele antes de usar o site.
