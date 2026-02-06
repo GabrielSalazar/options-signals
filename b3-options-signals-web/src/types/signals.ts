@@ -8,7 +8,7 @@ export interface Signal {
     timestamp: string;
     recommendation?: string;
     recommended_action?: string;
-    risk_level: string; // 'LOW' | 'MEDIUM' | 'HIGH' | 'UNLIMITED'
+    risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'UNLIMITED';
 
     // New fields from Day 3
     confidence_score?: number;
