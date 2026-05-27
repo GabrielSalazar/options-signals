@@ -1,0 +1,27 @@
+# GitHub Repository Structure Verification
+
+## Status
+✅ All files at project root
+✅ No duplicate folders
+✅ Repository structure is clean
+
+## Root Files (26)
+- Documentation: README.md, README.pt-BR.md, STRUCTURE.txt, etc
+- Configuration: package.json, tsconfig.json, Dockerfile, etc
+- Backend: main.py, core_engine.py, indicators.py, etc
+- Metadata: CLEANUP_LOG.txt, etc
+
+## Directories
+- src/ (Frontend)
+- docs/ (Documentation)
+- gregas/ (Strategies)
+- public/ (Assets)
+- supabase/ (Config)
+- node_modules/ (Dependencies)
+- __pycache__/ (Cache)
+
+## Note for GitHub Display
+If GitHub shows "options-signals/options-signals" in breadcrumb,
+it's a display artifact. Actual repository has no nested folders.
+All files are correctly positioned at root level.
+

@@ -1,0 +1,71 @@
+# B3 Options Signals - Final Project Structure
+
+## Root Level Files (Raiz do Projeto)
+
+### Documentation (4 files)
+- README.md (1,361 lines - English)
+- README.pt-BR.md (1,360 lines - Portuguese)
+- README_REWRITE_SUMMARY.md (164 lines)
+- REWRITE_ANALYSIS.md (569 lines)
+
+### Configuration
+- package.json (Next.js + dependencies)
+- tsconfig.json (TypeScript)
+- tailwind.config.ts
+- postcss.config.mjs
+- eslint.config.mjs
+- next.config.ts
+- requirements.txt (Python)
+- Dockerfile
+- docker-compose.yml
+- .gitignore
+- .dockerignore
+
+### Backend Python (9 files)
+- main.py (684 lines)
+- core_engine.py (285 lines)
+- indicators.py
+- options_math.py
+- backtest.py
+- config.py
+- cache.py
+- data_providers.py
+- scanner_opcoes_b3_v3.py
+
+### Logs & Metadata
+- CLEANUP_LOG.txt
+- next-env.d.ts
+
+## Directories
+
+### Frontend
+- src/ (TypeScript + React)
+  ├── app/ (8 pages)
+  ├── components/ (25+ components)
+  ├── lib/ (utilities)
+  ├── context/ (auth)
+  ├── hooks/ (custom hooks)
+  └── types/ (TypeScript definitions)
+
+- public/ (Next.js static assets)
+
+### Documentation
+- docs/ (8 specialized documents)
+- gregas/ (3 strategy documents)
+
+### Infrastructure
+- supabase/ (Supabase configuration)
+- node_modules/ (installed dependencies)
+- __pycache__/ (Python cache)
+
+## Status
+
+✅ NO DUPLICATE FOLDERS
+✅ ALL FILES IN ROOT (where they belong)
+✅ CLEAN REPOSITORY STRUCTURE
+✅ READY FOR PRODUCTION
+
+Total commits: 6
+Last commit: a09fc3b (cleanup)
+Branch: main
+Status: Clean (nothing to commit)
