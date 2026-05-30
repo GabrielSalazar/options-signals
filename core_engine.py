@@ -1,7 +1,8 @@
 import yfinance as yf
 import pandas as pd
 import logging
-from config import CONFIG, OTM_POR_ATIVO, is_reentrada_valida, registrar_sinal, score_horario
+from datetime import datetime, timedelta
+from config import CONFIG, OTM_POR_ATIVO, OTM_DEFAULT, is_reentrada_valida, registrar_sinal, score_horario
 from cache import cache_get_df, cache_set_df
 from indicators import (
     calcular_indicadores,
@@ -10,7 +11,9 @@ from indicators import (
     detectar_canal_linear
 )
 from options_math import mes_vencimento_ideal, estimar_iv_historica, estimar_premio_otm
-from data_providers import get_real_options_from_opcoes_net
+from data_providers import get_real_options_from_opcoes_net, fetch_brapi_historical
+from greeks import calculate_greeks, implied_volatility
+from scoring import score_ponderado
 
 logger = logging.getLogger("b3_scanner")
 
@@ -44,10 +47,19 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
                     except Exception as e:
                         if tentativa == max_retries - 1:
                             if verbose:
-                                logger.error(f"Falha ao baixar dados para {ticker} após {max_retries} tentativas: {e}")
-                            return None
+                                logger.warning(f"yfinance falhou para {ticker} após {max_retries} tentativas: {e}. Tentando brapi...")
+                            df = None
+                            break
                         import time
                         time.sleep(2 ** tentativa) # Exponential backoff: 1s, 2s, 4s
+
+                # Fallback brapi se yfinance falhou ou retornou vazio
+                if df is None or df.empty:
+                    df = fetch_brapi_historical(ticker, range_=period, interval=interval)
+                    if df is not None and not df.empty:
+                        cache_set_df(cache_key, df, ttl=300)
+                        if verbose:
+                            logger.info(f"📡 {ticker}: dados via brapi (fallback)")
         
         if df is None or len(df) < 30:
             return None
@@ -89,7 +101,6 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
         res20        = float(ultimo.get("resistencia_20",preco))
         vol_ratio    = volume / vol_med if vol_med > 0 else 1.0
         bb_lo        = float(ultimo.get("bb_lower",     0))
-        bb_up        = float(ultimo.get("bb_upper", preco*2))
 
         # ── GATILHOS DE ALTA ─────────────────────────────────────────────
         if (stoch_k < CONFIG["stoch_oversold"] + 10 and stoch_k > stoch_d and stoch_k_prev <= stoch_d_prev):
@@ -205,7 +216,7 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
             emoji         = "🔴"
 
         # ── ESTRUTURA DO SINAL ────────────────────────────────────────────
-        dist_otm   = OTM_POR_ATIVO.get(ticker_base, 0.07)
+        dist_otm   = OTM_POR_ATIVO.get(ticker_base, OTM_DEFAULT)
         strike_ref = round(
             preco * (1 - dist_otm) if tipo_sinal == "PUT" else preco * (1 + dist_otm), 2
         )
@@ -224,16 +235,39 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
             preco_tela = None
             ticker_opcao = "N/A (S/ Liquidez)"
 
+        # Greeks: se há preço REAL de tela, derivamos IV de mercado e usamos no BS
+        T = max(dte, 1) / 252
+        iv_mercado = None
+        sigma_para_greeks = iv
+        if preco_tela:
+            try:
+                iv_mercado = implied_volatility(
+                    preco, strike_ref, T, preco_tela, tipo_sinal, sigma_init=iv,
+                )
+                if 0.05 <= iv_mercado <= 3.0:
+                    sigma_para_greeks = iv_mercado
+            except Exception:
+                iv_mercado = None
+        greeks = calculate_greeks(preco, strike_ref, T, sigma_para_greeks, tipo_sinal)
+
+        delta_abs = abs(greeks["delta"])
+        if delta_abs and not (CONFIG.get("delta_min", 0.0) <= delta_abs <= CONFIG.get("delta_max", 1.0)):
+            if verbose:
+                logger.info(f"⚠ {ticker_base}: |delta|={delta_abs:.2f} fora da faixa OTM ideal")
+            return None
+
         # O preço de tela vira a nossa entrada principal, se existir
         preco_base_calculo = preco_tela if preco_tela else premio_est
 
-        entrada_min  = round(preco_base_calculo * 0.90, 2)
-        entrada_max  = round(preco_base_calculo * 1.10, 2)
+        band = CONFIG.get("buy_band_pct", 0.035)
+        entrada_min  = round(preco_base_calculo * (1 - band), 2)
+        entrada_max  = round(preco_base_calculo * (1 + band), 2)
         alvo1        = round(preco_base_calculo * (1 + CONFIG["alvo1_pct"]),     2)
         alvo2        = round(preco_base_calculo * (1 + CONFIG["alvo2_pct"]),     2)
         alvo_final   = round(preco_base_calculo * (1 + CONFIG["alvo_final_pct"]),2)
         stop         = round(preco_base_calculo * (1 + CONFIG["stop_pct"]),      2)
 
+        book_until   = (datetime.now() + timedelta(days=CONFIG.get("book_days", 7))).strftime("%d/%m")
         risco        = preco_base_calculo - stop
         rr_alvo1     = round((alvo1 - preco_base_calculo) / risco, 2) if risco > 0 else 0
         rr_alvo2     = round((alvo2 - preco_base_calculo) / risco, 2) if risco > 0 else 0
@@ -247,6 +281,28 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
         if df_provided is None:
             registrar_sinal(ticker_base)
 
+        # ── SHADOW MODE: calcula score ponderado em paralelo ───────────────
+        try:
+            score_pond = score_ponderado(
+                ultimo, penult,
+                option_price=(preco_tela if preco_tela else premio_est),
+                dte=dte, greeks=greeks, direction=tipo_sinal,
+            )
+            shadow_score = score_pond["score"]
+            shadow_signal = score_pond["signal"]
+            shadow_reasons = score_pond["reasons"]
+        except Exception as e:
+            if verbose:
+                logger.warning(f"shadow score falhou para {ticker_base}: {e}")
+            shadow_score, shadow_signal, shadow_reasons = None, None, []
+
+        # No modo "ponderado" o ponderado decide; "classico" mantém comportamento atual
+        if CONFIG.get("scoring_mode") == "ponderado":
+            if not shadow_signal:
+                if verbose:
+                    logger.info(f"⚠ {ticker_base}: score ponderado {shadow_score} abaixo do limiar")
+                return None
+
         return {
             "emoji":        emoji,
             "ticker":       ticker_base,
@@ -258,6 +314,7 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
             "strike_ref":   strike_ref,
             "dist_otm_pct": dist_otm * 100,
             "iv_hist":      round(iv * 100, 1),
+            "iv_mercado":   round(iv_mercado * 100, 1) if iv_mercado else None,
             "dte":          dte,
             "mes_venc":     mes_v,
             "ano_venc":     ano_v,
@@ -269,6 +326,11 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
             "alvo2":        alvo2,
             "alvo_final":   alvo_final,
             "stop":         stop,
+            "book_until":   book_until,
+            "greeks":       greeks,
+            "score_ponderado": shadow_score,
+            "ponderado_passou": shadow_signal,
+            "ponderado_reasons": shadow_reasons,
             "rr_alvo1":     rr_alvo1,
             "rr_alvo2":     rr_alvo2,
             "rr_final":     rr_final,
