@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { calcAll, callPrice, putPrice, calcD1, normalCDF, normalPDF } from '@/lib/black-scholes';
 import { Slider } from '@/components/ui/slider';
 import {
@@ -46,16 +46,26 @@ type ChartTab = 'payoff' | 'greeks' | 'comparison';
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function GreeksCalculator() {
+export default function GreeksCalculator({ realData }: { realData?: { S: number, K: number, T: number, sigma: number, optType: 'call'|'put' } }) {
   // State
   const [S, setS] = useState(100);
   const [K, setK] = useState(100);
   const [sigma, setSigma] = useState(25);
   const [T, setT] = useState(30);
-  const [r, setR] = useState(14.75);
+  const [r, setR] = useState(13.5); // Selic
   const [q, setQ] = useState(0);
   const [optionType, setOptionType] = useState<'call' | 'put'>('call');
   const [chartTab, setChartTab] = useState<ChartTab>('payoff');
+
+  useEffect(() => {
+     if (realData) {
+         setS(realData.S);
+         setK(realData.K);
+         setT(Math.max(1, realData.T));
+         setSigma(realData.sigma);
+         setOptionType(realData.optType);
+     }
+  }, [realData]);
 
   // Core calculation (recalculates on any input change)
   const bs = useMemo(

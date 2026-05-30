@@ -72,6 +72,9 @@ export default function MarketWidget() {
     const [opcoesAttempted, setOpcoesAttempted] = useState(false)
     const [opcoesLastUpdate, setOpcoesLastUpdate] = useState<Date | null>(null)
 
+    const [opcoesTicker, setOpcoesTicker] = useState("PETR4")
+    const [opcoesTickerInput, setOpcoesTickerInput] = useState("PETR4")
+
     const fetchMarket = useCallback(async () => {
         try {
             const res = await api.get("/market")
@@ -87,8 +90,8 @@ export default function MarketWidget() {
     const fetchOpcoes = useCallback(async () => {
         setOpcoesLoading(true)
         try {
-            const res = await api.get("/market/opcoes")
-            setOpcoes(res.data?.opcoes ?? null)
+            const res = await api.get(`/market/opcoes/chain/${opcoesTicker}`)
+            setOpcoes(res.data?.chain ?? null)
             setOpcoesLastUpdate(new Date())
         } catch {
             setOpcoes(null) // mantém null → frontend usa fallback
@@ -96,7 +99,7 @@ export default function MarketWidget() {
             setOpcoesLoading(false)
             setOpcoesAttempted(true)
         }
-    }, [])
+    }, [opcoesTicker])
 
     useEffect(() => {
         fetchMarket()
@@ -157,11 +160,36 @@ export default function MarketWidget() {
                     <table className="mkt-table">
                         <thead>
                             {activeTab === 2 ? (
-                                <tr>
-                                    <th>Ticker</th>
-                                    <th>Preço</th>
-                                    <th>Strike</th>
-                                </tr>
+                                <>
+                                    <tr>
+                                        <td colSpan={3} className="p-2">
+                                            <form
+                                                onSubmit={(e) => {
+                                                    e.preventDefault()
+                                                    setOpcoesTicker(opcoesTickerInput.toUpperCase())
+                                                }}
+                                                className="flex gap-2"
+                                            >
+                                                <input
+                                                    type="text"
+                                                    value={opcoesTickerInput}
+                                                    onChange={(e) => setOpcoesTickerInput(e.target.value)}
+                                                    placeholder="Ticker (ex: PETR4)"
+                                                    className="w-full text-xs px-2 py-1 rounded bg-transparent border focus:outline-none"
+                                                    style={{ borderColor: "var(--dw-rule)", color: "var(--dw-ink)" }}
+                                                />
+                                                <button type="submit" className="text-xs px-2 rounded btn-secondary">
+                                                    Buscar
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Ticker</th>
+                                        <th>Preço</th>
+                                        <th>Strike</th>
+                                    </tr>
+                                </>
                             ) : (
                                 <tr>
                                     <th>Ticker</th>

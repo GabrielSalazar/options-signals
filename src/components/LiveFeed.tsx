@@ -1,12 +1,38 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useSignals } from '@/hooks/useSignals';
 import SignalCard from '@/components/SignalCard';
 import { Activity, RefreshCw } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function LiveFeed() {
     const { signals, isLoading, isError, mutate } = useSignals(true);
+
+    useEffect(() => {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const ev = new EventSource(`${baseUrl}/signals/alerts/stream`);
+        
+        ev.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                toast.success(`Novo Sinal de ${data.tipo_sinal}: ${data.ticker}`, {
+                    duration: 5000,
+                    icon: '🚀',
+                    style: {
+                        background: 'var(--dw-bg)',
+                        color: 'var(--dw-ink)',
+                        border: '1px solid var(--dw-rule)',
+                    },
+                });
+                mutate();
+            } catch (err) {
+                console.error("Erro ao fazer parse do evento SSE", err);
+            }
+        };
+
+        return () => ev.close();
+    }, [mutate]);
 
     if (isError) {
         return (

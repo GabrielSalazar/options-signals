@@ -281,7 +281,15 @@ export default function AnalyticsPage() {
 
       {/* ── Bloco 2: Gregas Interativo ── */}
       <div className="my-6">
-        <GreeksCalculator />
+        <GreeksCalculator 
+           realData={signals.length > 0 ? {
+              S: signals[0].preco_acao,
+              K: signals[0].strike_ref,
+              T: signals[0].dte,
+              sigma: signals[0].iv_hist,
+              optType: signals[0].tipo_sinal.toLowerCase() as 'call' | 'put'
+           } : undefined}
+        />
       </div>
 
       {/* IV Surface */}
