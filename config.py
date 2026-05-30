@@ -15,18 +15,27 @@ CONFIG = {
     "ema_slow":          21,
     "volume_mult":       1.5,
 
-    # ── Gestão de risco ────────────────────────────────────────────────────
-    "stop_pct":          -0.42,
+    # ── Gestão de risco (calibrado sobre 31 sinais reais) ──────────────────
+    "stop_pct":          -0.43,
     "alvo1_pct":         0.25,
-    "alvo2_pct":         1.50,
-    "alvo_final_pct":    4.00,
+    "alvo2_pct":         2.50,
+    "alvo_final_pct":    7.00,
     "rr_minimo":         0.8,
+    "buy_band_pct":      0.035,   # faixa de compra = ±3,5% do preço central
+    "book_days":         7,       # validade da ordem no book (dias corridos)
 
     # ── Filtros ────────────────────────────────────────────────────────────
     "min_volume_diario":    1_000_000,
     "min_variacao_gatilho": 0.015,
     "lookback_dias":        30,
     "min_score":            5,
+    "scoring_mode":        "classico",  # "classico" | "ponderado"
+    "min_score_ponderado": 60,           # limiar para modo ponderado (0-100)
+    "delta_min":           0.15,         # filtro de qualidade |delta| mínimo
+    "delta_max":           0.45,         # filtro de qualidade |delta| máximo
+    "option_price_min":    0.10,         # preço mínimo da opção (R$)
+    "option_price_max":    3.00,         # preço máximo da opção (R$)
+    "min_negocios_opcao":  10,           # nº mínimo de negócios na opção (proxy de OI/liquidez)
 
     # ── DTE (Days to Expiration) ───────────────────────────────────────────
     "dte_minimo":   10,
@@ -70,6 +79,29 @@ ATIVOS_B3 = {
     "MRVE3.SA":  "MRV Engenharia",
     "BOVA11.SA": "ETF IBOVESPA",
     "RANI3.SA":  "Irani Papel",
+    "COGN3.SA":  "Cogna Educação",
+    "EMBR3.SA":  "Embraer",
+    "RENT3.SA":  "Localiza",
+    "PRIO3.SA":  "PRIO",
+    "RAIL3.SA":  "Rumo",
+    "ENEV3.SA":  "Eneva",
+    "EQTL3.SA":  "Equatorial",
+    "CSAN3.SA":  "Cosan",
+    "HAPV3.SA":  "Hapvida",
+    "HYPE3.SA":  "Hypera",
+    "RDOR3.SA":  "Rede D'Or",
+    "NTCO3.SA":  "Natura",
+    "CPLE6.SA":  "Copel",
+    "CYRE3.SA":  "Cyrela",
+    "TIMS3.SA":  "TIM",
+    "VBBR3.SA":  "Vibra Energia",
+    "VIVT3.SA":  "Vivo",
+    "YDUQ3.SA":  "YDUQS",
+    "MULT3.SA":  "Multiplan",
+    "PCAR3.SA":  "Grupo Pão de Açúcar",
+    "MRFG3.SA":  "Marfrig",
+    "BBDC3.SA":  "Bradesco ON",
+    "ITUB3.SA":  "Itaú Unibanco ON",
 }
 
 OTM_POR_ATIVO = {
@@ -81,7 +113,31 @@ OTM_POR_ATIVO = {
     "BBAS3":  0.05,  "SANB11":0.05,  "B3SA3":  0.06,  "BPAC11":0.05,
     "WEGE3":  0.06,  "EGIE3": 0.05,  "KLBN11": 0.07,
     "BOVA11": 0.04,  "RANI3": 0.08,
+    "COGN3": 0.10,  "EMBR3": 0.07,  "RENT3": 0.06,  "PRIO3": 0.07,
+    "RAIL3": 0.07,  "ENEV3": 0.08,  "EQTL3": 0.06,  "CSAN3": 0.08,
+    "HAPV3": 0.09,  "HYPE3": 0.07,  "RDOR3": 0.06,  "NTCO3": 0.09,
+    "CPLE6": 0.06,  "CYRE3": 0.08,  "TIMS3": 0.06,  "VBBR3": 0.07,
+    "VIVT3": 0.05,  "YDUQ3": 0.09,  "MULT3": 0.07,  "PCAR3": 0.10,
+    "MRFG3": 0.10,  "BBDC3": 0.06,  "ITUB3": 0.06,
 }
+
+OTM_DEFAULT = 0.08  # distância OTM default para tickers fora do dicionário curado
+
+
+def get_all_b3_assets() -> dict:
+    """
+    Retorna ATIVOS_B3 mesclado com todos os tickers da B3 via brapi.
+    Tickers desconhecidos recebem o próprio código como nome.
+    Em caso de falha da brapi, devolve apenas a lista curada.
+    """
+    from data_providers import fetch_all_b3_tickers
+    merged = dict(ATIVOS_B3)
+    for t in fetch_all_b3_tickers():
+        key = f"{t}.SA"
+        if key not in merged:
+            merged[key] = t
+    return merged
+
 
 _historico_sinais = {}
 
