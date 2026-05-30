@@ -15,7 +15,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
 
-from config import ATIVOS_B3, CONFIG
+from config import ATIVOS_B3, CONFIG, get_all_b3_assets
 from core_engine import analisar_ativo
 from cache import redis_status
 from scanner_opcoes_b3_v3 import enviar_telegram
@@ -114,6 +114,11 @@ def persist_signals(sinais: list[dict]):
             "rsi":           s.get("rsi"),
             "vol_ratio":     s.get("vol_ratio"),
             "gatilhos":      s.get("gatilhos", []),
+            "book_until":    s.get("book_until"),
+            "greeks":        s.get("greeks"),
+            "score_ponderado": s.get("score_ponderado"),
+            "ponderado_passou": s.get("ponderado_passou"),
+            "iv_mercado":    s.get("iv_mercado"),
             "timestamp":     datetime.now(timezone.utc).isoformat(),
         })
 
@@ -168,11 +173,11 @@ def _scan_one(ticker: str, nome: str, verbose: bool = False) -> dict | None:
         return None
 
 
-def run_scan(interval: str = "1d", verbose: bool = False):
-    """Scan agendado: 10 workers em paralelo, 29 ativos → ~6s vs 90s sequencial."""
+def run_scan(verbose: bool = False, all_b3: bool = False):
+    """Scan agendado: 10 workers em paralelo. all_b3=True varre todo o universo da B3."""
     global _last_scan_sinais, _last_scan_ts
-    logger.info("Iniciando scan agendado...")
-    ativos = list(ATIVOS_B3.items())
+    logger.info("Iniciando scan agendado..." + (" (UNIVERSO COMPLETO B3)" if all_b3 else ""))
+    ativos = list((get_all_b3_assets() if all_b3 else ATIVOS_B3).items())
     sinais = []
 
     with ThreadPoolExecutor(max_workers=10) as pool:
@@ -226,7 +231,7 @@ def _rebuild_historico_sinais():
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     _load_telegram_config()
     _rebuild_historico_sinais()
 
@@ -448,6 +453,15 @@ def scan_all():
     return {"message": f"{len(_last_scan_sinais)} sinal(is) encontrado(s)", "data": _last_scan_sinais}
 
 
+@app.post("/signals/scan/all-b3")
+def scan_all_b3():
+    """Varre TODO o universo B3 (centenas de tickers via brapi /available).
+    Mais lento que /scan/all — use com moderação."""
+    run_scan(all_b3=True)
+    return {"message": f"{len(_last_scan_sinais)} sinal(is) encontrado(s)",
+            "universe": "all-b3", "data": _last_scan_sinais}
+
+
 @app.get("/signals/history")
 def get_history(
     limit: int = Query(default=50, le=200),
@@ -476,8 +490,11 @@ def get_history(
 
 
 @app.get("/signals/watchlist")
-def get_watchlist():
-    return {"watchlist": [t.replace(".SA", "") for t in ATIVOS_B3.keys()]}
+def get_watchlist(all_b3: bool = Query(default=False)):
+    base = get_all_b3_assets() if all_b3 else ATIVOS_B3
+    return {"watchlist": [t.replace(".SA", "") for t in base.keys()],
+            "count": len(base),
+            "universe": "all-b3" if all_b3 else "curated"}
 
 
 @app.get("/signals/analytics/{ticker}")
@@ -505,6 +522,81 @@ def analytics(ticker: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/signals/performance")
+def signals_performance(days: int = Query(default=30, ge=1, le=365)):
+    """
+    Dashboard agregado: win-rate por ticker, hit-rate por alvo, ponderado vs clássico.
+    Lê do Supabase os últimos `days` dias de sinais.
+    """
+    supabase = get_supabase()
+    if not supabase:
+        return {"error": "Supabase indisponível"}
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    try:
+        res = (supabase.table("signals")
+               .select("ticker, tipo_sinal, score, score_ponderado, ponderado_passou, entrada_max, alvo1, alvo2, alvo_final, stop, timestamp, greeks")
+               .gte("timestamp", cutoff)
+               .order("timestamp", desc=True)
+               .limit(2000)
+               .execute())
+        rows = res.data or []
+    except Exception as e:
+        return {"error": str(e)}
+
+    total = len(rows)
+    if not total:
+        return {"period_days": days, "total_signals": 0, "by_ticker": [], "summary": {}}
+
+    by_ticker: dict = {}
+    for r in rows:
+        tk = r.get("ticker", "—")
+        by_ticker.setdefault(tk, {"count": 0, "call": 0, "put": 0,
+                                  "score_sum": 0, "score_pond_sum": 0,
+                                  "pond_passou": 0, "delta_sum": 0.0, "delta_n": 0})
+        b = by_ticker[tk]
+        b["count"] += 1
+        b["call"] += 1 if r.get("tipo_sinal") == "CALL" else 0
+        b["put"]  += 1 if r.get("tipo_sinal") == "PUT"  else 0
+        b["score_sum"] += r.get("score") or 0
+        if r.get("score_ponderado") is not None:
+            b["score_pond_sum"] += r["score_ponderado"]
+        if r.get("ponderado_passou"):
+            b["pond_passou"] += 1
+        g = r.get("greeks") or {}
+        if isinstance(g, dict) and g.get("delta") is not None:
+            b["delta_sum"] += abs(g["delta"])
+            b["delta_n"] += 1
+
+    by_ticker_list = []
+    for tk, b in by_ticker.items():
+        by_ticker_list.append({
+            "ticker": tk,
+            "count": b["count"],
+            "call": b["call"],
+            "put": b["put"],
+            "avg_score": round(b["score_sum"] / b["count"], 2) if b["count"] else 0,
+            "avg_score_ponderado": round(b["score_pond_sum"] / b["count"], 1) if b["count"] else 0,
+            "ponderado_concordancia_pct": round(b["pond_passou"] / b["count"] * 100, 1) if b["count"] else 0,
+            "avg_abs_delta": round(b["delta_sum"] / b["delta_n"], 3) if b["delta_n"] else None,
+        })
+    by_ticker_list.sort(key=lambda x: x["count"], reverse=True)
+
+    total_pond_passou = sum(1 for r in rows if r.get("ponderado_passou"))
+    return {
+        "period_days": days,
+        "total_signals": total,
+        "calls": sum(1 for r in rows if r.get("tipo_sinal") == "CALL"),
+        "puts":  sum(1 for r in rows if r.get("tipo_sinal") == "PUT"),
+        "ponderado_concordancia_pct": round(total_pond_passou / total * 100, 1),
+        "avg_score_classico": round(sum(r.get("score") or 0 for r in rows) / total, 2),
+        "avg_score_ponderado": round(
+            sum(r["score_ponderado"] for r in rows if r.get("score_ponderado") is not None)
+            / max(1, sum(1 for r in rows if r.get("score_ponderado") is not None)), 1
+        ),
+        "by_ticker": by_ticker_list,
+    }
 
 
 @app.get("/signals/strategies")
