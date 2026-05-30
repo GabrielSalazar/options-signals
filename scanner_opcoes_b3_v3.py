@@ -104,20 +104,30 @@ def varrer_ativos(ativos: dict, interval: str, verbose: bool):
         print(f"\n{Style.BRIGHT}{Fore.YELLOW}Nenhum sinal encontrado com os critérios atuais.{Style.RESET_ALL}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Scanner de Opções B3 - TP Capital")
+    parser = argparse.ArgumentParser(description="Scanner de Opções B3")
     parser.add_argument("ticker", nargs="?", help="Analisar apenas um ticker específico (ex: MGLU3)")
     parser.add_argument("--backtest", action="store_true", help="Rodar em modo backtest")
     parser.add_argument("--start", type=str, default="2026-01-01", help="Data início backtest (YYYY-MM-DD)")
     parser.add_argument("--end", type=str, default=datetime.now().strftime("%Y-%m-%d"), help="Data fim backtest (YYYY-MM-DD)")
     parser.add_argument("--interval", type=str, default="1d", choices=["1d", "1h"], help="Intervalo dos dados (1d ou 1h)")
     parser.add_argument("--verbose", action="store_true", help="Ativar logs detalhados")
-    
+    parser.add_argument("--realtime", action="store_true",
+                        help="Rodar em loop a cada N minutos (default 30) durante o pregão")
+    parser.add_argument("--every", type=int, default=30,
+                        help="Intervalo do --realtime em minutos (default 30)")
+    parser.add_argument("--all-b3", action="store_true",
+                        help="Varrer TODO o universo da B3 via brapi /available")
+
     args = parser.parse_args()
     
     if args.verbose:
         logger.setLevel(logging.DEBUG)
     
-    ativos_alvo = ATIVOS_B3
+    if args.all_b3:
+        from config import get_all_b3_assets
+        ativos_alvo = get_all_b3_assets()
+    else:
+        ativos_alvo = ATIVOS_B3
     if args.ticker:
         ticker_sa = args.ticker.upper()
         if not ticker_sa.endswith(".SA"):
@@ -133,6 +143,20 @@ def main():
             sinais = rodar_backtest(ticker, nome, args.start, args.end, interval=args.interval)
             todos_sinais.extend(sinais)
         exibir_relatorio_backtest(todos_sinais)
+    elif args.realtime:
+        import time as _time
+        from config import dentro_horario_pregao
+        print(f"🔄 Modo TEMPO REAL ativo — scan a cada {args.every} min (Ctrl+C para parar)")
+        try:
+            while True:
+                if dentro_horario_pregao(margem_min=0):
+                    print(f"\n⏰ [{datetime.now():%H:%M:%S}] Executando varredura...")
+                    varrer_ativos(ativos_alvo, args.interval, args.verbose)
+                else:
+                    print(f"⏸ [{datetime.now():%H:%M:%S}] Fora do pregão — aguardando.")
+                _time.sleep(args.every * 60)
+        except KeyboardInterrupt:
+            print("\n🛑 Scanner encerrado.")
     else:
         varrer_ativos(ativos_alvo, args.interval, args.verbose)
 
