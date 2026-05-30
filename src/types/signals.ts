@@ -28,6 +28,19 @@ export interface Signal {
   rsi: number
   vol_ratio: number
   gatilhos: string[]
+  // v4.0: Greeks (Black-Scholes) + book + score ponderado
+  book_until?: string
+  greeks?: {
+    delta: number
+    gamma: number
+    theta: number
+    vega: number
+    rho: number
+    prob_profit: number
+  }
+  score_ponderado?: number | null
+  ponderado_passou?: boolean | null
+  ponderado_reasons?: string[]
   // From Supabase rows
   id?: string
   timestamp?: string

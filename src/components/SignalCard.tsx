@@ -74,7 +74,7 @@ export default function SignalCard({ signal }: { signal: Signal }) {
                     <div>
                         <p className="label">Stop</p>
                         <p className="font-mono font-bold text-dw-red">R$ {signal.stop?.toFixed(2)}</p>
-                        <p className="text-dw-ink-muted mt-0.5">-42%</p>
+                        <p className="text-dw-ink-muted mt-0.5">-43%</p>
                     </div>
                 </div>
             </div>
@@ -107,6 +107,50 @@ export default function SignalCard({ signal }: { signal: Signal }) {
                 </div>
             </div>
 
+            {/* Greeks (expandido) */}
+            {expanded && signal.greeks && (
+                <div className="bg-dw-bg-soft border border-dw-rule-soft rounded-lg p-3 space-y-2">
+                    <p className="label">Detalhes Técnicos (Black-Scholes)</p>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div>
+                            <p className="label">Delta</p>
+                            <p className="font-mono font-bold text-dw-ink-mid">{signal.greeks.delta?.toFixed(3)}</p>
+                        </div>
+                        <div>
+                            <p className="label">Theta/dia</p>
+                            <p className="font-mono font-bold text-dw-ink-mid">{signal.greeks.theta?.toFixed(4)}</p>
+                        </div>
+                        <div>
+                            <p className="label">Vega</p>
+                            <p className="font-mono font-bold text-dw-ink-mid">{signal.greeks.vega?.toFixed(4)}</p>
+                        </div>
+                        <div>
+                            <p className="label">Gamma</p>
+                            <p className="font-mono font-bold text-dw-ink-mid">{signal.greeks.gamma?.toFixed(4)}</p>
+                        </div>
+                        <div>
+                            <p className="label">POP</p>
+                            <p className="font-mono font-bold text-dw-ink-mid">{(signal.greeks.prob_profit * 100)?.toFixed(0)}%</p>
+                        </div>
+                        <div>
+                            <p className="label">IV Hist</p>
+                            <p className="font-mono font-bold text-dw-ink-mid">{signal.iv_hist?.toFixed(1)}%</p>
+                        </div>
+                    </div>
+                    {signal.score_ponderado != null && (
+                        <div className="pt-2 border-t border-dw-rule-soft flex items-center justify-between text-xs">
+                            <span className="label">Score ponderado (shadow)</span>
+                            <span className={`font-mono font-bold ${signal.ponderado_passou ? 'text-dw-green' : 'text-dw-ink-muted'}`}>
+                                {signal.score_ponderado}/100 {signal.ponderado_passou ? '✓' : '—'}
+                            </span>
+                        </div>
+                    )}
+                    {signal.book_until && (
+                        <p className="text-xs text-dw-ink-muted">Book válido até {signal.book_until}</p>
+                    )}
+                </div>
+            )}
+
             {/* Gatilhos (expandido) */}
             {expanded && signal.gatilhos?.length > 0 && (
                 <div className="bg-dw-blue-soft border border-dw-rule rounded-lg p-3 space-y-2">
@@ -127,7 +171,7 @@ export default function SignalCard({ signal }: { signal: Signal }) {
                 className="btn-secondary w-full justify-center text-xs"
                 onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
             >
-                {expanded ? '▼ Ocultar Gatilhos' : '▶ Ver Gatilhos'}
+                {expanded ? '▼ Ocultar Detalhes' : '▶ Ver Detalhes & Greeks'}
             </button>
         </div>
     )
