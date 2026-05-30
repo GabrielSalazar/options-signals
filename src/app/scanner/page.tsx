@@ -110,7 +110,10 @@ export default function ScannerPage() {
         try {
             const controller = new AbortController();
             const t = setTimeout(() => controller.abort(), 4000);
-            const res = await fetch(`${BACKEND_URL}/health`, { signal: controller.signal });
+            const res = await fetch(`${BACKEND_URL}/health`, { 
+                signal: controller.signal,
+                cache: 'no-store' 
+            });
             clearTimeout(t);
             return res.ok;
         } catch {
