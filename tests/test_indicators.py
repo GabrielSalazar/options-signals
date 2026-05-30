@@ -11,7 +11,7 @@ Cobre:
 import pytest
 import numpy as np
 import pandas as pd
-from indicators import (
+from backend.domain.indicators import (
     calcular_indicadores,
     detectar_divergencia,
     encontrar_zonas_demanda_oferta,
@@ -49,6 +49,7 @@ class TestCalcularIndicadores:
             "trend_up", "trend_down",
             "vol_media_20", "suporte_20", "resistencia_20",
             "var_pct", "is_fundo_local", "is_topo_local",
+            "kc_upper", "kc_lower", "kc_mid", "vwap"
         ]
         for col in expected_cols:
             assert col in result.columns, f"Coluna {col} ausente"

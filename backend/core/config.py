@@ -130,7 +130,7 @@ def get_all_b3_assets() -> dict:
     Tickers desconhecidos recebem o próprio código como nome.
     Em caso de falha da brapi, devolve apenas a lista curada.
     """
-    from data_providers import fetch_all_b3_tickers
+    from backend.services.data_providers import fetch_all_b3_tickers
     merged = dict(ATIVOS_B3)
     for t in fetch_all_b3_tickers():
         key = f"{t}.SA"

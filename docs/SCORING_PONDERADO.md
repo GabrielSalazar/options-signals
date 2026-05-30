@@ -26,7 +26,9 @@ A coexistência permite A/B testing sem perder a lógica histórica.
 | 8 | ADX ≥ 25 | **5** | Tendência forte |
 | 9 | Volume relativo | **8** | 8 se ≥1,5x • 4 se ≥1,0x |
 | 10 | Bônus Bollinger | **4** | Preço junto à banda a favor (reversão) |
-| | **Teto** | **100** | |
+| 11 | **NOVO:** Institucional VWAP | **+5** | Preço a favor da VWAP |
+| 12 | **NOVO:** Compressão TTM Squeeze | **+8** | Bollinger Band dentro do Keltner Channel |
+| | **Teto (pode ultrapassar 100 com bônus)** | **~121** | |
 | | **Limiar (CONFIG["min_score_ponderado"])** | **60** | gera sinal |
 
 ## 3. Simetria CALL/PUT

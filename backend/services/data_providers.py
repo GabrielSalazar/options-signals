@@ -2,7 +2,7 @@ import os
 import requests
 import logging
 from typing import Dict, List, Optional
-from cache import cache_get, cache_set
+from backend.core.cache import cache_get, cache_set
 
 logger = logging.getLogger("b3_scanner")
 
@@ -107,7 +107,7 @@ def get_real_options_from_opcoes_net(ticker: str, tipo_alvo: str, strike_alvo: f
     if cached is not None:
         return cached if cached else None
 
-    from config import CONFIG
+    from backend.core.config import CONFIG
     min_neg = CONFIG.get("min_negocios_opcao", 0)
 
     chain = _fetch_chain(ticker)

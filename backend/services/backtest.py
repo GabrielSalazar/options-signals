@@ -2,9 +2,9 @@ import yfinance as yf
 import pandas as pd
 import logging
 from tqdm import tqdm
-from core_engine import analisar_ativo
-from options_math import estimar_premio_otm
-from indicators import calcular_indicadores
+from backend.services.core_engine import analisar_ativo
+from backend.domain.options_math import estimar_premio_otm
+from backend.domain.indicators import calcular_indicadores
 
 logger = logging.getLogger("b3_scanner")
 

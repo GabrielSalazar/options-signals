@@ -43,7 +43,7 @@ docker-compose down
 ### Backend (Python)
 
 ```bash
-cd b3-options-signals-py
+cd backend
 
 # Crie ambiente virtual
 python -m venv venv
@@ -58,18 +58,16 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Inicie servidor FastAPI
-uvicorn app.main:app --reload --port 8000
+uvicorn api.main:app --reload --port 8000
 ```
 
 Backend estará em: **http://localhost:8000**
 
 ### Frontend (Next.js)
 
-Em outro terminal:
+Em outro terminal na raiz do projeto (`options-signals`):
 
 ```bash
-cd b3-options-signals-web
-
 # Instale dependências
 npm install
 
@@ -85,7 +83,7 @@ Frontend estará em: **http://localhost:3000**
 
 ### Backend (.env)
 
-Crie arquivo `.env` em `b3-options-signals-py/`:
+Crie arquivo `.env` em `backend/`:
 
 ```env
 # API
@@ -103,7 +101,7 @@ TELEGRAM_CHAT_ID=seu_chat_id_aqui
 
 ### Frontend (.env.local)
 
-Crie arquivo `.env.local` em `b3-options-signals-web/`:
+Crie arquivo `.env.local` na raiz do projeto (`options-signals`):
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
@@ -235,25 +233,21 @@ Após fazer deploy do backend, **atualize** a variável no frontend:
 
 ```
 options-signals/
-├── b3-options-signals-py/           # Backend (FastAPI)
-│   ├── app/
-│   │   ├── main.py                  # Entrada FastAPI
-│   │   ├── routers/                 # Endpoints
-│   │   ├── core/                    # Lógica central
-│   │   └── data/                    # Dados reais
+├── backend/                         # Backend (FastAPI)
+│   ├── api/                         # Endpoints REST e App FastAPI
+│   ├── core/                        # Configuração e Cache
+│   ├── domain/                      # Regras de Negócio e Opções
+│   ├── services/                    # Motor de análise principal
 │   ├── requirements.txt
-│   ├── Dockerfile
 │   └── .env.example
 │
-├── b3-options-signals-web/          # Frontend (Next.js)
-│   ├── src/
-│   │   ├── app/                     # Páginas
-│   │   ├── components/              # Componentes
-│   │   └── lib/                     # Utilitários
-│   ├── package.json
-│   ├── Dockerfile
-│   └── .env.local.example
-│
+├── src/                             # Frontend (Next.js)
+│   ├── app/                         # Páginas
+│   ├── components/                  # Componentes
+│   └── lib/                         # Utilitários
+├── package.json
+├── Dockerfile
+├── .env.local.example
 └── docker-compose.yml               # Orquestração
 ```
 

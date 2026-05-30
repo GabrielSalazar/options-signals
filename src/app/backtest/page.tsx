@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { FlaskConical, BarChart2, TrendingUp, TrendingDown, Activity, Award } from 'lucide-react';
 import { runBacktest, BacktestMetrics } from '@/lib/api';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 
 export default function BacktestPage() {
@@ -225,6 +225,24 @@ export default function BacktestPage() {
                       icon: <Activity className="w-4 h-4" />,
                       color: 'var(--dw-blue)',
                     },
+                    {
+                      label: 'Sortino Ratio',
+                      value: String(metrics.sortino_ratio ?? 0),
+                      icon: <Activity className="w-4 h-4" />,
+                      color: 'var(--dw-blue)',
+                    },
+                    {
+                      label: 'Calmar Ratio',
+                      value: String(metrics.calmar_ratio ?? 0),
+                      icon: <Activity className="w-4 h-4" />,
+                      color: 'var(--dw-blue)',
+                    },
+                    {
+                      label: 'Expectância (R$)',
+                      value: `R$${metrics.expectancy ?? 0}`,
+                      icon: <Award className="w-4 h-4" />,
+                      color: (metrics.expectancy ?? 0) >= 0 ? 'var(--dw-green)' : 'var(--dw-red)',
+                    },
                   ].map(({ label, value, icon, color }) => (
                     <div key={label} className="rounded-xl p-4" style={{ background: 'var(--dw-bg-soft)', border: '1px solid var(--dw-rule)' }}>
                       <div className="flex items-center gap-1.5 mb-2" style={{ color: 'var(--dw-ink-muted)' }}>
@@ -243,7 +261,7 @@ export default function BacktestPage() {
                 <h3 className="font-serif text-lg mb-4">Equity Curve</h3>
                 <div style={{ height: 220 }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
+                    <AreaChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--dw-rule)" opacity={0.6} />
                       <XAxis
                         dataKey="trade"
@@ -272,15 +290,16 @@ export default function BacktestPage() {
                         formatter={(v: number | undefined) => [`R$ ${(v ?? 0).toFixed(2)}`, 'Equity']}
                         labelFormatter={(l) => `Trade ${l}`}
                       />
-                      <Line
+                      <Area
                         type="monotone"
                         dataKey="equity"
                         stroke="var(--dw-blue)"
+                        fill="var(--dw-blue)"
+                        fillOpacity={0.15}
                         strokeWidth={2}
-                        dot={false}
                         activeDot={{ r: 5 }}
                       />
-                    </LineChart>
+                    </AreaChart>
                   </ResponsiveContainer>
                 </div>
               </div>

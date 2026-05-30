@@ -10,7 +10,7 @@ Cobre:
 """
 import pytest
 from datetime import datetime, timedelta
-from config import (
+from backend.core.config import (
     CONFIG, ATIVOS_B3, OTM_POR_ATIVO, OTM_DEFAULT,
     score_horario, is_reentrada_valida, registrar_sinal,
     _historico_sinais,

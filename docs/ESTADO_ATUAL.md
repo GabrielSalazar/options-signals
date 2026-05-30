@@ -25,7 +25,7 @@
 | `/scanner` | SSE stream, ~90 tickers B3 | `/signals/scan/stream` | ✅ Completo |
 | `/signals` | Filtro setor + stock picker + Realtime | Supabase | ✅ Completo |
 | `/alerts` | Feed filtros + CSV + regras localStorage | `/signals/history` | ✅ Completo |
-| `/backtest` | Equity curve Recharts + métricas | `/backtest/run` | ✅ Completo |
+| `/backtest` | Equity curve Recharts (AreaChart) + Sortino/Calmar | `/backtest/run` | ✅ Completo |
 | `/analytics` | Vol Smile + IV Surface 3D (Plotly) | `/signals/analytics/{ticker}` | ✅ Completo |
 | `/portfolio` | Paper Trading + modal de encerramento | localStorage | ✅ Completo |
 | `/strategies` | Biblioteca de estratégias | Motor local (17 estratégias) | ✅ Completo (UI Dinâmica + Gráficos Recharts) |
@@ -84,8 +84,9 @@
 
 ## Algoritmo de Sinais
 
-Motor de 19 gatilhos técnicos:
+Motor de 21 gatilhos técnicos (incluindo ponderados):
 - **11 gatilhos ALTA** (G1–G11): Stochastic, RSI, EMA, MACD, Bollinger, Volume, Divergência, Canal, Suporte
+- **Novos Gatilhos Institucionais**: VWAP (Bônus +5) e TTM Squeeze (Bônus +8) no modo ponderado
 - **8 gatilhos BAIXA** (B1–B8): equivalentes bearish
 - **Bônus horário**: +0 a +3 pts conforme janela de liquidez
 - **Score mínimo**: 5 (configurável)
@@ -117,7 +118,7 @@ O motor de estratégias suporta as 17 operações estruturadas com cálculo din�
 
 ### Média Prioridade
 3. **`middleware.ts`** — proteção server-side de rotas internas
-4. **Testes automatizados** — zero cobertura atualmente
+4. **Implementação de novos testes** — A suite atual cobre 117 testes automatizados de backend, mas faltam testes E2E e unitários de front-end.
 
 ### Baixa Prioridade
 5. **Tab "Opções" MarketWidget** — precisaria endpoint de options pricing

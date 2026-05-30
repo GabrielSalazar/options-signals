@@ -16,7 +16,7 @@ Pesos:
   ─────────────────────────────  ─────
   Teto                           100
 """
-from config import CONFIG
+from backend.core.config import CONFIG
 
 
 def _trend_points(t: int) -> int:
@@ -142,6 +142,23 @@ def score_ponderado(last, prev, option_price: float, dte: int,
         score += 4; reasons.append("✅ Bollinger: perto da banda inferior")
     elif (not up) and bb > 0.75:
         score += 4; reasons.append("✅ Bollinger: perto da banda superior")
+
+    # 11. Bônus VWAP (até 5)
+    vwap = float(last.get("vwap", 0.0))
+    close = float(last.get("Close", 0.0))
+    if vwap > 0:
+        if up and close > vwap:
+            score += 5; reasons.append("✅ Preço acima do VWAP (força compradora)")
+        elif (not up) and close < vwap:
+            score += 5; reasons.append("✅ Preço abaixo do VWAP (força vendedora)")
+
+    # 12. Bônus Volatility Squeeze (até 5)
+    bb_u, bb_l = float(last.get("bb_upper", 0)), float(last.get("bb_lower", 0))
+    kc_u, kc_l = float(last.get("kc_upper", 0)), float(last.get("kc_lower", 0))
+    if bb_u > 0 and kc_u > 0:
+        # Se as bandas de Bollinger entrarem nos canais de Keltner, há Volatility Squeeze
+        if bb_u < kc_u and bb_l > kc_l:
+            score += 5; reasons.append("🔥 Volatility Squeeze (Expansão Iminente)")
 
     score = min(int(score), 100)
     return {

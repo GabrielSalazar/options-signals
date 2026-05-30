@@ -20,9 +20,9 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from config import ATIVOS_B3, CONFIG, get_all_b3_assets
-from core_engine import analisar_ativo
-from cache import redis_status
+from backend.core.config import ATIVOS_B3, CONFIG, get_all_b3_assets
+from backend.services.core_engine import analisar_ativo
+from backend.core.cache import redis_status
 from scanner_opcoes_b3_v3 import enviar_telegram
 
 load_dotenv()
@@ -219,7 +219,7 @@ scheduler = BackgroundScheduler(timezone="America/Sao_Paulo")
 def _rebuild_historico_sinais():
     """B2-fix: reconstrói _historico_sinais a partir do Supabase para evitar
     bypass da regra de reentrada após restart do processo."""
-    from config import _historico_sinais, registrar_sinal
+    from backend.core.config import _historico_sinais, registrar_sinal
     supabase = get_supabase()
     if not supabase:
         return
@@ -663,7 +663,7 @@ def backtest_strategies():
 
 @app.post("/backtest/run")
 def backtest_run(params: BacktestParams):
-    from backtest import rodar_backtest
+    from backend.services.backtest import rodar_backtest
     import numpy as np
     ticker_raw = params.ticker
     ticker = ticker_raw + ".SA"
@@ -707,16 +707,33 @@ def backtest_run(params: BacktestParams):
     for e in equity_curve:
         if e > peak:
             peak = e
-        dd = (e - peak) / peak
-        if dd < max_dd:
+        dd = (peak - e) / peak
+        if dd > max_dd:
             max_dd = dd
 
     if len(trade_returns) > 1:
         mean_r = float(np.mean(trade_returns))
         std_r = float(np.std(trade_returns))
         sharpe = round(mean_r / std_r * (252 ** 0.5), 2) if std_r > 0 else 0.0
+        
+        # Sortino
+        down_returns = [r for r in trade_returns if r < 0]
+        std_down = float(np.std(down_returns)) if len(down_returns) > 1 else 0.0
+        sortino = round(mean_r / std_down * (252 ** 0.5), 2) if std_down > 0 else 0.0
+        
+        # Calmar
+        calmar = round(total_return_pct / 100 / max_dd, 2) if max_dd > 0 else 0.0
+        
+        # Expectancy ($) per trade based on 10k initial equity position sizing
+        avg_win = float(np.mean([r for r in trade_returns if r > 0])) if any(r > 0 for r in trade_returns) else 0.0
+        avg_loss = float(np.mean([r for r in trade_returns if r < 0])) if any(r < 0 for r in trade_returns) else 0.0
+        expectancy_pct = (win_rate * avg_win) + ((1 - win_rate) * avg_loss)
+        expectancy_usd = round(expectancy_pct * 1000, 2) # Assume $1000 per trade average size
     else:
         sharpe = 0.0
+        sortino = 0.0
+        calmar = 0.0
+        expectancy_usd = 0.0
 
     return {
         "sinais": total,
@@ -725,6 +742,9 @@ def backtest_run(params: BacktestParams):
             "total_return": round(total_return_pct, 1),
             "max_drawdown": round(max_dd * 100, 1),
             "sharpe_ratio": sharpe,
+            "sortino_ratio": sortino,
+            "calmar_ratio": calmar,
+            "expectancy": expectancy_usd,
             "trades": total,
         },
         "equity_curve": equity_curve,
@@ -790,7 +810,7 @@ def get_market_options():
     Todos os tickers são consultados em paralelo (ThreadPoolExecutor).
     Em caso de erro total, retorna lista vazia (frontend usa fallback).
     """
-    from data_providers import get_liquid_options_for_ticker
+    from backend.services.data_providers import get_liquid_options_for_ticker
 
     TICKERS_HOT = ["PETR4", "VALE3", "ITUB4", "MGLU3", "WEGE3", "BBAS3"]
 
@@ -816,7 +836,7 @@ def get_market_options():
 @app.get("/market/opcoes/chain/{ticker}")
 def get_options_chain(ticker: str):
     """Retorna a cadeia completa de opções em tempo real para o ticker."""
-    from data_providers import _fetch_chain
+    from backend.services.data_providers import _fetch_chain
     chain = _fetch_chain(ticker)
     opcoes = []
     for op in chain:

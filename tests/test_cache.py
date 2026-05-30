@@ -10,7 +10,7 @@ Nota: Sem Redis rodando, cache_set/cache_get retornam None.
       Os testes verificam o comportamento graceful nesse cenário.
 """
 import pytest
-from cache import cache_get, cache_set, cache_get_df, cache_set_df, redis_status
+from backend.core.cache import cache_get, cache_set, cache_get_df, cache_set_df, redis_status
 
 
 class TestRedisStatus:

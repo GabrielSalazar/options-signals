@@ -584,8 +584,8 @@ scheduler.add_job(
 
 #### Historical Analysis
 - Full backtest engine with walk-forward analysis
-- Equity curve visualization with Recharts
-- Performance metrics: Sharpe ratio, max drawdown, win rate, total return
+- Equity curve visualization with Recharts (AreaChart)
+- Performance metrics: Sharpe ratio, Sortino ratio, Calmar ratio, Expectancy, max drawdown, win rate, total return
 - Trade-by-trade breakdown
 - Strategy parameter optimization
 
@@ -621,6 +621,10 @@ scheduler.add_job(
 - Market hours validation (Mon-Fri 10:00-15:30 Brasília time)
 - Real-time data refresh
 
+#### Engineering & Quality
+- Clean Architecture (api, core, domain, services layers)
+- Automated Test Suite with 117+ passing tests (pytest)
+
 ### ⚠️ Partial Implementation
 
 | Feature | Status | Blocker |
@@ -635,7 +639,6 @@ scheduler.add_job(
 |---------|--------|------------|
 | **Login/Authentication Page** | High — nav link broken | 2–3 hours |
 | **Route Protection Middleware** | High — auth prerequisite | 2 hours |
-| **Automated Test Suite** | High — 0% coverage | 3–5 days |
 | **Rate Limiting** | Medium — DoS prevention | 2 hours |
 | **Observability/Metrics** | Medium — production visibility | 1 day |
 
@@ -738,16 +741,23 @@ options-signals/
 │   ├── eslint.config.mjs                 # ESLint rules
 │   └── .env.local                        # Environment variables
 │
-├── Backend (FastAPI + Python)
-│   ├── main.py                           # FastAPI app, routers
-│   ├── core_engine.py                    # Signal analysis engine
-│   ├── indicators.py                     # Technical indicators
-│   ├── options_math.py                   # Options Greeks & pricing
-│   ├── backtest.py                       # Backtesting engine
-│   ├── config.py                         # B3 tickers, parameters
-│   ├── cache.py                          # Redis caching layer
-│   ├── data_providers.py                 # Market data sources
-│   ├── scanner_opcoes_b3_v3.py           # Telegram integration
+├── backend/                              # FastAPI Backend (Python)
+│   ├── api/                              # REST API endpoints
+│   │   ├── routers/                      # Route handlers
+│   │   └── main.py                       # FastAPI application
+│   ├── core/                             # Core configuration
+│   │   ├── cache.py                      # Redis caching layer
+│   │   └── config.py                     # System configuration
+│   ├── domain/                           # Business logic
+│   │   ├── greeks.py                     # Options Greeks calculation
+│   │   ├── indicators.py                 # Technical indicators
+│   │   ├── options_math.py               # Black-Scholes models
+│   │   └── scoring.py                    # Multi-factor scoring logic
+│   ├── services/                         # External & workflow services
+│   │   ├── backtest.py                   # Backtesting engine
+│   │   ├── backtest_recalibracao.py      # Backtest calibration
+│   │   ├── core_engine.py                # Main scanning engine
+│   │   └── data_providers.py             # External data sources
 │   │
 │   ├── requirements.txt                  # Python dependencies
 │   ├── .env                              # Environment variables

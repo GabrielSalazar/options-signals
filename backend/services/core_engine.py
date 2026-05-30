@@ -2,18 +2,18 @@ import yfinance as yf
 import pandas as pd
 import logging
 from datetime import datetime, timedelta
-from config import CONFIG, OTM_POR_ATIVO, OTM_DEFAULT, is_reentrada_valida, registrar_sinal, score_horario
-from cache import cache_get_df, cache_set_df
-from indicators import (
+from backend.core.config import CONFIG, OTM_POR_ATIVO, OTM_DEFAULT, is_reentrada_valida, registrar_sinal, score_horario
+from backend.core.cache import cache_get_df, cache_set_df
+from backend.domain.indicators import (
     calcular_indicadores,
     detectar_divergencia,
     encontrar_zonas_demanda_oferta,
     detectar_canal_linear
 )
-from options_math import mes_vencimento_ideal, estimar_iv_historica, estimar_premio_otm
-from data_providers import get_real_options_from_opcoes_net, fetch_brapi_historical
-from greeks import calculate_greeks, implied_volatility
-from scoring import score_ponderado
+from backend.domain.options_math import mes_vencimento_ideal, estimar_iv_historica, estimar_premio_otm
+from backend.services.data_providers import get_real_options_from_opcoes_net, fetch_brapi_historical
+from backend.domain.greeks import calculate_greeks, implied_volatility
+from backend.domain.scoring import score_ponderado
 
 logger = logging.getLogger("b3_scanner")
 

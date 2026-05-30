@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, date, timezone
 from scipy.stats import norm
-from config import CONFIG
+from backend.core.config import CONFIG
 
 MESES_CALL = {"A":1,"B":2,"C":3,"D":4,"E":5,"F":6,"G":7,"H":8,"I":9,"J":10,"K":11,"L":12}
 MESES_PUT  = {"M":1,"N":2,"O":3,"P":4,"Q":5,"R":6,"S":7,"T":8,"U":9,"V":10,"W":11,"X":12}

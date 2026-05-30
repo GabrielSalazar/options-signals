@@ -43,6 +43,9 @@ export interface BacktestMetrics {
     total_return: number;
     max_drawdown: number;
     sharpe_ratio: number;
+    sortino_ratio?: number;
+    calmar_ratio?: number;
+    expectancy?: number;
     trades: number;
 }
 

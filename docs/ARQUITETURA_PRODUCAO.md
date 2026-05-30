@@ -19,7 +19,7 @@ User Browser → Next.js (3000) → FastAPI (8000) + Supabase (PostgreSQL)
 
 ## 1. Mapeamento de Camadas
 
-### Versão Python Puro (scratch/)
+### Versão Python Puro (Antiga)
 
 ```
 core_engine.py (analisar_ativo)
@@ -28,6 +28,16 @@ core_engine.py (analisar_ativo)
     ├─ indicators.py (RSI, MACD, EMA, Stoch, Divergência, Zonas, Canal)
     ├─ options_math.py (Black-Scholes, DTE, IV)
     └─ scanner_opcoes_b3_v3.py (CLI, Telegram, tabelas)
+```
+
+### Versão Atual (Fase 2)
+
+```
+backend/
+    ├── api/ (Rotas FastAPI e Pydantic models)
+    ├── core/ (Configurações, Caching e Logging)
+    ├── domain/ (Lógica de indicadores, scoring e opções)
+    └── services/ (Casos de uso principais, Motor de Sinais e Backtest)
 ```
 
 ### Arquitetura Atual (v2, 2026)
@@ -76,26 +86,27 @@ core_engine.py (analisar_ativo)
 ┌──────────────────────────────────────┐  ┌─────────────────────────┐
 │   BACKEND: FastAPI (Railway)         │  │  DB: Supabase           │
 ├──────────────────────────────────────┤  ├─────────────────────────┤
-│ app/routers/                         │  │ PostgreSQL Tables:      │
+│ backend/api/routers/                 │  │ PostgreSQL Tables:      │
 │  ├─ signals.py (POST scan)           │  │  • signals              │
 │  ├─ strategies.py (GET strategies)   │  │  • strategies           │
 │  ├─ backtest.py (POST run)           │  │  • backtest_results     │
 │  └─ health.py (GET health)           │  │  • users (auth)         │
 │                                      │  │                         │
-│ app/core/                            │  │ Auth:                   │
-│  ├─ strategies.py (20 estratégias)   │  │  • JWT tokens           │
-│  ├─ risk_classifier.py               │  │  • Session management   │
-│  └─ backtester.py                    │  │                         │
-│                                      │  │ Real-time:              │
-│ app/services/                        │  │  • WebSocket subscr.    │
-│  ├─ scanner.py (orquestração)        │  │  • Push notifications   │
-│  ├─ greeks.py (Black-Scholes)        │  │                         │
-│  └─ alerts.py (Telegram)             │  │                         │
+│ backend/core/                        │  │ Auth:                   │
+│  ├─ cache.py (Redis cache)           │  │  • JWT tokens           │
+│  └─ config.py                        │  │  • Session management   │
 │                                      │  │                         │
-│ app/data/                            │  │                         │
-│  ├─ real_time.py (Yahoo + B3)        │  │                         │
-│  ├─ technicals.py (indicadores)      │  │                         │
-│  └─ cache.py (Redis cache)           │  │                         │
+│ backend/domain/                      │  │ Real-time:              │
+│  ├─ indicators.py                    │  │  • WebSocket subscr.    │
+│  ├─ greeks.py                        │  │  • Push notifications   │
+│  ├─ options_math.py                  │  │                         │
+│  └─ scoring.py                       │  │                         │
+│                                      │  │                         │
+│ backend/services/                    │  │                         │
+│  ├─ core_engine.py                   │  │                         │
+│  ├─ backtest.py                      │  │                         │
+│  ├─ backtest_recalibracao.py         │  │                         │
+│  └─ data_providers.py                │  │                         │
 └──────────────────────────────────────┘  └─────────────────────────┘
 ```
 

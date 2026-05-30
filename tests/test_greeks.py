@@ -10,7 +10,7 @@ Cobre:
 """
 import pytest
 import math
-from greeks import (
+from backend.domain.greeks import (
     bs_call_price, bs_put_price,
     calculate_greeks, implied_volatility,
     _d1_d2, RISK_FREE_RATE_DEFAULT,

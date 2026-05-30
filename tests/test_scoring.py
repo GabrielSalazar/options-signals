@@ -10,7 +10,7 @@ Cobre:
 """
 import pytest
 from unittest.mock import patch
-from scoring import score_ponderado
+from backend.domain.scoring import score_ponderado
 
 
 def _make_row(**overrides):
@@ -157,6 +157,19 @@ class TestScorePonderadoCall:
         """bb_pct < 0.25 para CALL → +4 bônus."""
         result = self._call_score(last_kw={"bb_pct": 0.10})
         assert any("Bollinger" in r and "inferior" in r for r in result["reasons"])
+
+    def test_vwap_bonus_call(self):
+        """Preço acima do VWAP para CALL → +5."""
+        result = self._call_score(last_kw={"Close": 105.0, "vwap": 100.0})
+        assert any("VWAP" in r for r in result["reasons"])
+
+    def test_volatility_squeeze_bonus(self):
+        """Bollinger dentro de Keltner → +5 (Volatility Squeeze)."""
+        result = self._call_score(last_kw={
+            "bb_upper": 102.0, "bb_lower": 98.0,
+            "kc_upper": 105.0, "kc_lower": 95.0
+        })
+        assert any("Squeeze" in r for r in result["reasons"])
 
 
 class TestScorePonderadoPut:

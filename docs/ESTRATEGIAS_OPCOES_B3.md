@@ -48,14 +48,16 @@ O sistema procura cenários de **exaustão vendedora**, **ruptura de suporte**, 
 
 ---
 
-### Estrutura de Liquidez Histórica — 2 gatilhos
+### Estrutura de Liquidez Histórica e Compressão — 4 gatilhos
 
 | ID | Critério | Score | Interpretação |
 |---|---|---|---|
 | **G10** | Preço em zona de demanda histórica (±1 ATR de swing low nos últimos 60D) | +3 | **Mapa institucional.** Pior caso para grande player = seu melhor trade. |
 | **G5** | Volume ≥ 1,5× volume_média_20D | +1 | **Confirmação de liquidez.** Sem volume, opção não tem gamma. |
+| **G12** | **NOVO:** Institucional VWAP | +5 | Preço e tendência trabalhando acima da VWAP. |
+| **G13** | **NOVO:** Compressão TTM Squeeze | +8 | Bandas de Bollinger penetram no Canal de Keltner. Movimento explosivo iminente. |
 
-**Interpretação:** G10 + G5 juntos = "captura liquidez demanda" — gatilho mais associado aos maiores ganhos na planilha histórica.
+**Interpretação:** G10 + G5 juntos = "captura liquidez demanda" — gatilho mais associado aos maiores ganhos na planilha histórica. VWAP traz fluxo pesado, e Squeeze anuncia volatilidade acentuada (essencial para gama na opção).
 
 ---
 
@@ -98,13 +100,15 @@ O sistema procura cenários de **exaustão compradora**, **falha de rompimento**
 
 ---
 
-### Estrutura de Liquidez Histórica — 1 gatilho
+### Estrutura de Liquidez Histórica e Compressão — 3 gatilhos
 
 | ID | Critério | Score | Interpretação |
 |---|---|---|---|
 | **B8** | Preço em zona de oferta histórica (±1 ATR de swing high nos últimos 60D) | +3 | **Mapa institucional inverso.** Realização de lucros / short.  |
+| **B12** | **NOVO:** Institucional VWAP | +5 | Preço e tendência trabalhando abaixo da VWAP. |
+| **B13** | **NOVO:** Compressão TTM Squeeze | +8 | Bandas de Bollinger penetram no Canal de Keltner. Queda explosiva iminente. |
 
-**Interpretação:** Similar a G10 mas para vendedores. Zona de oferta = teto psicológico / técnico.
+**Interpretação:** Similar a G10 mas para vendedores. Zona de oferta = teto psicológico / técnico. O TTM Squeeze para o lado da baixa acelera a queda.
 
 ---
 

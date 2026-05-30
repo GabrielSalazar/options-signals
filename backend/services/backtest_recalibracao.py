@@ -10,8 +10,8 @@ Uso:
     python backtest_recalibracao.py
 """
 import logging
-from config import CONFIG
-from backtest import rodar_backtest
+from backend.core.config import CONFIG
+from backend.services.backtest import rodar_backtest
 
 logging.basicConfig(level=logging.WARNING)
 

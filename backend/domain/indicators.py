@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from config import CONFIG
+from backend.core.config import CONFIG
 
 try:
     import ta
@@ -39,6 +39,16 @@ def calcular_indicadores(df: pd.DataFrame) -> pd.DataFrame:
         df["adx"]         = adx_obj.adx()
         df["williams_r"]  = ta.momentum.WilliamsRIndicator(h, l, c, lbp=14).williams_r()
         df["cci"]         = ta.trend.CCIIndicator(h, l, c, window=20).cci()
+        
+        # Keltner Channels (using ta-lib / ta wrapper if available, or manual)
+        kc                = ta.volatility.KeltnerChannel(h, l, c, window=20, window_atr=14, fillna=False)
+        df["kc_upper"]    = kc.keltner_channel_hband()
+        df["kc_lower"]    = kc.keltner_channel_lband()
+        df["kc_mid"]      = kc.keltner_channel_mband()
+        
+        # VWAP (ta.volume)
+        vwap              = ta.volume.VolumeWeightedAveragePrice(h, l, c, v, window=20, fillna=False)
+        df["vwap"]        = vwap.volume_weighted_average_price()
     else:
         df["stoch_k"]     = _stoch_manual(h, l, c, CONFIG["stoch_k_period"])
         df["rsi"]         = _rsi_manual(c, CONFIG["rsi_period"])
@@ -60,6 +70,15 @@ def calcular_indicadores(df: pd.DataFrame) -> pd.DataFrame:
         tp_ma             = tp.rolling(20).mean()
         tp_md             = tp.rolling(20).apply(lambda x: np.mean(np.abs(x - x.mean())), raw=True)
         df["cci"]         = (tp - tp_ma) / (0.015 * tp_md + 1e-9)
+        
+        # Keltner Channels (Manual)
+        df["kc_mid"]      = df["ema21"] # Approximation for EMA 20
+        df["kc_upper"]    = df["kc_mid"] + (1.5 * df["atr"])
+        df["kc_lower"]    = df["kc_mid"] - (1.5 * df["atr"])
+        
+        # VWAP (Rolling 20 periods for Daily charts)
+        vwap_vol_sum      = v.rolling(20).sum()
+        df["vwap"]        = (tp * v).rolling(20).sum() / (vwap_vol_sum + 1e-9)
 
     # Derivados úteis para o score ponderado (independentes da lib ta)
     df["bb_pct"]   = (c - df["bb_lower"]) / (df["bb_upper"] - df["bb_lower"] + 1e-9)

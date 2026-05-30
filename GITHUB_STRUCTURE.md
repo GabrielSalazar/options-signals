@@ -12,30 +12,39 @@ https://github.com/GabrielSalazar/options-signals/tree/main
 ├── STRUCTURE.txt
 ├── .github-structure.txt
 │
-├── Main.py (Backend)
-├── core_engine.py
-├── indicators.py
-├── options_math.py
-├── backtest.py
-├── config.py
-├── cache.py
-├── data_providers.py
-├── requirements.txt
+├── backend/ (Python Backend)
+│   ├── api/
+│   │   ├── routers/
+│   │   └── main.py
+│   ├── core/
+│   │   ├── cache.py
+│   │   └── config.py
+│   ├── domain/
+│   │   ├── greeks.py
+│   │   ├── indicators.py
+│   │   ├── options_math.py
+│   │   └── scoring.py
+│   ├── services/
+│   │   ├── backtest.py
+│   │   ├── backtest_recalibracao.py
+│   │   ├── core_engine.py
+│   │   └── data_providers.py
+│   └── requirements.txt
 │
-├── package.json (Frontend)
-├── tsconfig.json
-├── tailwind.config.ts
-├── next.config.ts
-├── Dockerfile
-├── docker-compose.yml
-│
-├── src/ (Frontend source)
+├── src/ (Next.js Frontend)
 │   ├── app/
 │   ├── components/
 │   ├── lib/
 │   ├── context/
 │   ├── hooks/
 │   └── types/
+│
+├── package.json
+├── tsconfig.json
+├── tailwind.config.ts
+├── next.config.mjs
+├── Dockerfile
+├── docker-compose.yml
 │
 ├── docs/ (Documentation)
 │   ├── ESTADO_ATUAL.md

@@ -584,8 +584,8 @@ scheduler.add_job(
 
 #### Análise Histórica
 - Motor de backtest completo com análise walk-forward
-- Visualização de curva de equity com Recharts
-- Métricas de desempenho: Sharpe ratio, drawdown máximo, win rate, retorno total
+- Visualização de curva de equity com Recharts (AreaChart)
+- Métricas de desempenho: Sharpe ratio, Sortino ratio, Calmar ratio, Expectância, drawdown máximo, win rate, retorno total
 - Breakdown trade por trade
 - Otimização de parâmetros de estratégia
 
@@ -621,6 +621,10 @@ scheduler.add_job(
 - Validação de horário de mercado (segunda-sexta 10:00-15:30 horário Brasília)
 - Atualização de dados em tempo real
 
+#### Engenharia & Qualidade
+- Clean Architecture (camadas api, core, domain, services)
+- Suite de Testes Automatizados com 117+ testes passando (pytest)
+
 ### ⚠️ Implementação Parcial
 
 | Funcionalidade | Status | Bloqueador |
@@ -635,7 +639,6 @@ scheduler.add_job(
 |----------|--------|------------|
 | **Página de Login/Autenticação** | Alto — link de nav quebrado | 2–3 horas |
 | **Middleware de Proteção de Rotas** | Alto — pré-requisito de auth | 2 horas |
-| **Suite de Testes Automatizados** | Alto — zero cobertura | 3–5 dias |
 | **Rate Limiting** | Médio — prevenção de DoS | 2 horas |
 | **Observabilidade/Métricas** | Médio — visibilidade de produção | 1 dia |
 
@@ -738,16 +741,23 @@ options-signals/
 │   ├── eslint.config.mjs                 # Regras ESLint
 │   └── .env.local                        # Variáveis de ambiente
 │
-├── Backend (FastAPI + Python)
-│   ├── main.py                           # App FastAPI, rotas
-│   ├── core_engine.py                    # Motor de análise de sinais
-│   ├── indicators.py                     # Indicadores técnicos
-│   ├── options_math.py                   # Gregas & precificação de opções
-│   ├── backtest.py                       # Motor de backtesting
-│   ├── config.py                         # Tickers B3, parâmetros
-│   ├── cache.py                          # Camada de caching Redis
-│   ├── data_providers.py                 # Fontes de dados de mercado
-│   ├── scanner_opcoes_b3_v3.py           # Integração Telegram
+├── backend/                              # Backend FastAPI (Python)
+│   ├── api/                              # REST API endpoints
+│   │   ├── routers/                      # Manipuladores de rotas
+│   │   └── main.py                       # Aplicação FastAPI
+│   ├── core/                             # Configuração central
+│   │   ├── cache.py                      # Camada de caching Redis
+│   │   └── config.py                     # Configuração do sistema
+│   ├── domain/                           # Lógica de negócio
+│   │   ├── greeks.py                     # Cálculo de gregas
+│   │   ├── indicators.py                 # Indicadores técnicos
+│   │   ├── options_math.py               # Modelos Black-Scholes
+│   │   └── scoring.py                    # Lógica de pontuação multi-fator
+│   ├── services/                         # Serviços e workflows
+│   │   ├── backtest.py                   # Motor de backtesting
+│   │   ├── backtest_recalibracao.py      # Recalibração de backtest
+│   │   ├── core_engine.py                # Motor de scanning principal
+│   │   └── data_providers.py             # Fontes de dados externas
 │   │
 │   ├── requirements.txt                  # Dependências Python
 │   ├── .env                              # Variáveis de ambiente
