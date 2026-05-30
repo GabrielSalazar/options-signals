@@ -6,8 +6,8 @@ export function middleware(req: NextRequest) {
   // Se você tem rotas específicas a proteger, inclua na lógica.
   const authCookie = req.cookies.get('sb-access-token') || req.cookies.get('supabase-auth-token')
   
-  // Rotas que queremos proteger (exemplo: dashboard, settings)
-  const protectedRoutes = ['/dashboard', '/settings', '/alerts']
+  // Desabilitado temporariamente, conforme solicitado (sem login/autenticação)
+  const protectedRoutes: string[] = []
   const isProtectedRoute = protectedRoutes.some(route => req.nextUrl.pathname.startsWith(route))
 
   if (isProtectedRoute && !authCookie) {
