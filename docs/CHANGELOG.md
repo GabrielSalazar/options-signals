@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.1.0] - 2026-05-29
+
+### Added
+- **Shadow mode do score ponderado:** [core_engine.py](../core_engine.py) calcula o score ponderado em paralelo ao clássico e persiste `score_ponderado` + `ponderado_passou` no Supabase, sem afetar a decisão (controlado por `CONFIG["scoring_mode"]`).
+- **IV de mercado real:** quando `opcoes.net` retorna `preco_tela`, o pipeline deriva IV via Newton-Raphson e recalcula os Greeks com a IV real. Campo `iv_mercado` no JSON.
+- **Filtro de liquidez:** `CONFIG["min_negocios_opcao"] = 10` rejeita opções com poucos negócios em [data_providers.py](../data_providers.py).
+- **Fallback brapi:** `fetch_brapi_historical()` é usado quando `yfinance` falha ou retorna vazio.
+- **CLI `--realtime`:** scanner v3 ganhou loop nativo com `--realtime --every N --all-b3`.
+- **Endpoint `/signals/performance`:** dashboard agregado (win-rate por ticker, score médio clássico × ponderado, concordância, delta médio).
+- **Frontend SignalCard:** exibe Delta/Theta/Vega/Gamma/POP/IV e o score ponderado em modo expandido.
+- **`backtest_recalibracao.py`:** runner comparativo dos multiplicadores antigos vs novos.
+
+### Fixed
+- Removidos avisos do linter: `bb_up` unused em [core_engine.py](../core_engine.py); `interval` unused em `run_scan`; `app` unused no lifespan da FastAPI.
+
+## [4.0.0] - 2026-05-29
+
+### Added
+- **Greeks no pipeline:** novo módulo [greeks.py](../greeks.py) com Delta, Gamma, Theta, Vega, Rho, POP e IV (Newton-Raphson). Greeks são anexados a cada sinal e persistidos no Supabase.
+- **Filtro de qualidade por Delta:** sinais com `|Δ|` fora de `[delta_min, delta_max]` (0,15–0,45) são rejeitados, evitando deep-OTM sem liquidez.
+- **Score ponderado 0–100:** novo módulo [scoring.py](../scoring.py) com pesos calibrados (MACD, RSI, Estocástico, ADX, Bollinger, volume, tendência). Coexiste com o score clássico via `CONFIG["scoring_mode"]`.
+- **Indicadores extras:** ADX, Williams %R, CCI, `bb_pct`, `bb_width`, `vol_ratio`, `trend_up`/`trend_down` em [indicators.py](../indicators.py).
+- **Universo completo B3:** `data_providers.fetch_all_b3_tickers()` puxa todos os tickers via brapi `/available` (cache 24h). Helper `config.get_all_b3_assets()` mescla com a lista curada. Novo endpoint `POST /signals/scan/all-b3` e flag `?all_b3=true` em `/signals/watchlist`.
+- **Watchlist curada expandida:** +23 tickers (COGN3, EMBR3, RENT3, PRIO3, RAIL3, ENEV3, EQTL3, CSAN3, HAPV3, HYPE3, RDOR3, NTCO3, CPLE6, CYRE3, TIMS3, VBBR3, VIVT3, YDUQ3, MULT3, PCAR3, MRFG3, BBDC3, ITUB3).
+- **Campo `book_until`** em cada sinal (data-limite da ordem no book, padrão 7 dias).
+- **Docs:** [GREEKS_E_BLACK_SCHOLES.md](GREEKS_E_BLACK_SCHOLES.md) e [SCORING_PONDERADO.md](SCORING_PONDERADO.md).
+
+### Changed
+- **Alvos recalibrados sobre 31 sinais reais:** `alvo2_pct 1.50→2.50`, `alvo_final_pct 4.00→7.00`, `stop_pct -0.42→-0.43`.
+- **Faixa de compra:** de ±10% (hardcoded) para `CONFIG["buy_band_pct"] = 0.035` (±3,5%), alinhado ao padrão observado.
+- Removidas todas as menções a "TP Capital" em código, docs e UI.
+
 ## [2.1.0] - 2026-05-27
 
 ### Added
