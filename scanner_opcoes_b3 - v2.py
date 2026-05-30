@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ╔══════════════════════════════════════════════════════════════════════╗
-║   SCANNER DE OPÇÕES OTM — B3 (Estratégia TP Capital)               ║
+║   SCANNER DE OPÇÕES OTM — B3                                        ║
 ║   Engenharia Reversa dos Sinais de Swing Trade                      ║
 ║                                                                      ║
 ║   COMO USAR:                                                         ║
@@ -43,7 +43,7 @@ import time
 import re
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  CONFIGURAÇÕES DA ESTRATÉGIA (extraídas dos sinais TP Capital)
+#  CONFIGURAÇÕES DA ESTRATÉGIA (extraídas de sinais de referência)
 # ─────────────────────────────────────────────────────────────────────────────
 
 CONFIG = {
@@ -260,7 +260,7 @@ def _atr_manual(high, low, close, period=14):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  MOTOR DE SINAIS — LÓGICA DA ESTRATÉGIA TP CAPITAL
+#  MOTOR DE SINAIS — LÓGICA DA ESTRATÉGIA
 # ─────────────────────────────────────────────────────────────────────────────
 
 def analisar_ativo(ticker: str, nome: str, verbose=False) -> dict | None:
@@ -493,7 +493,7 @@ def print_banner():
     banner = """
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║                                                                          ║
-║   🎯  SCANNER OTM B3 — ESTRATÉGIA TP CAPITAL                           ║
+║   🎯  SCANNER OTM B3                                                    ║
 ║   Engenharia Reversa de Sinais de Swing Trade com Opções                 ║
 ║                                                                          ║
 ╚══════════════════════════════════════════════════════════════════════════╝
@@ -685,7 +685,7 @@ ATIVOS_B3_EXTRA = {
 ATIVOS_B3.update(ATIVOS_B3_EXTRA)
 
 # ─── FILTRO DE HORÁRIO (adicionado Batch 3) ───────────────────────────────────
-# A estratégia TP Capital emite sinais principalmente entre 10:00-16:30 BRT
+# A estratégia emite sinais principalmente entre 10:00-16:30 BRT
 # Análise dos timestamps mostrou:
 #   Manhã  (10:00-12:00): 42% dos sinais  - alta volatilidade abertura
 #   Tarde  (13:00-15:00): 35% dos sinais  - confirmação de tendência

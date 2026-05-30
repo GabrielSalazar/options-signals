@@ -582,7 +582,7 @@ export default function SobrePage() {
                     ))}
                 </div>
                 <p className="text-base text-dw-ink-mid leading-relaxed text-center max-w-3xl mx-auto">
-                    Base: planilha TP Capital (22 operações confirmadas, período março a maio de 2026).
+                    Base: planilha de referência (22 operações confirmadas, período março a maio de 2026).
                     Dados históricos não garantem resultados futuros — performance passada deve ser interpretada
                     como evidência estatística de que o modelo capta padrões reais, não como promessa de retorno.
                 </p>

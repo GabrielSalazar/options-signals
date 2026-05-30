@@ -101,8 +101,8 @@ def exibir_relatorio_backtest(sinais: list):
     print(df_sinais[cols].tail(10).to_string(index=False))
     
     try:
-        df_excel = pd.read_excel('TP_Capital_Opcoes_B3-v2.xlsx', header=1)
+        df_excel = pd.read_excel('sinais_referencia.xlsx', header=1)
         if 'CÓDIGO OPÇÃO' in df_excel.columns:
-            print(f"\n[INFO] Planilha TP Capital carregada para comparação cruzada (Total registros: {len(df_excel)}).")
+            print(f"\n[INFO] Planilha de referência carregada para comparação cruzada (Total registros: {len(df_excel)}).")
     except Exception:
         pass
