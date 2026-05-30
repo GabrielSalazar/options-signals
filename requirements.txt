@@ -15,3 +15,5 @@ requests
 redis>=5.0.0
 scipy
 tqdm
+slowapi
+prometheus-client

@@ -14,6 +14,11 @@ from pydantic import BaseModel, field_validator
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
+from prometheus_client import make_asgi_app
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from config import ATIVOS_B3, CONFIG, get_all_b3_assets
 from core_engine import analisar_ativo
@@ -147,6 +152,11 @@ def cleanup_old_signals(days: int = 30):
 _last_scan_sinais: list[dict] = []
 _last_scan_ts: str | None = None
 _scan_lock = threading.Lock()
+_alert_queues: list[asyncio.Queue] = []
+
+async def broadcast_alert(sinal: dict):
+    for q in _alert_queues:
+        await q.put(sinal)
 
 
 class BacktestParams(BaseModel):
@@ -188,6 +198,11 @@ def run_scan(verbose: bool = False, all_b3: bool = False):
             if result:
                 sinais.append(result)
                 enviar_telegram(result)
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(broadcast_alert(result))
+                except RuntimeError:
+                    pass
 
     with _scan_lock:
         _last_scan_sinais = sinais
@@ -271,6 +286,14 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="B3 Options Signals API", lifespan=lifespan)
 
+limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
+
 _allowed_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -351,6 +374,11 @@ def scan_ticker(ticker: str = Path(pattern=r"^[A-Za-z0-9]{4,8}$")):
         return {"sinal": None, "message": "Nenhum sinal detectado"}
     persist_signals([sinal])
     enviar_telegram(sinal)
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(broadcast_alert(sinal))
+    except RuntimeError:
+        pass
     return {"sinal": sinal}
 
 
@@ -439,6 +467,30 @@ async def scan_stream(tickers: str = Query(default="")):
             _last_scan_ts = datetime.now(timezone.utc).isoformat()
 
         yield f"data: {json.dumps({'type': 'done', 'count': len(sinais)}, default=str)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/signals/alerts/stream")
+async def alerts_stream():
+    """SSE: envia eventos proativos em tempo real (novos sinais de opções)."""
+    q = asyncio.Queue()
+    _alert_queues.append(q)
+
+    async def event_generator():
+        try:
+            while True:
+                sinal = await q.get()
+                yield f"data: {json.dumps(sinal, default=str)}\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            if q in _alert_queues:
+                _alert_queues.remove(q)
 
     return StreamingResponse(
         event_generator(),
@@ -759,6 +811,26 @@ def get_market_options():
     # Ordenar globalmente por liquidez, top 6
     todas.sort(key=lambda x: x["negocios"], reverse=True)
     return {"opcoes": todas[:6]}
+
+
+@app.get("/market/opcoes/chain/{ticker}")
+def get_options_chain(ticker: str):
+    """Retorna a cadeia completa de opções em tempo real para o ticker."""
+    from data_providers import _fetch_chain
+    chain = _fetch_chain(ticker)
+    opcoes = []
+    for op in chain:
+        if len(op) < 10:
+            continue
+        op_ticker, _, op_tipo, _, _, op_strike, _, _, op_preco, op_negocios = op[:10]
+        opcoes.append({
+            "ticker": op_ticker,
+            "tipo": op_tipo,
+            "strike": float(op_strike) if op_strike else 0.0,
+            "preco": float(op_preco) if op_preco else 0.0,
+            "negocios": int(op_negocios) if op_negocios else 0
+        })
+    return {"chain": opcoes}
 
 
 @app.get("/config/telegram")
