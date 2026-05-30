@@ -23,7 +23,6 @@ from slowapi.middleware import SlowAPIMiddleware
 from backend.core.config import ATIVOS_B3, CONFIG, get_all_b3_assets
 from backend.services.core_engine import analisar_ativo
 from backend.core.cache import redis_status
-from scanner_opcoes_b3_v3 import enviar_telegram
 
 load_dotenv()
 
@@ -64,6 +63,37 @@ def _save_telegram_config(token: str, chat_id: str):
             json.dump({"token": token, "chat_id": chat_id}, f)
     except Exception as e:
         logger.warning(f"Erro ao salvar telegram_config.json: {e}")
+
+NOMES_MESES = {1:"Jan",2:"Fev",3:"Mar",4:"Abr",5:"Mai",6:"Jun",
+               7:"Jul",8:"Ago",9:"Set",10:"Out",11:"Nov",12:"Dez"}
+
+def enviar_telegram(sinal: dict):
+    import requests
+    token   = CONFIG.get("telegram_token", "")
+    chat_id = CONFIG.get("telegram_chat_id", "")
+    if not token or not chat_id:
+        return
+        
+    mes_str = NOMES_MESES.get(sinal.get("mes_venc"), "")
+    msg = (
+        f"🎯 *SINAL B3 — {sinal.get('ticker')}* ({sinal.get('nome')})\\n"
+        f"*Tipo:* {sinal.get('tipo_sinal')} | *Venc:* {mes_str}/{sinal.get('ano_venc')}\\n"
+        f"*Strike ref:* R$ {sinal.get('strike_ref', 0):.2f} ({sinal.get('dist_otm_pct', 0):.0f}% OTM)\\n"
+        f"*IV Hist:* {sinal.get('iv_hist')}% | *DTE:* {sinal.get('dte')} du\\n\\n"
+        f"*Entrada:* R$ {sinal.get('entrada_min', 0):.2f} – {sinal.get('entrada_max', 0):.2f}\\n"
+        f"*Alvo 1:* R$ {sinal.get('alvo1', 0):.2f} (+{CONFIG.get('alvo1_pct', 0.25)*100:.0f}%) | R/R: {sinal.get('rr_alvo1', 0):.1f}×\\n"
+        f"*Alvo 2:* R$ {sinal.get('alvo2', 0):.2f} (+{CONFIG.get('alvo2_pct', 0.5)*100:.0f}%) | R/R: {sinal.get('rr_alvo2', 0):.1f}×\\n"
+        f"*Stop:* R$ {sinal.get('stop', 0):.2f} ({CONFIG.get('stop_pct', 0.5)*100:.0f}%)\\n\\n"
+        f"*Score:* {sinal.get('score')}/10\\n"
+        f"*Gatilhos:*\\n• " + "\\n• ".join(sinal.get("gatilhos", []))
+    )
+    
+    try:
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        requests.post(url, data={'chat_id': chat_id, 'text': msg, 'parse_mode': 'Markdown'}, timeout=10)
+        logger.info(f"Sinal {sinal.get('ticker')} enviado ao Telegram.")
+    except Exception as e:
+        logger.error(f"Erro ao enviar Telegram para {sinal.get('ticker')}: {e}")
 
 # ── Supabase ──────────────────────────────────────────────────────────────────
 
