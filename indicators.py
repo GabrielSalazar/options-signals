@@ -35,6 +35,10 @@ def calcular_indicadores(df: pd.DataFrame) -> pd.DataFrame:
         df["bb_upper"]    = bb.bollinger_hband()
         df["bb_lower"]    = bb.bollinger_lband()
         df["bb_mid"]      = bb.bollinger_mavg()
+        adx_obj           = ta.trend.ADXIndicator(h, l, c, window=14)
+        df["adx"]         = adx_obj.adx()
+        df["williams_r"]  = ta.momentum.WilliamsRIndicator(h, l, c, lbp=14).williams_r()
+        df["cci"]         = ta.trend.CCIIndicator(h, l, c, window=20).cci()
     else:
         df["stoch_k"]     = _stoch_manual(h, l, c, CONFIG["stoch_k_period"])
         df["rsi"]         = _rsi_manual(c, CONFIG["rsi_period"])
@@ -49,6 +53,22 @@ def calcular_indicadores(df: pd.DataFrame) -> pd.DataFrame:
         df["bb_lower"]    = c.rolling(20).mean() - 2 * c.rolling(20).std()
         df["bb_upper"]    = c.rolling(20).mean() + 2 * c.rolling(20).std()
         df["bb_mid"]      = c.rolling(20).mean()
+        df["adx"]         = _adx_manual(h, l, c, 14)
+        lo14, hi14        = l.rolling(14).min(), h.rolling(14).max()
+        df["williams_r"]  = -100 * (hi14 - c) / (hi14 - lo14 + 1e-9)
+        tp                = (h + l + c) / 3
+        tp_ma             = tp.rolling(20).mean()
+        tp_md             = tp.rolling(20).apply(lambda x: np.mean(np.abs(x - x.mean())), raw=True)
+        df["cci"]         = (tp - tp_ma) / (0.015 * tp_md + 1e-9)
+
+    # Derivados úteis para o score ponderado (independentes da lib ta)
+    df["bb_pct"]   = (c - df["bb_lower"]) / (df["bb_upper"] - df["bb_lower"] + 1e-9)
+    df["bb_width"] = (df["bb_upper"] - df["bb_lower"]) / df["bb_mid"]
+    df["vol_ratio"] = v / v.rolling(20).mean()
+    df["trend_up"]   = ((c > df["ema9"]).astype(int) + (c > df["ema21"]).astype(int)
+                        + (c > df["ema200"]).astype(int))
+    df["trend_down"] = ((c < df["ema9"]).astype(int) + (c < df["ema21"]).astype(int)
+                        + (c < df["ema200"]).astype(int))
 
     df["vol_media_20"]    = v.rolling(20).mean()
     df["suporte_20"]      = l.rolling(20).min()
@@ -76,6 +96,18 @@ def _atr_manual(high, low, close, period=14):
                     (high - close.shift()).abs(),
                     (low  - close.shift()).abs()], axis=1).max(axis=1)
     return tr.rolling(period).mean()
+
+def _adx_manual(high, low, close, period=14):
+    plus_dm = high.diff().clip(lower=0)
+    minus_dm = (-low.diff()).clip(lower=0)
+    tr = pd.concat([high - low,
+                    (high - close.shift()).abs(),
+                    (low  - close.shift()).abs()], axis=1).max(axis=1)
+    atr = tr.rolling(period).mean()
+    plus_di  = 100 * plus_dm.rolling(period).mean() / (atr + 1e-9)
+    minus_di = 100 * minus_dm.rolling(period).mean() / (atr + 1e-9)
+    dx = (abs(plus_di - minus_di) / (plus_di + minus_di + 1e-9)) * 100
+    return dx.rolling(period).mean()
 
 def detectar_divergencia(df: pd.DataFrame, janela: int = 5) -> tuple:
     if len(df) < janela + 2:
