@@ -59,7 +59,7 @@ export default function AnalyticsPage() {
     setStats(null);
     try {
       const [sigs, statsData] = await Promise.all([
-        fetchSignalHistory(200, t),
+        fetchSignalHistory(200, 0, t),
         fetchAnalytics(t),
       ]);
       setSignals(sigs);

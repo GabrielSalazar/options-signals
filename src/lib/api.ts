@@ -7,7 +7,7 @@ const api = axios.create({
 });
 
 // Single-ticker scan — returns { sinal: Signal | null }
-export const fetchScan = async (ticker: string, filters: any = {}) => {
+export const fetchScan = async (ticker: string, filters: Record<string, unknown> = {}) => {
     const response = await api.post(`/signals/scan/${ticker}`, null, {
         params: filters
     });
@@ -68,10 +68,11 @@ export const fetchBacktestStrategies = async () => {
 
 export const fetchSignalHistory = async (
     limit = 50,
+    offset = 0,
     ticker?: string,
     tipo_sinal?: string,
 ): Promise<import('@/types/signals').Signal[]> => {
-    const params = new URLSearchParams({ limit: String(limit) });
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
     if (ticker) params.set('ticker', ticker);
     if (tipo_sinal) params.set('tipo_sinal', tipo_sinal);
     const response = await api.get(`/signals/history?${params}`);

@@ -49,6 +49,7 @@ def get_signals(
 @router.get("/signals/history")
 def get_history(
     limit: int = Query(default=50, le=200),
+    offset: int = Query(default=0, ge=0),
     ticker: str = Query(default=None),
     tipo_sinal: str = Query(default=None),
 ):
@@ -59,18 +60,18 @@ def get_history(
     if tipo_sinal:
         filtered = [s for s in filtered if s.get("tipo_sinal", "") == tipo_sinal.upper()]
     if not supabase:
-        return {"data": filtered[:limit], "source": "memory"}
+        return {"data": filtered[offset:offset + limit], "source": "memory"}
     try:
         query = supabase.table("signals").select("*").order("timestamp", desc=True)
         if ticker:
             query = query.eq("ticker", ticker.upper())
         if tipo_sinal:
             query = query.eq("tipo_sinal", tipo_sinal.upper())
-        res = query.limit(limit).execute()
+        res = query.range(offset, offset + limit - 1).execute()
         return {"data": res.data, "source": "supabase"}
     except Exception as e:
         logger.error(f"Erro ao buscar histórico: {e}")
-        return {"data": filtered[:limit], "source": "memory_fallback"}
+        return {"data": filtered[offset:offset + limit], "source": "memory_fallback"}
 
 
 @router.get("/signals/watchlist")

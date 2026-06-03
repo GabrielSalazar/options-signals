@@ -2,6 +2,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import { Signal } from '@/types/signals';
 
+// Número de sinais mantidos no feed ao vivo (consulta inicial + janela do realtime).
+const LIVE_FEED_LIMIT = 100;
+
 function isB3MarketOpen(): boolean {
     const now = new Date();
     const fmt = new Intl.DateTimeFormat('en-US', {
@@ -30,7 +33,7 @@ export function useSignals(active: boolean = true) {
                 .from('signals')
                 .select('*')
                 .order('timestamp', { ascending: false })
-                .limit(100);
+                .limit(LIVE_FEED_LIMIT);
 
             if (error) {
                 setIsError(true);
@@ -66,7 +69,7 @@ export function useSignals(active: boolean = true) {
                     'postgres_changes',
                     { event: 'INSERT', schema: 'public', table: 'signals' },
                     (payload: { new: Signal }) => {
-                        setSignals((prev) => [payload.new, ...prev].slice(0, 100));
+                        setSignals((prev) => [payload.new, ...prev].slice(0, LIVE_FEED_LIMIT));
                     }
                 )
                 .subscribe();

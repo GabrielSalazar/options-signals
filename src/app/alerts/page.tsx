@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import {
-  Bell, RefreshCcw, Download, Plus, Trash2, X,
+  Bell, RefreshCcw, Download, Plus, Trash2, X, ChevronDown,
 } from 'lucide-react';
 import { fetchSignalHistory } from '@/lib/api';
 import { Signal } from '@/types/signals';
+
+// Tamanho da página de histórico — paginação real via limit/offset no backend.
+const PAGE_SIZE = 50;
 
 // ── Alert Rules ──────────────────────────────────────────────────────────────
 
@@ -66,6 +69,8 @@ function exportCSV(signals: Signal[]) {
 export default function AlertsPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Filters
@@ -81,20 +86,34 @@ export default function AlertsPage() {
 
   useEffect(() => { setRules(loadRules()); }, []);
 
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchSignalHistory(200);
+      const data = await fetchSignalHistory(PAGE_SIZE, 0);
       setSignals(data);
+      setHasMore(data.length === PAGE_SIZE);
     } catch {
       setError('Falha ao carregar histórico. Verifique se o backend está rodando.');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { loadHistory(); }, []);
+  const loadMore = useCallback(async () => {
+    setLoadingMore(true);
+    try {
+      const data = await fetchSignalHistory(PAGE_SIZE, signals.length);
+      setSignals((prev) => [...prev, ...data]);
+      setHasMore(data.length === PAGE_SIZE);
+    } catch {
+      setError('Falha ao carregar mais sinais.');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [signals.length]);
+
+  useEffect(() => { loadHistory(); }, [loadHistory]);
 
   // Client-side filtering
   const cutoff = useMemo(() => {
@@ -447,6 +466,22 @@ export default function AlertsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Paginação — carrega a próxima página via offset no backend */}
+        {!loading && !error && hasMore && (
+          <div className="flex justify-center pt-4">
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="btn-secondary flex items-center gap-2 disabled:opacity-40"
+            >
+              {loadingMore
+                ? <RefreshCcw className="h-4 w-4 animate-spin" />
+                : <ChevronDown className="h-4 w-4" />}
+              {loadingMore ? 'Carregando...' : 'Carregar mais'}
+            </button>
+          </div>
+        )}
       </div>
     </main>
   );
