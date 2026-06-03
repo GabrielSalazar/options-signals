@@ -1,0 +1,25 @@
+#!/bin/sh
+# Regra de pré-commit: bloqueia co-autoria de IA (Claude/Anthropic) e
+# qualquer email @anthropic.com nas mensagens de commit.
+#
+# Ativado via:  git config core.hooksPath .githooks
+# Roda automaticamente em todo commit (qualquer autor/ferramenta).
+
+msg_file="$1"
+
+if grep -qiE 'co-authored-by:[[:space:]]*.*(claude|anthropic)' "$msg_file"; then
+  echo "❌ Commit bloqueado: remova o trailer 'Co-Authored-By' de Claude/Anthropic da mensagem." >&2
+  exit 1
+fi
+
+if grep -qiE '@anthropic\.com' "$msg_file"; then
+  echo "❌ Commit bloqueado: remova emails @anthropic.com da mensagem de commit." >&2
+  exit 1
+fi
+
+if grep -qiE 'generated with[[:space:]]+.*claude' "$msg_file"; then
+  echo "❌ Commit bloqueado: remova menções de geração por Claude da mensagem de commit." >&2
+  exit 1
+fi
+
+exit 0
