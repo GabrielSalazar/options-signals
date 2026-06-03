@@ -1,14 +1,17 @@
-from fastapi import APIRouter, HTTPException
+"""Endpoints de dados de mercado: cotações de índices/ações e opções líquidas."""
 import logging
-import yfinance as yf
-from backend.services.data_providers import get_liquid_options_for_ticker
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+from fastapi import APIRouter, HTTPException
 
 logger = logging.getLogger("b3_api")
 router = APIRouter(prefix="/market", tags=["Market"])
 
-@router.get("/")
+
+@router.get("")
 def get_market():
+    import yfinance as yf
+
     INDICES = [("IBOV", "^BVSP")]
     ACOES = [
         ("PETR4", "PETR4.SA"), ("VALE3", "VALE3.SA"), ("ITUB4", "ITUB4.SA"),
@@ -55,7 +58,18 @@ def get_market():
 
 @router.get("/opcoes")
 def get_market_options():
+    """
+    Retorna lista de opções reais mais líquidas dos principais tickers da B3,
+    consumida pela tab Opções do MarketWidget no frontend.
+
+    Dados vêm de opcoes.net.br com cache de 3 min por ticker.
+    Todos os tickers são consultados em paralelo (ThreadPoolExecutor).
+    Em caso de erro total, retorna lista vazia (frontend usa fallback).
+    """
+    from backend.services.data_providers import get_liquid_options_for_ticker
+
     TICKERS_HOT = ["PETR4", "VALE3", "ITUB4", "MGLU3", "WEGE3", "BBAS3"]
+
     todas: list[dict] = []
 
     def fetch_opts(ticker: str) -> list[dict]:
@@ -70,12 +84,14 @@ def get_market_options():
         for future in as_completed(futures):
             todas.extend(future.result())
 
+    # Ordenar globalmente por liquidez, top 6
     todas.sort(key=lambda x: x["negocios"], reverse=True)
     return {"opcoes": todas[:6]}
 
 
 @router.get("/opcoes/chain/{ticker}")
 def get_options_chain(ticker: str):
+    """Retorna a cadeia completa de opções em tempo real para o ticker."""
     from backend.services.data_providers import _fetch_chain
     chain = _fetch_chain(ticker)
     opcoes = []
