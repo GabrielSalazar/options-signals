@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.2.0] - 2026-06-03
+
+### Refatoração Geral (clean code, sem mudança de contrato)
+
+#### Limpeza estrutural
+- Relatórios de sessões antigas movidos da raiz para [docs/archive/](archive/)
+  (REWRITE_ANALYSIS, README_REWRITE_SUMMARY, GITHUB_STRUCTURE, CLEANUP_LOG, STRUCTURE, .github-structure).
+- `ESTADO_ATUAL.md` e `REPORT_COMPLETO.md` atualizados para refletir o estado real.
+
+#### Backend — routers + camada de serviço
+- `backend/api/main.py` reduzido de **898 → 81 linhas**: agora só `create_app()`,
+  `lifespan` e `include_router`.
+- Endpoints divididos em routers: `health`, `signals`, `scan`, `backtest`, `market`, `config`.
+- Lógica de negócio extraída para serviços: `signal_service`, `telegram_service`,
+  `supabase_client`, `scheduler`.
+- Removido o router `/market` morto (nunca incluído) e a duplicação de endpoints inline.
+
+### Fixed
+- **Sombreamento de rotas:** `GET /signals/scan/stream`, `POST /signals/scan/all` e
+  `POST /signals/scan/all-b3` eram capturados por `/signals/scan/{ticker}` (retornavam
+  422 ou faziam scan errado). A ordenação correta dos routers restaura o comportamento
+  esperado pelo frontend. Coberto por `tests/test_api_routing.py` (21 testes).
+
+### Added
+- **Testes de front-end:** Vitest + React Testing Library (happy-dom) com 36 testes
+  cobrindo `black-scholes`, `strategies`, `monte-carlo`, `format` e smoke RTL.
+  Scripts `npm test` / `npm run test:watch`.
+- **Paginação real** no histórico de sinais: `offset` em `/signals/history`,
+  `fetchSignalHistory(limit, offset)` e botão "Carregar mais" na página de alertas
+  (no lugar do limite hardcoded de 200).
+
 ## [4.1.0] - 2026-05-29
 
 ### Added
