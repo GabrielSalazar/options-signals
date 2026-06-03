@@ -1,7 +1,7 @@
 # Estado Atual do Projeto — B3 Options Signals
 
-**Data:** 2026-05-27  
-**Versão:** v2.1 (Next.js + FastAPI + Supabase + Redis)  
+**Data:** 2026-06-03  
+**Versão:** v4.1 (Next.js + FastAPI + Supabase + Redis)  
 **Status:** Em produção — parcialmente funcional
 
 ---
@@ -112,15 +112,15 @@ O motor de estratégias suporta as 17 operações estruturadas com cálculo din�
 
 ## Próximos Passos Prioritários
 
-### Alta Prioridade
-1. **Restart Render se adormecido** — render.com → options-signals-b79i → Restart
-2. **Página /login** — rota faltante, botão "Entrar" quebrado
+### Em andamento — Refatoração Geral (jun/2026)
+Ver spec em [superpowers/specs/2026-06-03-refatoracao-geral-design.md](superpowers/specs/2026-06-03-refatoracao-geral-design.md):
+1. **Limpeza estrutural** — relatórios soltos da raiz movidos para `docs/archive/`; docs de estado atualizados.
+2. **Qualidade do backend** — `main.py` (898 linhas) dividido em routers + camada de serviço.
+3. **Testes de front-end** — setup Vitest + RTL e cobertura dos módulos puros (`lib/`).
+4. **Paginação** — substituir limites hardcoded de 200 em `alerts`/`signals`.
 
-### Média Prioridade
-3. **`middleware.ts`** — proteção server-side de rotas internas
-4. **Implementação de novos testes** — A suite atual cobre 117 testes automatizados de backend, mas faltam testes E2E e unitários de front-end.
-
-### Baixa Prioridade
-5. **Tab "Opções" MarketWidget** — precisaria endpoint de options pricing
-6. **Alertas push/email** — backend não notifica proativamente
-7. **Paginação** — alerts/signals limitados a 200 registros hardcoded
+### Backlog (fora da refatoração atual)
+- **Página /login + `middleware.ts`** — autenticação e proteção de rotas (adiado).
+- **Tab "Opções" MarketWidget** — precisaria endpoint de options pricing.
+- **Alertas push/email** — backend não notifica proativamente.
+- **Restart Render se adormecido** — render.com → options-signals-b79i → Restart (limitação do free tier).

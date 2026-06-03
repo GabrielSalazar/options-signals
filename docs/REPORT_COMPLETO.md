@@ -2,6 +2,16 @@
 **Gerado em:** 2026-05-26  
 **Metodologia:** Auditoria full-stack com agentes especializados (frontend + backend)
 
+> **⚠️ Snapshot histórico (26/05/2026).** Este relatório reflete o estado naquela data.
+> Desde então, itens relevantes foram entregues — veja o estado atual em
+> [ESTADO_ATUAL.md](ESTADO_ATUAL.md) e o histórico em [CHANGELOG.md](CHANGELOG.md):
+> - ✅ **Cache Redis** configurado e otimizado (antes "não configurado").
+> - ✅ **Testes automatizados**: 119 testes de backend (antes "zero cobertura").
+> - ✅ **Greeks + score ponderado** adicionados ao pipeline (v4.0/v4.1).
+> - ✅ **Backend modularizado** em `backend/{api,core,domain,services}` (antes monólito na raiz).
+>
+> As seções abaixo são preservadas como registro da auditoria original.
+
 ---
 
 ## Sumário Executivo
