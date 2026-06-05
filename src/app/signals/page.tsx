@@ -13,7 +13,7 @@ const SECTORS: Record<string, { ticker: string; nome: string }[]> = {
         { ticker: 'PETR4', nome: 'Petrobras PN' },
         { ticker: 'PETR3', nome: 'Petrobras ON' },
         { ticker: 'PRIO3', nome: 'PetroRio' },
-        { ticker: 'RRRP3', nome: '3R Petroleum' },
+        { ticker: 'BRAV3', nome: 'Brava Energia' },
         { ticker: 'RECV3', nome: 'Recôncavo' },
     ],
     'Mineração': [
@@ -33,10 +33,9 @@ const SECTORS: Record<string, { ticker: string; nome: string }[]> = {
     ],
     'Varejo': [
         { ticker: 'MGLU3', nome: 'Magazine Luiza' },
-        { ticker: 'VIIA3', nome: 'Via' },
+        { ticker: 'BHIA3', nome: 'Casas Bahia' },
         { ticker: 'LREN3', nome: 'Lojas Renner' },
-        { ticker: 'SOMA3', nome: 'Grupo SOMA' },
-        { ticker: 'AMER3', nome: 'Americanas' },
+        { ticker: 'AZZA3', nome: 'Azzas 2154' },
     ],
     'Energia': [
         { ticker: 'EGIE3', nome: 'Engie Brasil' },
