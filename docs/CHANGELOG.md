@@ -12,7 +12,9 @@ All notable changes to this project will be documented in this file.
   sufixos 3/4/11) e `filtrar_por_volume()` (volume financeiro médio em R$).
 - `CONFIG`: `min_volume_rs`, `ticker_top_n`, `ticker_cache_segundos`, `scan_max_workers`,
   `telegram_throttle_s`.
-- Testes: `test_ticker_loader`, `test_data_providers`, `test_signal_service`, `test_telegram`.
+- `ticker_loader.nome_ativo()`: resolve o nome da empresa (curados → API B3 → código). [B2]
+- Testes: `test_ticker_loader`, `test_data_providers`, `test_signal_service`, `test_telegram`
+  e **`test_core_engine`** (caracterização de `analisar_ativo`, que antes tinha cobertura zero).
 
 ### Changed
 - Scan agendado passa a varrer o **universo líquido** por padrão
@@ -24,6 +26,10 @@ All notable changes to this project will be documented in this file.
 - Workers do scan configuráveis via `CONFIG["scan_max_workers"]` (era 10 fixo). [A2]
 - `CONFIG`: `min_volume_diario` renomeado para `min_volume_acoes` (desambigua do
   `min_volume_rs`). [A5]
+- **`analisar_ativo` decomposto** (~330 → ~40 linhas) em `_carregar_ohlcv`,
+  `_avaliar_gatilhos`, `_montar_estrutura_opcao` e `_montar_sinal`, sem mudança de
+  comportamento (travado por testes de caracterização). [B1]
+- `scan_single`/`scan_batch` usam o nome de empresa enriquecido para tickers não-curados. [B2]
 
 ### Fixed
 - Mensagens do Telegram usavam `\n` literal em vez de quebras de linha reais. [B3]

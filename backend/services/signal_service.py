@@ -14,7 +14,7 @@ from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from backend.core.config import ATIVOS_B3, CONFIG
-from backend.services.ticker_loader import carregar_tickers_b3
+from backend.services.ticker_loader import carregar_tickers_b3, nome_ativo
 from backend.services.core_engine import analisar_ativo
 from backend.services.supabase_client import get_supabase
 from backend.services.telegram_service import enviar_telegram, notificar_lote
@@ -186,7 +186,7 @@ def analyse_ticker(ticker: str, nome: str, verbose: bool = False) -> dict | None
 def scan_single(ticker: str) -> dict | None:
     """Scan de um ticker: analisa, persiste, notifica e faz broadcast."""
     ticker_sa = _normalize_ticker(ticker)
-    nome = ATIVOS_B3.get(ticker_sa, ticker.upper())
+    nome = nome_ativo(ticker_sa)
     sinal = analisar_ativo(ticker_sa, nome, verbose=True)
     if not sinal:
         return None
@@ -202,7 +202,7 @@ def scan_batch(tickers: list[str]) -> list[dict]:
     with ThreadPoolExecutor(max_workers=10) as pool:
         def do_scan(t: str):
             t_sa = _normalize_ticker(t)
-            nome = ATIVOS_B3.get(t_sa, t.upper())
+            nome = nome_ativo(t_sa)
             return analyse_ticker(t_sa, nome)
 
         futures = {pool.submit(do_scan, t): t for t in tickers}

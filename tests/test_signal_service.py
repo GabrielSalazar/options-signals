@@ -37,3 +37,15 @@ def test_run_scan_telegram_em_lote_unico(monkeypatch):
     ss.run_scan()
     assert len(lotes) == 1          # um único envio em lote, não por-sinal
     assert len(lotes[0]) == 2
+
+
+def test_scan_batch_usa_nome_enriquecido(monkeypatch):
+    from backend.services import ticker_loader as tl
+    monkeypatch.setattr(tl, "fetch_b3_official_tickers", lambda: {"XPTO3": "XPTO Corp"})
+    captured = {}
+    monkeypatch.setattr(ss, "analyse_ticker", lambda t_sa, nome: captured.update(nome=nome) or None)
+    monkeypatch.setattr(ss, "persist_signals", lambda s: None)
+    monkeypatch.setattr(ss, "update_last_scan", lambda s: None)
+    monkeypatch.setattr(ss, "notificar_lote", lambda s: None)
+    ss.scan_batch(["XPTO3"])  # não-curado → deve vir o nome da B3, não o código
+    assert captured["nome"] == "XPTO Corp"

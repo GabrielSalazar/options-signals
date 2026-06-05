@@ -94,6 +94,18 @@ def carregar_tickers_b3(
     return resultado
 
 
+def nome_ativo(ticker: str) -> str:
+    """Resolve o melhor nome conhecido para um ticker: lista curada → nome da
+    empresa via API oficial da B3 (cache 24h) → o próprio código. Usado por
+    scan_single/scan_batch para não exibir o código cru de não-curados (B2)."""
+    base = _base(ticker)
+    sa = f"{base}.SA"
+    if sa in ATIVOS_B3:
+        return ATIVOS_B3[sa]
+    nome = fetch_b3_official_tickers().get(base)
+    return nome if nome else base
+
+
 def get_all_b3_assets() -> Dict[str, str]:
     """Compat: universo líquido como dict {TICKER.SA: nome}. (Antes em config.py.)
 

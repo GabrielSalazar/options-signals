@@ -1,0 +1,153 @@
+"""Testes de caracterização de analisar_ativo (rede de segurança p/ refactor B1).
+
+`analisar_ativo` é determinístico quando recebe `df_provided` e mocka-se data,
+horário e a busca de opção real. Estes testes travam o comportamento atual antes
+da decomposição da função — devem permanecer verdes durante todo o refactor.
+
+Nota: o pipeline real rejeita por R/R (rr_alvo1 = 0.25/0.43 = 0.58 < rr_minimo 0.8
+para todo sinal teórico). Para exercitar o caminho completo de montagem de sinal,
+os testes relaxam `rr_minimo`/banda de delta via monkeypatch.
+"""
+import numpy as np
+import pandas as pd
+import pytest
+
+from backend.services import core_engine
+from backend.domain.indicators import calcular_indicadores
+
+
+def _make_df(seed: int, n: int = 90, drop: float = 1.6) -> pd.DataFrame:
+    """OHLCV determinístico com queda no final (empurra para sobrevenda)."""
+    rng = np.random.default_rng(seed)
+    base = 13.0 + np.cumsum(rng.normal(0, 0.12, n))
+    base[-18:] = base[-18] - np.linspace(0, drop, 18)
+    close = np.maximum(base, 1.0)
+    high = close * (1 + rng.uniform(0.002, 0.012, n))
+    low = close * (1 - rng.uniform(0.002, 0.012, n))
+    openp = close + rng.normal(0, 0.05, n)
+    vol = rng.uniform(2_000_000, 5_000_000, n)
+    idx = pd.date_range("2026-01-01", periods=n, freq="B")
+    df = pd.DataFrame({"Open": openp, "High": high, "Low": low,
+                       "Close": close, "Volume": vol}, index=idx)
+    return calcular_indicadores(df).dropna()
+
+
+def _relax_and_mock(monkeypatch):
+    monkeypatch.setitem(core_engine.CONFIG, "rr_minimo", 0.0)
+    monkeypatch.setitem(core_engine.CONFIG, "delta_min", 0.0)
+    monkeypatch.setitem(core_engine.CONFIG, "delta_max", 1.0)
+    monkeypatch.setattr(core_engine, "mes_vencimento_ideal", lambda: (6, 2026, 30))
+    monkeypatch.setattr(core_engine, "score_horario", lambda *a, **k: 0)
+    monkeypatch.setattr(core_engine, "get_real_options_from_opcoes_net", lambda *a, **k: None)
+
+
+def test_analisar_ativo_sinal_call_caracterizacao(monkeypatch):
+    _relax_and_mock(monkeypatch)
+    df = _make_df(0)
+
+    s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=df, indicators_calculated=True)
+
+    assert s is not None
+    assert s["ticker"] == "TESTE3"
+    assert s["nome"] == "Teste SA"
+    assert s["tipo_sinal"] == "CALL"
+    assert s["direcao"] == "COMPRA DE CALL"
+    assert s["score"] == 9
+    assert s["preco_acao"] == pytest.approx(12.2902, abs=1e-3)
+    assert s["strike_ref"] == 13.27
+    assert s["dist_otm_pct"] == 8.0
+    assert (s["dte"], s["mes_venc"], s["ano_venc"]) == (30, 6, 2026)
+    assert s["premio_est"] == 0.1
+    assert s["preco_tela"] is None
+    assert s["ticker_opcao"] == "N/A (S/ Liquidez)"
+    assert (s["entrada_min"], s["entrada_max"]) == (0.1, 0.1)
+    assert (s["alvo1"], s["alvo2"], s["alvo_final"], s["stop"]) == (0.12, 0.35, 0.8, 0.06)
+    assert (s["rr_alvo1"], s["rr_alvo2"], s["rr_final"]) == (0.5, 6.25, 17.5)
+    assert len(s["gatilhos"]) == 4
+    assert set(s["greeks"]) == {"delta", "gamma", "theta", "vega", "rho", "prob_profit"}
+    assert s["greeks"]["delta"] == pytest.approx(0.0095, abs=1e-3)
+
+
+def test_analisar_ativo_volume_baixo_retorna_none():
+    df = _make_df(0)
+    df["vol_media_20"] = 100  # abaixo de min_volume_acoes (1M) → rejeita no gate de volume
+    s = core_engine.analisar_ativo("TESTE3", "Teste", df_provided=df, indicators_calculated=True)
+    assert s is None
+
+
+def test_analisar_ativo_df_curto_retorna_none():
+    df = _make_df(0).head(20)  # < 30 barras
+    s = core_engine.analisar_ativo("TESTE3", "Teste", df_provided=df, indicators_calculated=True)
+    assert s is None
+
+
+# ── B1: testes das funções extraídas (decomposição) ──────────────────────────
+
+def test_carregar_ohlcv_df_provided_retorna_copia():
+    df = _make_df(0)
+    out = core_engine._carregar_ohlcv("X", "1d", df, True, False)
+    assert out is not None
+    assert len(out) == len(df)
+    assert out is not df  # é uma cópia, não o mesmo objeto
+
+
+def test_carregar_ohlcv_df_curto_retorna_none():
+    df = _make_df(0).head(20)
+    assert core_engine._carregar_ohlcv("X", "1d", df, True, False) is None
+
+
+def test_avaliar_gatilhos_seed0_alta():
+    df = _make_df(0)
+    u, p = df.iloc[-1], df.iloc[-2]
+    preco = float(u["Close"]); volume = float(u["Volume"]); vol_med = float(u["vol_media_20"])
+    g = core_engine._avaliar_gatilhos(df, u, p, preco, vol_med, volume)
+    assert g["score_alta"] == 9            # mesmo raw score da caracterização (bonus=0)
+    assert len(g["sinais_alta"]) == 4
+    assert g["score_alta"] > g["score_baixa"]
+    assert g["rsi"] == pytest.approx(float(u["rsi"]))
+    assert g["vol_ratio"] == pytest.approx(volume / vol_med)
+
+
+def test_montar_estrutura_opcao_seed0(monkeypatch):
+    _relax_and_mock(monkeypatch)
+    df = _make_df(0)
+    preco = float(df.iloc[-1]["Close"])
+    est = core_engine._montar_estrutura_opcao("TESTE3", preco, "CALL", df, "1d", False)
+    assert est is not None
+    assert est["strike_ref"] == 13.27
+    assert est["premio_est"] == 0.1
+    assert est["dte"] == 30
+    assert (est["alvo1"], est["alvo2"], est["alvo_final"], est["stop"]) == (0.12, 0.35, 0.8, 0.06)
+    assert (est["rr_alvo1"], est["rr_alvo2"], est["rr_final"]) == (0.5, 6.25, 17.5)
+    assert "greeks" in est and "preco_base_calculo" in est
+
+
+def test_montar_estrutura_opcao_rejeita_por_rr(monkeypatch):
+    # Sem relaxar rr_minimo (0.8): rr_alvo1=0.5 < 0.8 → rejeita
+    monkeypatch.setattr(core_engine, "mes_vencimento_ideal", lambda: (6, 2026, 30))
+    monkeypatch.setattr(core_engine, "get_real_options_from_opcoes_net", lambda *a, **k: None)
+    monkeypatch.setitem(core_engine.CONFIG, "delta_min", 0.0)
+    monkeypatch.setitem(core_engine.CONFIG, "delta_max", 1.0)
+    df = _make_df(0)
+    preco = float(df.iloc[-1]["Close"])
+    assert core_engine._montar_estrutura_opcao("TESTE3", preco, "CALL", df, "1d", False) is None
+
+
+def test_montar_sinal_monta_dict(monkeypatch):
+    _relax_and_mock(monkeypatch)
+    df = _make_df(0)
+    u, p = df.iloc[-1], df.iloc[-2]
+    preco = float(u["Close"])
+    gat = core_engine._avaliar_gatilhos(df, u, p, preco, float(u["vol_media_20"]), float(u["Volume"]))
+    est = core_engine._montar_estrutura_opcao("TESTE3", preco, "CALL", df, "1d", False)
+    s = core_engine._montar_sinal("TESTE3", "Teste SA", "CALL", "COMPRA DE CALL", "🟢",
+                                  9, gat["sinais_alta"], preco, u, p,
+                                  gat["stoch_k"], gat["rsi"], gat["vol_ratio"], est, False)
+    assert s["ticker"] == "TESTE3"
+    assert s["nome"] == "Teste SA"
+    assert s["tipo_sinal"] == "CALL"
+    assert s["score"] == 9
+    assert s["strike_ref"] == 13.27
+    assert s["dist_otm_pct"] == 8.0
+    assert set(s["greeks"]) == {"delta", "gamma", "theta", "vega", "rho", "prob_profit"}
+    assert "score_ponderado" in s and "ponderado_passou" in s

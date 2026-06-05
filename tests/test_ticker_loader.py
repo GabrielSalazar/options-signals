@@ -82,3 +82,19 @@ def test_config_nao_importa_services():
     import backend.core.config as cfg
     src = inspect.getsource(cfg)
     assert "backend.services" not in src
+
+
+def test_nome_ativo_curado_tem_precedencia(monkeypatch):
+    monkeypatch.setattr(tl, "fetch_b3_official_tickers", lambda: {"PETR4": "OUTRO"})
+    assert tl.nome_ativo("PETR4.SA") == ATIVOS_B3["PETR4.SA"]
+    assert tl.nome_ativo("petr4") == ATIVOS_B3["PETR4.SA"]
+
+
+def test_nome_ativo_usa_nome_b3_para_nao_curado(monkeypatch):
+    monkeypatch.setattr(tl, "fetch_b3_official_tickers", lambda: {"XPTO3": "XPTO Corp"})
+    assert tl.nome_ativo("XPTO3.SA") == "XPTO Corp"
+
+
+def test_nome_ativo_fallback_codigo(monkeypatch):
+    monkeypatch.setattr(tl, "fetch_b3_official_tickers", lambda: {})
+    assert tl.nome_ativo("ZZZZ3") == "ZZZZ3"
