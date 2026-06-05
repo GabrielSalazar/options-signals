@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Não lançado]
 
+### Removido
+- **Filtro de R/R retirado**: o gate `rr_alvo1 < rr_minimo` em `_montar_estrutura_opcao`
+  e a config `rr_minimo` foram removidos. Como alvos e stop são percentuais fixos, o
+  R/R era uma **constante** (~0.58) → o filtro nunca discriminava sinais (aceitava todos
+  ou rejeitava todos). Os valores `rr_alvo1/2/final` continuam no sinal como **informação**
+  (exibidos no card), apenas não filtram mais. A decisão de emissão fica com `score` + `delta`.
+
 ### Melhorias (rodada de refatoração jun/2026)
 - **[P0] Cache com fallback em memória** ([backend/core/cache.py](../backend/core/cache.py)):
   quando o Redis está indisponível, o cache passa a usar um store TTL in-process em vez

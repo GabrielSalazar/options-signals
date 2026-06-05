@@ -268,14 +268,10 @@ def _montar_estrutura_opcao(ticker_base: str, preco: float, tipo_sinal: str,
 
     book_until   = (datetime.now() + timedelta(days=CONFIG.get("book_days", 7))).strftime("%d/%m")
     risco        = preco_base_calculo - stop
+    # R/R é informativo apenas (alvos/stop são % fixos → razão constante; não filtra).
     rr_alvo1     = round((alvo1 - preco_base_calculo) / risco, 2) if risco > 0 else 0
     rr_alvo2     = round((alvo2 - preco_base_calculo) / risco, 2) if risco > 0 else 0
     rr_final     = round((alvo_final - preco_base_calculo) / risco, 2) if risco > 0 else 0
-
-    if rr_alvo1 < CONFIG["rr_minimo"]:
-        if verbose:
-            logger.info(f"⚠ {ticker_base}: R/R Alvo1={rr_alvo1:.2f} < {CONFIG['rr_minimo']} → rejeitado")
-        return None
 
     return {
         "dist_otm": dist_otm, "strike_ref": strike_ref, "iv": iv, "iv_mercado": iv_mercado,

@@ -24,11 +24,6 @@ class TestValidarConfig:
     def test_config_atual_e_valido(self):
         validar_config()  # não deve levantar
 
-    def test_rejeita_rr_minimo_alto(self):
-        c = copy.deepcopy(CONFIG); c["rr_minimo"] = 2.0  # > alvo1/|stop|
-        with pytest.raises(ValueError, match="rr_minimo"):
-            validar_config(c)
-
     def test_rejeita_dte_invalido(self):
         c = copy.deepcopy(CONFIG); c["dte_minimo"] = 50  # > dte_maximo
         with pytest.raises(ValueError, match="DTE"):
@@ -57,7 +52,7 @@ class TestConfigDefaults:
         "stoch_k_period", "stoch_d_period", "rsi_period",
         "ema_fast", "ema_slow", "volume_mult",
         "stop_pct", "alvo1_pct", "alvo2_pct", "alvo_final_pct",
-        "rr_minimo", "min_volume_acoes", "min_score",
+        "min_volume_acoes", "min_score",
         "delta_min", "delta_max", "dte_minimo", "dte_maximo",
         "reentrada_min_dias", "scoring_mode", "min_score_ponderado",
     ]
@@ -74,15 +69,6 @@ class TestConfigDefaults:
 
     def test_delta_range_valid(self):
         assert 0 < CONFIG["delta_min"] < CONFIG["delta_max"] <= 1.0
-
-    def test_rr_minimo_permite_sinais(self):
-        """rr_alvo1 = alvo1_pct/|stop_pct| é constante; se rr_minimo o exceder,
-        NENHUM sinal passa. O piso precisa ser <= essa R/R natural da estratégia."""
-        rr_natural = CONFIG["alvo1_pct"] / abs(CONFIG["stop_pct"])
-        assert CONFIG["rr_minimo"] <= rr_natural, (
-            f"rr_minimo={CONFIG['rr_minimo']} > R/R natural do alvo1 ({rr_natural:.2f}) "
-            "→ nenhum sinal seria emitido"
-        )
 
     def test_dte_range_valid(self):
         assert 0 < CONFIG["dte_minimo"] < CONFIG["dte_maximo"]

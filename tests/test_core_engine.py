@@ -4,9 +4,9 @@
 horário e a busca de opção real. Estes testes travam o comportamento atual antes
 da decomposição da função — devem permanecer verdes durante todo o refactor.
 
-Nota: o pipeline real rejeita por R/R (rr_alvo1 = 0.25/0.43 = 0.58 < rr_minimo 0.8
-para todo sinal teórico). Para exercitar o caminho completo de montagem de sinal,
-os testes relaxam `rr_minimo`/banda de delta via monkeypatch.
+Nota: o filtro de R/R foi removido (era constante e não discriminava sinais);
+os testes relaxam apenas a banda de delta via monkeypatch para exercitar o
+caminho completo de montagem.
 """
 import numpy as np
 import pandas as pd
@@ -33,7 +33,6 @@ def _make_df(seed: int, n: int = 90, drop: float = 1.6) -> pd.DataFrame:
 
 
 def _relax_and_mock(monkeypatch):
-    monkeypatch.setitem(core_engine.CONFIG, "rr_minimo", 0.0)
     monkeypatch.setitem(core_engine.CONFIG, "delta_min", 0.0)
     monkeypatch.setitem(core_engine.CONFIG, "delta_max", 1.0)
     monkeypatch.setattr(core_engine, "mes_vencimento_ideal", lambda: (6, 2026, 30))
@@ -157,21 +156,23 @@ def test_montar_estrutura_opcao_seed0(monkeypatch):
     assert "greeks" in est and "preco_base_calculo" in est
 
 
-def test_montar_estrutura_opcao_rejeita_por_rr(monkeypatch):
-    # rr_minimo alto força a rejeição pelo gate de R/R (rr_alvo1 ~0.5 < 0.9)
+def test_montar_estrutura_emite_mesmo_com_rr_baixissimo(monkeypatch):
+    """Sem o filtro de R/R, um setup com R/R péssimo (alvo1 quase nulo) ainda emite.
+    Antes (com o gate rr_minimo) isso era rejeitado; agora não há mais filtro de R/R."""
     monkeypatch.setattr(core_engine, "mes_vencimento_ideal", lambda: (6, 2026, 30))
     monkeypatch.setattr(core_engine, "get_real_options_from_opcoes_net", lambda *a, **k: None)
     monkeypatch.setitem(core_engine.CONFIG, "delta_min", 0.0)
     monkeypatch.setitem(core_engine.CONFIG, "delta_max", 1.0)
-    monkeypatch.setitem(core_engine.CONFIG, "rr_minimo", 0.9)
+    monkeypatch.setitem(core_engine.CONFIG, "alvo1_pct", 0.05)  # rr_alvo1 ~0.12, bem abaixo do antigo gate
     df = _make_df(0)
     preco = float(df.iloc[-1]["Close"])
-    assert core_engine._montar_estrutura_opcao("TESTE3", preco, "CALL", df, "1d", False) is None
+    est = core_engine._montar_estrutura_opcao("TESTE3", preco, "CALL", df, "1d", False)
+    assert est is not None
+    assert "rr_alvo1" in est  # R/R continua disponível como informação, só não filtra
 
 
-def test_montar_estrutura_emite_com_rr_padrao(monkeypatch):
-    """Com o rr_minimo PADRÃO do CONFIG, um setup válido deve emitir (não ser
-    rejeitado pelo gate de R/R). Relaxa apenas a banda de delta para isolar o R/R."""
+def test_montar_estrutura_emite_setup_valido(monkeypatch):
+    """Sanity: setup normal emite e expõe os campos de R/R informativos."""
     monkeypatch.setattr(core_engine, "mes_vencimento_ideal", lambda: (6, 2026, 30))
     monkeypatch.setattr(core_engine, "get_real_options_from_opcoes_net", lambda *a, **k: None)
     monkeypatch.setitem(core_engine.CONFIG, "delta_min", 0.0)
@@ -179,8 +180,8 @@ def test_montar_estrutura_emite_com_rr_padrao(monkeypatch):
     df = _make_df(0)
     preco = float(df.iloc[-1]["Close"])
     est = core_engine._montar_estrutura_opcao("TESTE3", preco, "CALL", df, "1d", False)
-    assert est is not None              # rr_minimo padrão deixa o alvo1 (~0.5) passar
-    assert est["rr_alvo1"] >= 0.5
+    assert est is not None
+    assert all(k in est for k in ("rr_alvo1", "rr_alvo2", "rr_final"))
 
 
 def test_montar_sinal_monta_dict(monkeypatch):
