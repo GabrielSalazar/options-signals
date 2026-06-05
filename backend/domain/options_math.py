@@ -74,13 +74,16 @@ def calcular_dte(mes_venc: int, ano_venc: int = None) -> int:
 def _proximo_vencimento_b3() -> tuple:
     """Retorna (mes, ano, dte, tipo_venc) do próximo vencimento B3 no range [dte_min, dte_max].
     Busca sextas semanais (toda sexta-feira, exceto 3ª sexta) e mensais (3ª sexta).
-    Retorna primeiro match dentro do range."""
+    Retorna primeiro match dentro do range. Se hoje é sexta, pula para próxima sexta."""
     hoje = datetime.now(timezone.utc).date()
     dte_min = CONFIG["dte_minimo"]
     dte_max = CONFIG["dte_maximo"]
 
+    # Se hoje é sexta, começa a procurar a partir de amanhã; senão, a partir de hoje
+    dias_adiante_inicio = 1 if hoje.weekday() == 4 else 1
+
     # Procura próximas 12 sextas (3 meses de cobertura)
-    for dias_adiante in range(1, 365):
+    for dias_adiante in range(dias_adiante_inicio, 365):
         candidato = hoje + pd.Timedelta(days=dias_adiante)
         if candidato.weekday() != 4:  # 4 = sexta
             continue
