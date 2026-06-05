@@ -2,19 +2,24 @@
 Score ponderado 0-100 para sinais de opções (CALL/PUT).
 
 Espelha o algoritmo do scanner v4.0 calibrado sobre 31 sinais reais.
+O somatório bruto dos pesos passa de 100 (os bônus são oportunistas); o score
+final é capado em 100 (ver `min(int(score), 100)` no fim).
+
 Pesos:
-  Preço na faixa operável         12
-  DTE 10-60 dias                   8
-  |Delta| 0.15-0.45 (OTM ideal)   10
-  Tendência (0/8/16/20)           20
-  MACD (cross/favor/aceleração)   18
-  RSI na zona da direção          14
-  Estocástico                      9
-  ADX >= 25                        5
-  Volume relativo                  8
-  Bônus Bollinger                  4
-  ─────────────────────────────  ─────
-  Teto                           100
+  Preço na faixa operável            12
+  DTE no range [dte_minimo, _maximo]  8
+  |Delta| 0.15-0.45 (OTM ideal)      10
+  Tendência (0/8/16/20)              20
+  MACD (cross/favor/aceleração)      18
+  RSI na zona da direção             14
+  Estocástico                         9
+  ADX >= 25                           5
+  Volume relativo                     8
+  Bônus Bollinger                     4
+  Bônus VWAP                          5
+  Bônus Volatility Squeeze            5
+  ────────────────────────────────  ─────
+  Bruto                             118  (cap final = 100)
 """
 from backend.core.config import CONFIG
 
