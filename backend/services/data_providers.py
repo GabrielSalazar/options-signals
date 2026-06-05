@@ -1,6 +1,10 @@
 import os
+import time
+import json
+import base64
 import requests
 import logging
+import yfinance as yf
 from typing import Dict, List, Optional
 from backend.core.cache import cache_get, cache_set
 
@@ -70,6 +74,120 @@ def fetch_all_b3_tickers() -> List[str]:
     except Exception as e:
         logger.warning(f"Erro ao buscar /available da brapi: {e}")
         return []
+
+
+_B3_LISTED_BASE = ("https://sistemaswebb3-listados.b3.com.br/listedCompaniesProxy"
+                   "/CompanyCall/GetInitialCompanies")
+_B3_SUFIXOS = ("3", "4", "11")
+_B3_HEADERS = {
+    "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                   "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"),
+    "Accept": "application/json, text/plain, */*",
+}
+
+
+def _b3_page_url(page_number: int, page_size: int = 120) -> str:
+    payload = {"language": "pt-br", "pageNumber": page_number, "pageSize": page_size}
+    encoded = base64.b64encode(json.dumps(payload).encode("utf-8")).decode("ascii")
+    return f"{_B3_LISTED_BASE}/{encoded}"
+
+
+def fetch_b3_official_tickers() -> Dict[str, str]:
+    """
+    Colhe raízes de empresas + nomes via API oficial da B3 e expande cada raiz
+    de 4 letras nos sufixos negociáveis (3, 4, 11). Retorna {ticker_base: nome}.
+    Cache 24h. Qualquer falha → {} (degradação graciosa). O ruído (tickers que
+    não negociam) é removido depois pelo filtro de volume.
+    """
+    cached = cache_get("b3_official_tickers")
+    if cached is not None:
+        return cached
+
+    resultado: Dict[str, str] = {}
+    try:
+        page, total_pages = 1, 1
+        while page <= total_pages:
+            r = requests.get(_b3_page_url(page), headers=_B3_HEADERS, timeout=15)
+            r.raise_for_status()
+            data = r.json()
+            total_pages = data.get("page", {}).get("totalPages", 1) or 1
+            for emp in data.get("results", []):
+                raiz = (emp.get("issuingCompany") or "").strip().upper()
+                nome = (emp.get("tradingName") or emp.get("companyName") or raiz).strip()
+                if len(raiz) == 4 and raiz.isalpha():
+                    for suf in _B3_SUFIXOS:
+                        resultado.setdefault(f"{raiz}{suf}", nome)
+            page += 1
+            if page <= total_pages:
+                time.sleep(0.3)
+        cache_set("b3_official_tickers", resultado, ttl=86400)
+        logger.info(f"B3 oficial: {len(resultado)} candidatos em {total_pages} página(s)")
+        return resultado
+    except Exception as e:
+        logger.warning(f"Erro ao buscar API oficial da B3: {e}")
+        return {}
+
+
+def _volume_financeiro(data, ticker: str, single: bool) -> Optional[float]:
+    """Volume financeiro médio diário (Close*Volume) de um ticker no df do yfinance.
+    Lida com df single-index (1 ticker) e MultiIndex (vários)."""
+    try:
+        if single:
+            sub = data
+        else:
+            if ticker not in data.columns.get_level_values(0):
+                return None
+            sub = data[ticker]
+        close = sub["Close"].dropna()
+        volume = sub["Volume"].dropna()
+        if close.empty or volume.empty:
+            return None
+        fin = (close * volume).dropna()
+        if fin.empty:
+            return None
+        return float(fin.mean())
+    except Exception:
+        return None
+
+
+def filtrar_por_volume(
+    tickers: List[str],
+    min_volume_rs: float,
+    batch_size: int = 20,
+    delay_s: float = 1.0,
+    period: str = "10d",
+) -> Dict[str, float]:
+    """
+    Baixa OHLCV de `period` via yfinance em lotes e retorna
+    {ticker: volume_financeiro_medio_rs} apenas para os que atingem min_volume_rs.
+    Tickers sem dados são ignorados; erro num lote → loga e pula. Delay entre lotes.
+    """
+    aprovados: Dict[str, float] = {}
+    if not tickers:
+        return aprovados
+
+    for i in range(0, len(tickers), batch_size):
+        lote = tickers[i:i + batch_size]
+        try:
+            data = yf.download(
+                lote, period=period, interval="1d", auto_adjust=True,
+                progress=False, group_by="ticker", threads=True,
+            )
+        except Exception as e:
+            logger.warning(f"filtrar_por_volume: lote {i // batch_size} falhou: {e}")
+            continue
+
+        single = len(lote) == 1
+        for t in lote:
+            vol_rs = _volume_financeiro(data, t, single)
+            if vol_rs is not None and vol_rs >= min_volume_rs:
+                aprovados[t] = vol_rs
+
+        if i + batch_size < len(tickers):
+            time.sleep(delay_s)
+
+    logger.info(f"filtro de volume: {len(aprovados)}/{len(tickers)} ≥ R${min_volume_rs:,.0f}")
+    return aprovados
 
 
 def _fetch_chain(ticker: str) -> List[list]:

@@ -5,7 +5,8 @@ from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, HTTPException, Query
 
-from backend.core.config import ATIVOS_B3, get_all_b3_assets
+from backend.core.config import ATIVOS_B3
+from backend.services.ticker_loader import get_all_b3_assets
 from backend.services import signal_service
 from backend.services.supabase_client import get_supabase
 

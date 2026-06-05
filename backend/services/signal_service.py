@@ -13,10 +13,11 @@ import threading
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from backend.core.config import ATIVOS_B3, CONFIG, get_all_b3_assets
+from backend.core.config import ATIVOS_B3, CONFIG
+from backend.services.ticker_loader import carregar_tickers_b3
 from backend.services.core_engine import analisar_ativo
 from backend.services.supabase_client import get_supabase
-from backend.services.telegram_service import enviar_telegram
+from backend.services.telegram_service import enviar_telegram, notificar_lote
 
 logger = logging.getLogger("b3_api")
 
@@ -212,29 +213,38 @@ def scan_batch(tickers: list[str]) -> list[dict]:
 
     if sinais:
         persist_signals(sinais)
-        for s in sinais:
-            enviar_telegram(s)
+        notificar_lote(sinais)
         update_last_scan(sinais)
 
     return sinais
 
 
-def run_scan(verbose: bool = False, all_b3: bool = False):
-    """Scan agendado: 10 workers em paralelo. all_b3=True varre todo o universo da B3."""
-    logger.info("Iniciando scan agendado..." + (" (UNIVERSO COMPLETO B3)" if all_b3 else ""))
-    ativos = list((get_all_b3_assets() if all_b3 else ATIVOS_B3).items())
+def run_scan(verbose: bool = False, universe: str = "liquido"):
+    """Scan agendado. universe: 'liquido' (padrão, universo filtrado) | 'curado'.
+
+    A2: workers via CONFIG['scan_max_workers']. A3: Telegram em lote ao final
+    (fora do hot-loop). A4: loga a duração do scan.
+    """
+    inicio = datetime.now(timezone.utc)
+    if universe == "curado":
+        ativos = list(ATIVOS_B3.items())
+    else:
+        ativos = list(carregar_tickers_b3().items())
+    logger.info(f"Iniciando scan ({universe}) — {len(ativos)} ativos...")
     sinais: list[dict] = []
 
-    with ThreadPoolExecutor(max_workers=10) as pool:
+    max_workers = CONFIG.get("scan_max_workers", 8)
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {pool.submit(analyse_ticker, ticker, nome, verbose): ticker
                    for ticker, nome in ativos}
         for future in as_completed(futures):
             result = future.result()
             if result:
                 sinais.append(result)
-                enviar_telegram(result)
                 _maybe_broadcast(result)
 
     update_last_scan(sinais)
     persist_signals(sinais)
-    logger.info(f"Scan concluído — {len(sinais)} sinal(is) encontrado(s)")
+    notificar_lote(sinais)
+    dur = (datetime.now(timezone.utc) - inicio).total_seconds()
+    logger.info(f"Scan ({universe}) concluído — {len(sinais)} sinal(is) em {dur:.0f}s")

@@ -24,7 +24,7 @@ class TestConfigDefaults:
         "stoch_k_period", "stoch_d_period", "rsi_period",
         "ema_fast", "ema_slow", "volume_mult",
         "stop_pct", "alvo1_pct", "alvo2_pct", "alvo_final_pct",
-        "rr_minimo", "min_volume_diario", "min_score",
+        "rr_minimo", "min_volume_acoes", "min_score",
         "delta_min", "delta_max", "dte_minimo", "dte_maximo",
         "reentrada_min_dias", "scoring_mode", "min_score_ponderado",
     ]
@@ -121,3 +121,20 @@ class TestReentrada:
     def test_different_tickers_independent(self):
         registrar_sinal("PETR4")
         assert is_reentrada_valida("VALE3") is True
+
+
+class TestLoaderKnobs:
+    """Knobs do carregador de tickers e dos pontos expostos (A2/A3)."""
+
+    @pytest.mark.parametrize("key", [
+        "min_volume_rs", "ticker_top_n", "ticker_cache_segundos",
+        "scan_max_workers", "telegram_throttle_s",
+    ])
+    def test_knob_exists(self, key):
+        assert key in CONFIG, f"CONFIG missing key: {key}"
+
+    def test_min_volume_rs_positive(self):
+        assert CONFIG["min_volume_rs"] > 0
+
+    def test_scan_max_workers_reasonable(self):
+        assert 1 <= CONFIG["scan_max_workers"] <= 32

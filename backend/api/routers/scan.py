@@ -14,7 +14,7 @@ from fastapi.responses import StreamingResponse
 from backend.core.config import ATIVOS_B3
 from backend.services import signal_service
 from backend.services.signal_service import analyse_ticker, persist_signals
-from backend.services.telegram_service import enviar_telegram
+from backend.services.telegram_service import notificar_lote
 
 logger = logging.getLogger("b3_api")
 router = APIRouter(tags=["Scan"])
@@ -73,8 +73,7 @@ async def scan_stream(tickers: str = Query(default="")):
 
         if sinais:
             persist_signals(sinais)
-            for s in sinais:
-                enviar_telegram(s)
+            notificar_lote(sinais)
             signal_service.update_last_scan(sinais)
 
         yield f"data: {json.dumps({'type': 'done', 'count': len(sinais)}, default=str)}\n\n"
@@ -102,16 +101,16 @@ async def alerts_stream():
 
 @router.post("/signals/scan/all")
 def scan_all():
-    signal_service.run_scan()
+    signal_service.run_scan(universe="curado")
     sinais = signal_service.last_scan_signals()
     return {"message": f"{len(sinais)} sinal(is) encontrado(s)", "data": sinais}
 
 
 @router.post("/signals/scan/all-b3")
 def scan_all_b3():
-    """Varre TODO o universo B3 (centenas de tickers via brapi /available).
-    Mais lento que /scan/all — use com moderação."""
-    signal_service.run_scan(all_b3=True)
+    """Varre o universo LÍQUIDO da B3 (curados + B3 + brapi, pré-filtrados por
+    volume e limitados a top_n). Mais lento que /scan/all — use com moderação."""
+    signal_service.run_scan(universe="liquido")
     sinais = signal_service.last_scan_signals()
     return {"message": f"{len(sinais)} sinal(is) encontrado(s)",
             "universe": "all-b3", "data": sinais}

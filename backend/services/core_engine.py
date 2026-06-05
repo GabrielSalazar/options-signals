@@ -79,7 +79,7 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
         volume    = float(ultimo["Volume"])
         vol_med   = float(ultimo.get("vol_media_20", volume))
 
-        if vol_med < CONFIG["min_volume_diario"]:
+        if vol_med < CONFIG["min_volume_acoes"]:
             return None
 
         sinais_alta, sinais_baixa = [], []

@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Não lançado]
+
+### Added
+- **Carregador dinâmico de tickers da B3** ([backend/services/ticker_loader.py](../backend/services/ticker_loader.py)):
+  universo líquido = curados (`ATIVOS_B3`) + API oficial da B3 + brapi, com pré-filtro
+  de **volume financeiro (R$)** e `top_n`. Cache TTL em processo (independe do Redis).
+- `data_providers`: `fetch_b3_official_tickers()` (API oficial da B3, expansão de
+  sufixos 3/4/11) e `filtrar_por_volume()` (volume financeiro médio em R$).
+- `CONFIG`: `min_volume_rs`, `ticker_top_n`, `ticker_cache_segundos`, `scan_max_workers`,
+  `telegram_throttle_s`.
+- Testes: `test_ticker_loader`, `test_data_providers`, `test_signal_service`, `test_telegram`.
+
+### Changed
+- Scan agendado passa a varrer o **universo líquido** por padrão
+  (`run_scan(universe="liquido")`); `POST /signals/scan/all-b3` agora varre ~150 líquidos
+  (antes ~400 crus). `POST /signals/scan/all` segue na lista curada.
+- `get_all_b3_assets` movido de `config` (core) para `ticker_loader` (service) — fim da
+  violação de camadas (core importava services). [A1]
+- Telegram enviado em **lote com throttle**, fora do hot-loop de scan. [A3]
+- Workers do scan configuráveis via `CONFIG["scan_max_workers"]` (era 10 fixo). [A2]
+- `CONFIG`: `min_volume_diario` renomeado para `min_volume_acoes` (desambigua do
+  `min_volume_rs`). [A5]
+
+### Fixed
+- Mensagens do Telegram usavam `\n` literal em vez de quebras de linha reais. [B3]
+
 ## [4.2.0] - 2026-06-03
 
 ### Refatoração Geral (clean code, sem mudança de contrato)

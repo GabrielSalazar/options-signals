@@ -25,7 +25,7 @@ CONFIG = {
     "book_days":         7,       # validade da ordem no book (dias corridos)
 
     # ── Filtros ────────────────────────────────────────────────────────────
-    "min_volume_diario":    1_000_000,
+    "min_volume_acoes":     1_000_000,   # volume mínimo diário em QUANTIDADE DE AÇÕES (filtro fino do core_engine)
     "min_variacao_gatilho": 0.015,
     "lookback_dias":        30,
     "min_score":            5,
@@ -43,6 +43,15 @@ CONFIG = {
 
     # ── Reentrada ──────────────────────────────────────────────────────────
     "reentrada_min_dias": 3,
+
+    # ── Carregador de tickers (universo líquido) ───────────────────────────
+    "min_volume_rs":         5_000_000,   # piso de volume financeiro diário (R$) p/ pré-filtro
+    "ticker_top_n":          150,         # nº máx de tickers no universo líquido (None = sem limite)
+    "ticker_cache_segundos": 3600,        # TTL do cache da lista líquida (em processo)
+
+    # ── Scan / notificações (pontos expostos A2/A3) ────────────────────────
+    "scan_max_workers":      8,           # workers do scan completo (alavanca anti rate-limit)
+    "telegram_throttle_s":   0.5,         # delay entre envios de Telegram (evita 429)
 
     # ── Telegram (opcional) ───────────────────────────────────────────────
     "telegram_token":   os.getenv("TELEGRAM_TOKEN", ""),
@@ -123,20 +132,8 @@ OTM_POR_ATIVO = {
 
 OTM_DEFAULT = 0.08  # distância OTM default para tickers fora do dicionário curado
 
-
-def get_all_b3_assets() -> dict:
-    """
-    Retorna ATIVOS_B3 mesclado com todos os tickers da B3 via brapi.
-    Tickers desconhecidos recebem o próprio código como nome.
-    Em caso de falha da brapi, devolve apenas a lista curada.
-    """
-    from backend.services.data_providers import fetch_all_b3_tickers
-    merged = dict(ATIVOS_B3)
-    for t in fetch_all_b3_tickers():
-        key = f"{t}.SA"
-        if key not in merged:
-            merged[key] = t
-    return merged
+# A montagem do universo (curados + B3 + brapi) vive em backend/services/ticker_loader.py
+# para respeitar a direção de dependência routers → services → domain/core.
 
 
 _historico_sinais = {}
