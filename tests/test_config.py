@@ -8,13 +8,46 @@ Cobre:
   - is_reentrada_valida / registrar_sinal
   - dentro_horario_pregao
 """
+import copy
 import pytest
 from datetime import datetime, timedelta
 from backend.core.config import (
     CONFIG, ATIVOS_B3, OTM_POR_ATIVO, OTM_DEFAULT,
     score_horario, is_reentrada_valida, registrar_sinal,
-    _historico_sinais,
+    validar_config, _historico_sinais,
 )
+
+
+class TestValidarConfig:
+    """validar_config() trava invariantes críticos no boot (fail-fast). [P2-7]"""
+
+    def test_config_atual_e_valido(self):
+        validar_config()  # não deve levantar
+
+    def test_rejeita_rr_minimo_alto(self):
+        c = copy.deepcopy(CONFIG); c["rr_minimo"] = 2.0  # > alvo1/|stop|
+        with pytest.raises(ValueError, match="rr_minimo"):
+            validar_config(c)
+
+    def test_rejeita_dte_invalido(self):
+        c = copy.deepcopy(CONFIG); c["dte_minimo"] = 50  # > dte_maximo
+        with pytest.raises(ValueError, match="DTE"):
+            validar_config(c)
+
+    def test_rejeita_delta_invalido(self):
+        c = copy.deepcopy(CONFIG); c["delta_min"] = 0.6  # > delta_max
+        with pytest.raises(ValueError, match="delta"):
+            validar_config(c)
+
+    def test_rejeita_stop_positivo(self):
+        c = copy.deepcopy(CONFIG); c["stop_pct"] = 0.43
+        with pytest.raises(ValueError, match="stop_pct"):
+            validar_config(c)
+
+    def test_rejeita_alvos_nao_crescentes(self):
+        c = copy.deepcopy(CONFIG); c["alvo2_pct"] = 0.1  # < alvo1
+        with pytest.raises(ValueError, match="alvo"):
+            validar_config(c)
 
 
 class TestConfigDefaults:
