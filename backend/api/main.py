@@ -18,13 +18,14 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from backend.core.cache import redis_status
+from backend.core.logging_config import configure_logging
 from backend.services import signal_service, scheduler
 from backend.services.telegram_service import load_telegram_config
 from backend.api.routers import health, signals, scan, backtest, market, config
 
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+configure_logging(level=logging.INFO)
 logger = logging.getLogger("b3_api")
 
 
@@ -36,14 +37,17 @@ async def lifespan(_app: FastAPI):
     # Valida e loga estado do Redis logo no boot para facilitar diagnóstico
     rs = redis_status()
     if rs["status"] == "disabled":
-        logger.warning(
-            "REDIS_URL não configurada — cache desabilitado. "
-            "Adicione REDIS_URL no Render para ativar cache distribuído."
+        logger.info(
+            "REDIS_URL não configurada — usando cache TTL em memória (fallback). "
+            "Para cache distribuído entre instâncias, adicione REDIS_URL no Render."
         )
     elif rs["status"] == "connected":
         logger.info("Redis conectado e operacional.")
     else:
-        logger.warning(f"Redis configurado mas indisponível (status={rs['status']}).")
+        logger.warning(
+            f"Redis configurado mas indisponível (status={rs['status']}) — "
+            "caindo para cache TTL em memória."
+        )
 
     scheduler.start()
     yield

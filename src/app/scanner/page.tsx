@@ -3,46 +3,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchScan, getBackendUrl } from '@/lib/api';
 import { BACKEND_URL } from '@/lib/config';
+import { ALL_B3_TICKERS } from '@/lib/tickers';
 import { Signal } from '@/types/signals';
 import SignalCard from '@/components/SignalCard';
 import { AlertCircle, Search, Activity, ArrowRight, ChevronDown, ChevronUp, SlidersHorizontal, Wifi, WifiOff, Zap } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 
 type BackendStatus = 'checking' | 'waking' | 'online' | 'offline';
-
-// Universo completo de ativos B3 com opções líquidas (~90 tickers)
-const ALL_B3_TICKERS = [
-    // Petróleo & Gás
-    'PETR4','PETR3','PRIO3','BRAV3','RECV3','CSAN3',
-    // Mineração & Siderurgia
-    'VALE3','CSNA3','GGBR4','GGBR3','USIM5','CMIN3','GOAU4',
-    // Financeiro & Bancos
-    'ITUB4','ITUB3','BBDC4','BBDC3','BBAS3','SANB11','BPAC11','B3SA3','IRBR3','PSSA3','BBSE3',
-    // Seguros
-    'CXSE3',
-    // Varejo
-    'MGLU3','LREN3','AZZA3','ALPA4','LWSA3',
-    // Energia Elétrica
-    'EGIE3','TAEE11','ENGI11','CMIG4','CPFE3','SBSP3','ELET3','ELET6','TRPL4','AURE3','ENEV3','CPLE6',
-    // Industrial & Bens de Capital
-    'WEGE3','EMBR3','RAIL3','MOVI3','RENT3','RAPT4','POMO4',
-    // Consumo & Alimentos
-    'ABEV3','BRFS3','JBSS3','MRFG3','SMTO3','BEEF3','SLCE3',
-    // Telecom
-    'VIVT3','TIMS3',
-    // Saúde
-    'RDOR3','HAPV3','DASA3','FLRY3','QUAL3',
-    // Imobiliário & Construção
-    'MRVE3','CYRE3','EVEN3','EZTC3','TEND3',
-    // Educação
-    'COGN3','YDUQ3',
-    // Papel & Celulose
-    'SUZB3','KLBN11','DXCO3',
-    // Transporte & Logística
-    'AZUL4','GOLL4','ECOR3',
-    // Tech & Serviços
-    'TOTVS3',
-];
 
 const WAKE_TIMEOUT_S = 90;
 const HEALTH_RETRY_INTERVAL_S = 6;

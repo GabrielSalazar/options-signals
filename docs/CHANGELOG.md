@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Não lançado]
 
+### Melhorias (rodada de refatoração jun/2026)
+- **[P0] Cache com fallback em memória** ([backend/core/cache.py](../backend/core/cache.py)):
+  quando o Redis está indisponível, o cache passa a usar um store TTL in-process em vez
+  de virar no-op. Resolve a causa estrutural do rate-limit (cada scan rebaixava tudo).
+  Também corrige `pd.read_json(str)` deprecado.
+- **[P1] Logging central** ([backend/core/logging_config.py](../backend/core/logging_config.py)):
+  silencia o ruído de providers (yfinance/urllib3/peewee) que poluía o log com
+  "possibly delisted"/"Failed download"; aviso da brapi por-ticker rebaixado a debug.
+- **[P1] Testes de integração HTTP** ([tests/test_api_integration.py](../tests/test_api_integration.py)):
+  cobertura via `TestClient` de health, `/signals`, watchlist, strategies e history.
+- **[P1] Fonte única de tickers no frontend** ([src/lib/tickers.ts](../src/lib/tickers.ts)):
+  scanner e signals derivam de `SECTORS` (fim da duplicação que exigia editar 2 arquivos).
+  Remove OIBR3 (deslistada).
+- **[P2] `validar_config()`** ([backend/core/config.py](../backend/core/config.py)): fail-fast
+  no boot para invariantes (rr_minimo ≤ R/R natural, DTE/delta válidos, stop<0, alvos crescentes).
+- **[P3] Limpeza**: docstring do `scoring` reflete os pesos reais (118 bruto, cap 100);
+  remove `calcular_dte` (morto após refactor de vencimentos) e variáveis órfãs.
+
 ### Added
 - **Carregador dinâmico de tickers da B3** ([backend/services/ticker_loader.py](../backend/services/ticker_loader.py)):
   universo líquido = curados (`ATIVOS_B3`) + API oficial da B3 + brapi, com pré-filtro

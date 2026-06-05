@@ -5,66 +5,7 @@ import SignalCard from '@/components/SignalCard'
 import { useSignals } from '@/hooks/useSignals'
 import { Signal } from '@/types/signals'
 import { Activity, Filter, X, AlertCircle, Wifi } from 'lucide-react'
-
-// ── Setores e papéis da B3 ─────────────────────────────────────────────
-const SECTORS: Record<string, { ticker: string; nome: string }[]> = {
-    'Todos': [],
-    'Petróleo & Gás': [
-        { ticker: 'PETR4', nome: 'Petrobras PN' },
-        { ticker: 'PETR3', nome: 'Petrobras ON' },
-        { ticker: 'PRIO3', nome: 'PetroRio' },
-        { ticker: 'BRAV3', nome: 'Brava Energia' },
-        { ticker: 'RECV3', nome: 'Recôncavo' },
-    ],
-    'Mineração': [
-        { ticker: 'VALE3', nome: 'Vale' },
-        { ticker: 'CSNA3', nome: 'CSN' },
-        { ticker: 'GGBR4', nome: 'Gerdau PN' },
-        { ticker: 'USIM5', nome: 'Usiminas PNA' },
-        { ticker: 'CMIN3', nome: 'CSN Mineração' },
-    ],
-    'Financeiro': [
-        { ticker: 'ITUB4', nome: 'Itaú Unibanco PN' },
-        { ticker: 'BBDC4', nome: 'Bradesco PN' },
-        { ticker: 'BBAS3', nome: 'Banco do Brasil' },
-        { ticker: 'SANB11', nome: 'Santander' },
-        { ticker: 'BPAC11', nome: 'BTG Pactual' },
-        { ticker: 'B3SA3', nome: 'B3' },
-    ],
-    'Varejo': [
-        { ticker: 'MGLU3', nome: 'Magazine Luiza' },
-        { ticker: 'BHIA3', nome: 'Casas Bahia' },
-        { ticker: 'LREN3', nome: 'Lojas Renner' },
-        { ticker: 'AZZA3', nome: 'Azzas 2154' },
-    ],
-    'Energia': [
-        { ticker: 'EGIE3', nome: 'Engie Brasil' },
-        { ticker: 'TAEE11', nome: 'Taesa' },
-        { ticker: 'ENGI11', nome: 'Energisa' },
-        { ticker: 'CMIG4', nome: 'Cemig PN' },
-        { ticker: 'CPFE3', nome: 'CPFL Energia' },
-        { ticker: 'SBSP3', nome: 'Sabesp' },
-    ],
-    'Industrial': [
-        { ticker: 'WEGE3', nome: 'Weg' },
-        { ticker: 'EMBR3', nome: 'Embraer' },
-        { ticker: 'RAIL3', nome: 'Rumo' },
-        { ticker: 'MOVI3', nome: 'Movida' },
-        { ticker: 'RENT3', nome: 'Localiza' },
-    ],
-    'Consumo': [
-        { ticker: 'ABEV3', nome: 'Ambev' },
-        { ticker: 'BRFS3', nome: 'BRF' },
-        { ticker: 'JBSS3', nome: 'JBS' },
-        { ticker: 'MRFG3', nome: 'Marfrig' },
-        { ticker: 'SMTO3', nome: 'São Martinho' },
-    ],
-    'Telecom': [
-        { ticker: 'VIVT3', nome: 'Vivo' },
-        { ticker: 'TIMS3', nome: 'TIM' },
-        { ticker: 'OIBR3', nome: 'Oi' },
-    ],
-}
+import { SECTORS } from '@/lib/tickers'
 
 const ALL_STOCKS = Object.entries(SECTORS)
     .filter(([s]) => s !== 'Todos')

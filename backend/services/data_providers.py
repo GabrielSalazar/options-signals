@@ -48,7 +48,7 @@ def fetch_brapi_historical(ticker: str, range_: str = "6mo", interval: str = "1d
         cache_set(cache_key, df.reset_index().to_dict(orient="records"), ttl=300)
         return df
     except Exception as e:
-        logger.warning(f"brapi histórico falhou para {ticker}: {e}")
+        logger.debug(f"brapi histórico falhou para {ticker}: {e}")
         return pd.DataFrame()
 
 

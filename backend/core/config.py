@@ -136,6 +136,35 @@ OTM_DEFAULT = 0.08  # distância OTM default para tickers fora do dicionário cu
 # para respeitar a direção de dependência routers → services → domain/core.
 
 
+def validar_config(cfg: dict = None) -> None:
+    """Valida invariantes críticos do CONFIG (fail-fast no boot). [P2-7]
+
+    Levanta ValueError se algum invariante for violado — evita configs que
+    silenciosamente impedem a emissão de sinais (ex.: rr_minimo alto demais).
+    """
+    c = cfg if cfg is not None else CONFIG
+    rr_natural = c["alvo1_pct"] / abs(c["stop_pct"])
+    if c["rr_minimo"] > rr_natural:
+        raise ValueError(
+            f"rr_minimo ({c['rr_minimo']}) > R/R natural do alvo1 ({rr_natural:.2f}) "
+            "→ nenhum sinal seria emitido"
+        )
+    if not (0 < c["dte_minimo"] < c["dte_maximo"]):
+        raise ValueError(f"DTE inválido: dte_minimo={c['dte_minimo']} dte_maximo={c['dte_maximo']}")
+    if not (0 < c["delta_min"] < c["delta_max"] <= 1.0):
+        raise ValueError(f"banda de delta inválida: {c['delta_min']}..{c['delta_max']}")
+    if c["stop_pct"] >= 0:
+        raise ValueError(f"stop_pct deve ser negativo: {c['stop_pct']}")
+    if not (c["alvo1_pct"] < c["alvo2_pct"] < c["alvo_final_pct"]):
+        raise ValueError("alvos devem ser crescentes: alvo1_pct < alvo2_pct < alvo_final_pct")
+    if c["min_score"] <= 0:
+        raise ValueError(f"min_score deve ser > 0: {c['min_score']}")
+
+
+# Fail-fast: valida os invariantes assim que o módulo é importado (no boot).
+validar_config()
+
+
 _historico_sinais = {}
 
 def registrar_sinal(ticker: str):

@@ -2,7 +2,7 @@ import math
 import calendar
 import numpy as np
 import pandas as pd
-from datetime import datetime, date, timezone
+from datetime import datetime, timezone
 from scipy.stats import norm
 from backend.core.config import CONFIG
 
@@ -31,7 +31,6 @@ def decodificar_opcao_b3(codigo: str) -> dict:
     except ValueError:
         return {}
 
-    acao_norm = acao_base_raw.rstrip("0123456789") + "11" if acao_base_raw.startswith("BOV") else acao_base_raw
     is_etf = any(acao_base_raw.startswith(etf[:4]) for etf in ETFS_B3)
 
     if is_etf:
@@ -57,19 +56,6 @@ def decodificar_opcao_b3(codigo: str) -> dict:
         "ano_venc":   ano_atual if mes >= hoje.month else ano_atual + 1,
         "strike":     round(strike, 2),
     }
-
-def calcular_dte(mes_venc: int, ano_venc: int = None) -> int:
-    """Calcula DTE para a 3ª sexta (vencimento mensal) de um mês."""
-    hoje = datetime.now(timezone.utc).date()
-    if ano_venc is None:
-        ano_venc = hoje.year
-    cal = calendar.monthcalendar(ano_venc, mes_venc)
-    sextas = [semana[4] for semana in cal if semana[4] != 0]
-    if len(sextas) < 3:
-        return 0
-    venc = date(ano_venc, mes_venc, sextas[2])
-    dias_corridos = (venc - hoje).days
-    return max(0, round(dias_corridos * 5 / 7))
 
 def _proximo_vencimento_b3() -> tuple:
     """Retorna (mes, ano, dte, tipo_venc) do próximo vencimento B3 no range [dte_min, dte_max].
