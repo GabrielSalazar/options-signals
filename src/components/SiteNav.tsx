@@ -7,6 +7,7 @@ const navLinks = [
     { href: "/",              label: "Dashboard"      },
     { href: "/scanner",       label: "Scanner"        },
     { href: "/signals",       label: "Sinais"         },
+    { href: "/signals/sobre", label: "Metodologia"    },
     { href: "/estrategias",   label: "Estratégias"    },
     { href: "/portfolio",     label: "Portfólio"      },
     { href: "/backtest",      label: "Backtest"       },
