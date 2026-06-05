@@ -185,6 +185,16 @@ def signals_performance(days: int = Query(default=30, ge=1, le=365)):
     }
 
 
+@router.get("/signals/outcomes")
+def signals_outcomes(days: int = Query(default=30, ge=1, le=365)):
+    """Rastreamento de desfecho (abordagem A): reprecifica cada sinal via
+    Black-Scholes sobre o preço da ação e compara o win-rate do clássico vs.
+    o efeito de filtrar pelo score ponderado (shadow). Base para decidir o
+    scoring (clássico × ponderado)."""
+    from backend.services.outcome_service import avaliar_sinais
+    return avaliar_sinais(dias=days)
+
+
 @router.get("/signals/strategies")
 def get_strategies():
     return {"strategies": ["CALL OTM", "PUT OTM", "CALL ATM", "PUT ATM"]}

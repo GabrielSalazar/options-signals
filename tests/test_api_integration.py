@@ -60,3 +60,15 @@ def test_history_sem_supabase():
     r = client.get("/signals/history?limit=10")
     assert r.status_code == 200
     assert "data" in r.json()
+
+
+def test_outcomes_sem_supabase():
+    r = client.get("/signals/outcomes?days=30")
+    assert r.status_code == 200
+    body = r.json()
+    assert "sinais_avaliados" in body  # sem Supabase → 0, mas shape válido
+
+
+def test_outcomes_valida_days():
+    r = client.get("/signals/outcomes?days=999")  # le=365
+    assert r.status_code == 422
