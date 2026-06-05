@@ -52,3 +52,47 @@ class TestCacheGracefulDegradation:
             cache_set_df("test_df_no_crash", df, ttl=60)
         except Exception as e:
             pytest.fail(f"cache_set_df levantou exceção: {e}")
+
+
+class TestInMemoryFallback:
+    """Sem Redis, o cache usa um store TTL em memória (não mais no-op). [P0]"""
+
+    def setup_method(self):
+        from backend.core import cache
+        cache._mem.clear()
+
+    def test_set_get_roundtrip_sem_redis(self, monkeypatch):
+        from backend.core import cache
+        monkeypatch.setattr(cache, "_get_redis", lambda: None)
+        cache.cache_set("k1", {"a": 1}, ttl=60)
+        assert cache.cache_get("k1") == {"a": 1}
+
+    def test_df_roundtrip_sem_redis(self, monkeypatch):
+        import pandas as pd
+        from backend.core import cache
+        monkeypatch.setattr(cache, "_get_redis", lambda: None)
+        df = pd.DataFrame({"A": [1, 2, 3]})
+        cache.cache_set_df("df1", df, ttl=60)
+        out = cache.cache_get_df("df1")
+        assert out is not None
+        pd.testing.assert_frame_equal(out, df)
+
+    def test_ttl_expira(self, monkeypatch):
+        from backend.core import cache
+        monkeypatch.setattr(cache, "_get_redis", lambda: None)
+        t = {"now": 1000.0}
+        monkeypatch.setattr(cache.time, "time", lambda: t["now"])
+        cache.cache_set("k2", "v", ttl=10)
+        assert cache.cache_get("k2") == "v"
+        t["now"] = 1011.0  # passou do TTL
+        assert cache.cache_get("k2") is None
+
+    def test_df_get_retorna_copia(self, monkeypatch):
+        import pandas as pd
+        from backend.core import cache
+        monkeypatch.setattr(cache, "_get_redis", lambda: None)
+        df = pd.DataFrame({"A": [1, 2, 3]})
+        cache.cache_set_df("df2", df, ttl=60)
+        out = cache.cache_get_df("df2")
+        out.loc[0, "A"] = 999
+        assert cache.cache_get_df("df2").loc[0, "A"] == 1  # store não mutado
