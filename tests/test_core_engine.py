@@ -81,6 +81,41 @@ def test_analisar_ativo_df_curto_retorna_none():
     assert s is None
 
 
+# ── Fonte de dados: brapi primária quando há BRAPI_TOKEN ──────────────────────
+
+def test_baixar_ohlcv_brapi_primeiro_com_token(monkeypatch):
+    """Com BRAPI_TOKEN, brapi é tentada primeiro; yfinance nem é chamado."""
+    monkeypatch.setenv("BRAPI_TOKEN", "abc")
+    chamadas = {"yf": 0}
+    monkeypatch.setattr(core_engine, "fetch_brapi_historical", lambda *a, **k: _make_df(0))
+    monkeypatch.setattr(core_engine.yf, "download",
+                        lambda *a, **k: chamadas.__setitem__("yf", chamadas["yf"] + 1) or pd.DataFrame())
+    out = core_engine._baixar_ohlcv("PETR4.SA", "6mo", "1d", False)
+    assert out is not None and not out.empty
+    assert chamadas["yf"] == 0
+
+
+def test_baixar_ohlcv_fallback_yfinance_se_brapi_vazio(monkeypatch):
+    """Com token, se brapi vier vazia, cai para yfinance."""
+    monkeypatch.setenv("BRAPI_TOKEN", "abc")
+    monkeypatch.setattr(core_engine, "fetch_brapi_historical", lambda *a, **k: pd.DataFrame())
+    monkeypatch.setattr(core_engine.yf, "download", lambda *a, **k: _make_df(0))
+    out = core_engine._baixar_ohlcv("PETR4.SA", "6mo", "1d", False)
+    assert out is not None and not out.empty
+
+
+def test_baixar_ohlcv_sem_token_usa_yfinance_primeiro(monkeypatch):
+    """Sem token, yfinance é a fonte primária; brapi nem é chamada se yf funcionar."""
+    monkeypatch.delenv("BRAPI_TOKEN", raising=False)
+    chamadas = {"brapi": 0}
+    monkeypatch.setattr(core_engine, "fetch_brapi_historical",
+                        lambda *a, **k: chamadas.__setitem__("brapi", chamadas["brapi"] + 1) or pd.DataFrame())
+    monkeypatch.setattr(core_engine.yf, "download", lambda *a, **k: _make_df(0))
+    out = core_engine._baixar_ohlcv("PETR4.SA", "6mo", "1d", False)
+    assert out is not None and not out.empty
+    assert chamadas["brapi"] == 0
+
+
 # ── B1: testes das funções extraídas (decomposição) ──────────────────────────
 
 def test_carregar_ohlcv_df_provided_retorna_copia():

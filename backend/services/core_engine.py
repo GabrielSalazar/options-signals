@@ -1,3 +1,5 @@
+import os
+import time
 import yfinance as yf
 import pandas as pd
 import logging
@@ -17,11 +19,49 @@ from backend.domain.scoring import score_ponderado
 
 logger = logging.getLogger("b3_scanner")
 
+def _baixar_yfinance(ticker: str, period: str, interval: str, verbose: bool) -> pd.DataFrame | None:
+    """Baixa OHLCV via yfinance com 3 tentativas e backoff exponencial (1s, 2s, 4s)."""
+    for tentativa in range(3):
+        try:
+            df = yf.download(ticker, period=period, interval=interval, auto_adjust=True, progress=False)
+            if df is not None and not df.empty:
+                return df
+            return None
+        except Exception as e:
+            if tentativa == 2:
+                if verbose:
+                    logger.warning(f"yfinance falhou para {ticker} após 3 tentativas: {e}")
+                return None
+            time.sleep(2 ** tentativa)
+    return None
+
+
+def _baixar_ohlcv(ticker: str, period: str, interval: str, verbose: bool) -> pd.DataFrame | None:
+    """Escolhe a ordem das fontes de OHLCV. Com BRAPI_TOKEN configurado, usa a brapi
+    PRIMEIRO (evita o rate-limit do Yahoo no IP do servidor), caindo para yfinance se
+    vier vazia. Sem token, mantém yfinance primeiro com a brapi como fallback."""
+    if os.getenv("BRAPI_TOKEN"):
+        df = fetch_brapi_historical(ticker, range_=period, interval=interval)
+        if df is not None and not df.empty:
+            if verbose:
+                logger.info(f"📡 {ticker}: dados via brapi (primária)")
+            return df
+        return _baixar_yfinance(ticker, period, interval, verbose)
+
+    df = _baixar_yfinance(ticker, period, interval, verbose)
+    if df is not None and not df.empty:
+        return df
+    df = fetch_brapi_historical(ticker, range_=period, interval=interval)
+    if df is not None and not df.empty and verbose:
+        logger.info(f"📡 {ticker}: dados via brapi (fallback)")
+    return df
+
+
 def _carregar_ohlcv(ticker: str, interval: str, df_provided: pd.DataFrame | None,
                     indicators_calculated: bool, verbose: bool) -> pd.DataFrame | None:
-    """Carrega/prepara o OHLCV: usa ``df_provided`` ou baixa via yfinance (com cache
-    e fallback brapi), calcula indicadores e valida tamanho. Retorna o df pronto
-    para análise ou None se os dados forem insuficientes."""
+    """Carrega/prepara o OHLCV: usa ``df_provided`` ou baixa das fontes (brapi/yfinance,
+    com cache), calcula indicadores e valida tamanho. Retorna o df pronto para análise
+    ou None se os dados forem insuficientes."""
     if df_provided is not None:
         df = df_provided.copy()
     else:
@@ -30,29 +70,9 @@ def _carregar_ohlcv(ticker: str, interval: str, df_provided: pd.DataFrame | None
         df = cache_get_df(cache_key)
 
         if df is None:
-            max_retries = 3
-            for tentativa in range(max_retries):
-                try:
-                    df = yf.download(ticker, period=period, interval=interval, auto_adjust=True, progress=False)
-                    if df is not None and not df.empty:
-                        cache_set_df(cache_key, df, ttl=300)  # 5 min cache
-                        break
-                except Exception as e:
-                    if tentativa == max_retries - 1:
-                        if verbose:
-                            logger.warning(f"yfinance falhou para {ticker} após {max_retries} tentativas: {e}. Tentando brapi...")
-                        df = None
-                        break
-                    import time
-                    time.sleep(2 ** tentativa) # Exponential backoff: 1s, 2s, 4s
-
-            # Fallback brapi se yfinance falhou ou retornou vazio
-            if df is None or df.empty:
-                df = fetch_brapi_historical(ticker, range_=period, interval=interval)
-                if df is not None and not df.empty:
-                    cache_set_df(cache_key, df, ttl=300)
-                    if verbose:
-                        logger.info(f"📡 {ticker}: dados via brapi (fallback)")
+            df = _baixar_ohlcv(ticker, period, interval, verbose)
+            if df is not None and not df.empty:
+                cache_set_df(cache_key, df, ttl=300)  # 5 min cache
 
     if df is None or len(df) < 30:
         return None
