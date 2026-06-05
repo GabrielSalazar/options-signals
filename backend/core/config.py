@@ -38,7 +38,7 @@ CONFIG = {
     "min_negocios_opcao":  10,           # nº mínimo de negócios na opção (proxy de OI/liquidez)
 
     # ── DTE (Days to Expiration) ───────────────────────────────────────────
-    "dte_minimo":   10,
+    "dte_minimo":   1,     # B3: vencimentos semanais (sexta) + mensais (3ª sexta)
     "dte_maximo":   45,
 
     # ── Reentrada ──────────────────────────────────────────────────────────

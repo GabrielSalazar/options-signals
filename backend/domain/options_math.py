@@ -59,6 +59,7 @@ def decodificar_opcao_b3(codigo: str) -> dict:
     }
 
 def calcular_dte(mes_venc: int, ano_venc: int = None) -> int:
+    """Calcula DTE para a 3ª sexta (vencimento mensal) de um mês."""
     hoje = datetime.now(timezone.utc).date()
     if ano_venc is None:
         ano_venc = hoje.year
@@ -70,15 +71,41 @@ def calcular_dte(mes_venc: int, ano_venc: int = None) -> int:
     dias_corridos = (venc - hoje).days
     return max(0, round(dias_corridos * 5 / 7))
 
+def _proximo_vencimento_b3() -> tuple:
+    """Retorna (mes, ano, dte, tipo_venc) do próximo vencimento B3 no range [dte_min, dte_max].
+    Busca sextas semanais (toda sexta-feira, exceto 3ª sexta) e mensais (3ª sexta).
+    Retorna primeiro match dentro do range."""
+    hoje = datetime.now(timezone.utc).date()
+    dte_min = CONFIG["dte_minimo"]
+    dte_max = CONFIG["dte_maximo"]
+
+    # Procura próximas 12 sextas (3 meses de cobertura)
+    for dias_adiante in range(1, 365):
+        candidato = hoje + pd.Timedelta(days=dias_adiante)
+        if candidato.weekday() != 4:  # 4 = sexta
+            continue
+
+        dias_corridos = (candidato - hoje).days
+        dte = round(dias_corridos * 5 / 7)  # DTE em dias úteis
+
+        if not (dte_min <= dte <= dte_max):
+            continue
+
+        # É a 3ª sexta do mês? (mensal)
+        cal = calendar.monthcalendar(candidato.year, candidato.month)
+        sextas = [semana[4] for semana in cal if semana[4] != 0]
+        eh_terceira_sexta = len(sextas) >= 3 and candidato.day == sextas[2]
+        tipo = "mensal" if eh_terceira_sexta else "semanal"
+
+        return candidato.month, candidato.year, dte, tipo
+
+    # Fallback: não encontrou nada no range
+    return hoje.month, hoje.year, 0, "nenhum"
+
 def mes_vencimento_ideal() -> tuple:
-    hoje = datetime.now(timezone.utc)
-    for delta_mes in range(0, 4):
-        mes = ((hoje.month - 1 + delta_mes) % 12) + 1
-        ano = hoje.year + ((hoje.month - 1 + delta_mes) // 12)
-        dte = calcular_dte(mes, ano)
-        if CONFIG["dte_minimo"] <= dte <= CONFIG["dte_maximo"]:
-            return mes, ano, dte
-    return hoje.month, hoje.year, 0
+    """Retorna (mes, ano, dte) do próximo vencimento B3 no range [dte_min, dte_max]."""
+    mes, ano, dte, _ = _proximo_vencimento_b3()
+    return mes, ano, dte
 
 def estimar_iv_historica(df: pd.DataFrame, janela: int = 20, interval: str = "1d") -> float:
     retornos = np.log(df["Close"] / df["Close"].shift(1)).dropna()
