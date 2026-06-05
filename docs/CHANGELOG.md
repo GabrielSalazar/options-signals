@@ -33,6 +33,11 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Mensagens do Telegram usavam `\n` literal em vez de quebras de linha reais. [B3]
+- **Nenhum sinal era emitido:** o gate de R/R exigia `rr_minimo=0.8`, mas a R/R do alvo1
+  (`alvo1_pct/|stop_pct|` ≈ 0.58) é constante e sempre menor → todo sinal (teórico e real)
+  era rejeitado. `rr_minimo` baixado para **0.5** (R/R natural da estratégia de scale-out,
+  em que alvo1 é realização parcial e alvo2/final são os alvos de fato). Guard em
+  `test_config` impede reintroduzir o bug (`rr_minimo <= alvo1_pct/|stop_pct|`).
 
 ## [4.2.0] - 2026-06-03
 

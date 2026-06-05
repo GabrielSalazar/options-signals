@@ -123,14 +123,29 @@ def test_montar_estrutura_opcao_seed0(monkeypatch):
 
 
 def test_montar_estrutura_opcao_rejeita_por_rr(monkeypatch):
-    # Sem relaxar rr_minimo (0.8): rr_alvo1=0.5 < 0.8 → rejeita
+    # rr_minimo alto força a rejeição pelo gate de R/R (rr_alvo1 ~0.5 < 0.9)
+    monkeypatch.setattr(core_engine, "mes_vencimento_ideal", lambda: (6, 2026, 30))
+    monkeypatch.setattr(core_engine, "get_real_options_from_opcoes_net", lambda *a, **k: None)
+    monkeypatch.setitem(core_engine.CONFIG, "delta_min", 0.0)
+    monkeypatch.setitem(core_engine.CONFIG, "delta_max", 1.0)
+    monkeypatch.setitem(core_engine.CONFIG, "rr_minimo", 0.9)
+    df = _make_df(0)
+    preco = float(df.iloc[-1]["Close"])
+    assert core_engine._montar_estrutura_opcao("TESTE3", preco, "CALL", df, "1d", False) is None
+
+
+def test_montar_estrutura_emite_com_rr_padrao(monkeypatch):
+    """Com o rr_minimo PADRÃO do CONFIG, um setup válido deve emitir (não ser
+    rejeitado pelo gate de R/R). Relaxa apenas a banda de delta para isolar o R/R."""
     monkeypatch.setattr(core_engine, "mes_vencimento_ideal", lambda: (6, 2026, 30))
     monkeypatch.setattr(core_engine, "get_real_options_from_opcoes_net", lambda *a, **k: None)
     monkeypatch.setitem(core_engine.CONFIG, "delta_min", 0.0)
     monkeypatch.setitem(core_engine.CONFIG, "delta_max", 1.0)
     df = _make_df(0)
     preco = float(df.iloc[-1]["Close"])
-    assert core_engine._montar_estrutura_opcao("TESTE3", preco, "CALL", df, "1d", False) is None
+    est = core_engine._montar_estrutura_opcao("TESTE3", preco, "CALL", df, "1d", False)
+    assert est is not None              # rr_minimo padrão deixa o alvo1 (~0.5) passar
+    assert est["rr_alvo1"] >= 0.5
 
 
 def test_montar_sinal_monta_dict(monkeypatch):

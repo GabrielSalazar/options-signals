@@ -20,7 +20,7 @@ CONFIG = {
     "alvo1_pct":         0.25,
     "alvo2_pct":         2.50,
     "alvo_final_pct":    7.00,
-    "rr_minimo":         0.8,
+    "rr_minimo":         0.5,   # piso de R/R no alvo1; deve ser <= alvo1_pct/|stop_pct| (~0.58) senão NENHUM sinal passa
     "buy_band_pct":      0.035,   # faixa de compra = ±3,5% do preço central
     "book_days":         7,       # validade da ordem no book (dias corridos)
 

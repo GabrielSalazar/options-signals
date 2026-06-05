@@ -42,6 +42,15 @@ class TestConfigDefaults:
     def test_delta_range_valid(self):
         assert 0 < CONFIG["delta_min"] < CONFIG["delta_max"] <= 1.0
 
+    def test_rr_minimo_permite_sinais(self):
+        """rr_alvo1 = alvo1_pct/|stop_pct| é constante; se rr_minimo o exceder,
+        NENHUM sinal passa. O piso precisa ser <= essa R/R natural da estratégia."""
+        rr_natural = CONFIG["alvo1_pct"] / abs(CONFIG["stop_pct"])
+        assert CONFIG["rr_minimo"] <= rr_natural, (
+            f"rr_minimo={CONFIG['rr_minimo']} > R/R natural do alvo1 ({rr_natural:.2f}) "
+            "→ nenhum sinal seria emitido"
+        )
+
     def test_dte_range_valid(self):
         assert 0 < CONFIG["dte_minimo"] < CONFIG["dte_maximo"]
 
