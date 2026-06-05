@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Não lançado]
 
+### Added
+- **Rastreamento de desfecho de sinais** ([backend/domain/outcome.py](../backend/domain/outcome.py),
+  [backend/services/outcome_service.py](../backend/services/outcome_service.py)): reprecifica
+  cada sinal via Black-Scholes ao longo do preço da ação (abordagem A) e classifica
+  ganho/perda/aberto. Endpoint `GET /signals/outcomes?days=N` agrega o **win-rate do
+  clássico** vs. o **efeito de filtrar pelo score ponderado** — base de dados para decidir
+  o scoring (clássico × ponderado).
+
 ### Removido
 - **Filtro de R/R retirado**: o gate `rr_alvo1 < rr_minimo` em `_montar_estrutura_opcao`
   e a config `rr_minimo` foram removidos. Como alvos e stop são percentuais fixos, o
