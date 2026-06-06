@@ -17,7 +17,7 @@ const PIPELINE = [
     {
         n: "02",
         label: "Download OHLCV (6 meses)",
-        desc: "Baixa preço de abertura, máxima, mínima, fechamento e volume (OHLCV) dos últimos 6 meses (~126 candles diários). É a janela mínima para alimentar a EMA200 e validar comportamento estatístico do RSI e da volatilidade. yfinance é gratuito mas instável — o motor aplica 3 tentativas com backoff de 2s, resolvendo ~99% das falhas transitórias da API.",
+        desc: "Baixa preço de abertura, máxima, mínima, fechamento e volume (OHLCV) dos últimos 6 meses (~126 candles diários). É a janela mínima para alimentar a EMA200 e validar comportamento estatístico do RSI e da volatilidade. Quando há BRAPI_TOKEN configurado, a brapi é a fonte primária (evita o rate-limit do Yahoo no IP do servidor); senão usa o yfinance com 3 tentativas e backoff. O resultado é cacheado (TTL em memória ou Redis) para não rebaixar os mesmos dados a cada scan.",
     },
     {
         n: "03",
@@ -31,8 +31,8 @@ const PIPELINE = [
     },
     {
         n: "05",
-        label: "Motor de Score (19 Gatilhos)",
-        desc: "O coração do algoritmo. Em vez de uma regra binária (\"se A cruza B então compre\"), o motor avalia o ativo sob duas óticas simultâneas — compra de CALL e compra de PUT — somando evidências independentes (+1 a +3 pts cada). 11 gatilhos altistas e 8 baixistas são checados em paralelo. A direção vencedora emite o sinal apenas se o score atingir o limiar mínimo de 5.",
+        label: "Motor de Score (20 Gatilhos)",
+        desc: "O coração do algoritmo. Em vez de uma regra binária (\"se A cruza B então compre\"), o motor avalia o ativo sob duas óticas simultâneas — compra de CALL e compra de PUT — somando evidências independentes (+1 a +3 pts cada). 11 gatilhos altistas e 9 baixistas são checados em paralelo. A direção vencedora emite o sinal apenas se o score atingir o limiar mínimo de 5.",
     },
     {
         n: "06",
@@ -42,25 +42,20 @@ const PIPELINE = [
     {
         n: "07",
         label: "Cálculo de DTE & IV Histórica",
-        desc: "DTE (Days To Expiration) = dias úteis até o vencimento, sempre a 3ª sexta-feira do mês (padrão B3). A janela aceita é 10–45 du: abaixo de 10 o theta-decay devora o prêmio antes do movimento; acima de 45 o gamma fica fraco demais, exigindo movimento desproporcional. IV histórica = volatilidade anualizada calculada com log-returns dos últimos 20 dias.",
+        desc: "DTE (Days To Expiration) = dias úteis até o vencimento. A B3 negocia opções com vencimento toda sexta-feira (séries semanais) além da série mensal na 3ª sexta — o motor busca o próximo vencimento dentro da janela de 1–45 dias úteis. Janelas muito curtas sofrem theta-decay acelerado; acima de ~45 du o gamma fica fraco demais, exigindo movimento desproporcional. IV histórica = volatilidade anualizada calculada com log-returns dos últimos 20 dias.",
     },
     {
         n: "08",
         label: "Black-Scholes (Prêmio Estimado)",
-        desc: "Modelo matemático clássico que precifica opções a partir de 5 inputs: preço da ação, strike, tempo até vencimento, volatilidade e taxa livre de risco (Selic 10,75%). Para opções americanas da B3 é uma aproximação muito sólida em strikes OTM. Quando o scraping de opcoes.net.br retorna prêmio real de tela, o sistema substitui a estimativa — usando o preço efetivo do book.",
+        desc: "Modelo matemático clássico que precifica opções a partir de 5 inputs: preço da ação, strike, tempo até vencimento, volatilidade e taxa livre de risco (Selic ~13,5%). Para opções americanas da B3 é uma aproximação muito sólida em strikes OTM. Quando o scraping de opcoes.net.br retorna prêmio real de tela, o sistema substitui a estimativa — usando o preço efetivo do book.",
     },
     {
         n: "09",
         label: "Estrutura de Entrada e Saída",
-        desc: "Sobre o prêmio estimado, o motor monta automaticamente: zona de entrada (±10% para absorver spread do book), Alvo 1 em +25% (realização parcial de 50% da posição), Alvo 2 em +150% (alvo técnico principal onde a maioria dos wins fecha), Alvo Final em +400% (especulação remanescente). Stop em −42%, calibrado pela perda média histórica de −39,5% observada em 4 stops da base.",
+        desc: "Sobre o prêmio estimado, o motor monta automaticamente: zona de entrada (±3,5% para absorver spread do book), Alvo 1 em +25% (realização parcial de 50% da posição), Alvo 2 em +250% (alvo técnico principal onde a maioria dos wins fecha), Alvo Final em +700% (especulação remanescente) e Stop em −43%. Os valores de R/R (Alvo/Stop) são calculados e exibidos como informação no sinal.",
     },
     {
         n: "10",
-        label: "Filtro Obrigatório R/R ≥ 0.8×",
-        desc: "Risk/Reward = (Alvo 1 − prêmio) ÷ (prêmio − stop). Sinais com R/R do Alvo 1 abaixo de 0,8× são descartados, mesmo com score 10. A matemática: com 82% de acerto histórico e R/R 0,8, a expectância líquida é (0,82 × 0,8) − (0,18 × 1,0) = +0,476 por operação. Sem esse filtro, sinais com score alto mas assimetria ruim derrubariam a performance.",
-    },
-    {
-        n: "11",
         label: "Registro & Notificação",
         desc: "Sinal aprovado é persistido no Supabase com 29 campos (gatilhos ativados, score, R/R, IV, DTE, etc.), enviado via Telegram com formatação Markdown (token + chat_id em env vars), e seu timestamp é registrado no histórico interno — bloqueando o mesmo ticker pelos próximos 3 dias úteis (de volta à Etapa 1).",
     },
@@ -232,9 +227,9 @@ export default function SobrePage() {
                     </Link>
                     <h1 className="font-serif">Como os Sinais são Gerados</h1>
                     <p className="mt-3 text-dw-ink-light text-lg max-w-3xl leading-relaxed">
-                        Pipeline completo de 11 etapas — do dado bruto ao sinal operacional — com
-                        Black-Scholes, 19 gatilhos técnicos e filtro obrigatório de R/R ≥ 0.8×.
-                        Cada etapa abaixo explica não só <em>o que</em> o motor faz, mas <em>por quê</em>.
+                        Pipeline completo de 10 etapas — do dado bruto ao sinal operacional — com
+                        Black-Scholes e 20 gatilhos técnicos. A emissão é decidida por <em>score</em> + banda
+                        de <em>delta</em>. Cada etapa abaixo explica não só <em>o que</em> o motor faz, mas <em>por quê</em>.
                     </p>
                 </div>
             </div>
@@ -243,7 +238,7 @@ export default function SobrePage() {
             <section className="mb-12">
                 <div className="flex items-center gap-2 mb-5 pb-2" style={{ borderBottom: "2.5px solid var(--dw-ink)" }}>
                     <GitMerge className="w-4 h-4" />
-                    <span className="text-xs font-extrabold uppercase tracking-widest">Pipeline de Execução — 11 Etapas</span>
+                    <span className="text-xs font-extrabold uppercase tracking-widest">Pipeline de Execução — 10 Etapas</span>
                 </div>
                 <div className="space-y-3">
                     {PIPELINE.map(({ n, label, desc }) => (
@@ -285,7 +280,7 @@ export default function SobrePage() {
                         </div>
                         <div className="p-4 rounded-lg" style={{ background: "var(--dw-bg-soft)" }}>
                             <p className="font-semibold text-dw-ink text-base mb-2">Score de BAIXA</p>
-                            <p className="text-sm text-dw-ink-mid leading-relaxed">8 gatilhos baixistas (+1 a +3 pts cada). Se o total ≥ 5 e maior que o de alta → emite PUT.</p>
+                            <p className="text-sm text-dw-ink-mid leading-relaxed">9 gatilhos baixistas (+1 a +3 pts cada). Se o total ≥ 5 e maior que o de alta → emite PUT.</p>
                         </div>
                         <div className="p-4 rounded-lg" style={{ background: "var(--dw-bg-soft)" }}>
                             <p className="font-semibold text-dw-ink text-base mb-2">Bônus de Horário</p>
@@ -345,7 +340,7 @@ export default function SobrePage() {
             <section className="mb-12">
                 <div className="flex items-center gap-2 mb-5 pb-2" style={{ borderBottom: "2.5px solid var(--dw-ink)" }}>
                     <TrendingDown className="w-4 h-4 text-dw-red" />
-                    <span className="text-xs font-extrabold uppercase tracking-widest text-dw-red">8 Gatilhos de BAIXA → Sinal PUT</span>
+                    <span className="text-xs font-extrabold uppercase tracking-widest text-dw-red">9 Gatilhos de BAIXA → Sinal PUT</span>
                 </div>
                 <div className="space-y-3">
                     {GATILHOS_BAIXA.map(({ id, pts, cat, label, interp }) => {
@@ -418,10 +413,9 @@ export default function SobrePage() {
                         </div>
                         <p className="font-semibold text-dw-ink text-lg">Vencimento (DTE)</p>
                         <p className="text-base text-dw-ink-mid leading-relaxed max-w-xs">
-                            DTE = dias úteis até o vencimento. A B3 padroniza opções com vencimento na <strong className="text-dw-ink">3ª sexta-feira</strong> de cada mês.
-                            A janela aceita é <strong className="text-dw-ink">10–45 dias úteis</strong>:
-                            abaixo de 10, o theta-decay (perda por tempo) devora o prêmio antes do movimento direcional;
-                            acima de 45, o gamma fica fraco demais, exigindo movimento desproporcional.
+                            DTE = dias úteis até o vencimento. A B3 negocia opções com vencimento <strong className="text-dw-ink">toda sexta-feira</strong> (séries semanais), além da série mensal na <strong className="text-dw-ink">3ª sexta</strong>.
+                            O motor escolhe o próximo vencimento na janela de <strong className="text-dw-ink">1–45 dias úteis</strong>:
+                            janelas curtas sofrem theta-decay acelerado; acima de ~45 du o gamma fica fraco demais, exigindo movimento desproporcional.
                         </p>
                     </div>
                     <div className="card flex flex-col items-center text-center gap-3 py-6">
@@ -442,7 +436,7 @@ export default function SobrePage() {
                         <p className="font-semibold text-dw-ink text-lg">Black-Scholes</p>
                         <p className="text-base text-dw-ink-mid leading-relaxed max-w-xs">
                             Modelo matemático clássico que precifica opções europeias a partir de 5 inputs:
-                            preço, strike, tempo, volatilidade e taxa Selic (10,75%). Para opções americanas
+                            preço, strike, tempo, volatilidade e taxa Selic (~13,5%). Para opções americanas
                             da B3 em strikes OTM, a aproximação é muito sólida.
                             Quando há prêmio real de tela disponível, ele substitui a estimativa.
                         </p>
@@ -454,14 +448,14 @@ export default function SobrePage() {
             <section className="mb-12">
                 <div className="flex items-center gap-2 mb-5 pb-2" style={{ borderBottom: "2.5px solid var(--dw-ink)" }}>
                     <Shield className="w-4 h-4 text-dw-blue" />
-                    <span className="text-xs font-extrabold uppercase tracking-widest">Estrutura de Entrada, Alvos & Filtro R/R</span>
+                    <span className="text-xs font-extrabold uppercase tracking-widest">Estrutura de Entrada, Alvos & Stop</span>
                 </div>
                 <div className="card mb-4">
                     <p className="text-base text-dw-ink-mid leading-relaxed mb-5">
-                        Com prêmio definido, a estrutura é montada automaticamente. Os múltiplos (+25%, +150%, +400%, −42%)
-                        foram calibrados a partir da base histórica de 22 operações: representam os pontos onde o R/R x
-                        probabilidade maximiza a expectância. O filtro final de R/R garante que mesmo sinais de score alto
-                        sejam descartados se a assimetria não for favorável.
+                        Com prêmio definido, a estrutura é montada automaticamente. Os múltiplos (+25%, +250%, +700%, −43%)
+                        foram calibrados a partir da base histórica: representam os pontos onde o R/R × probabilidade
+                        maximiza a expectância de uma estratégia de scale-out (realiza parte no Alvo 1 e deixa o restante
+                        correr até Alvo 2/Final).
                     </p>
                     <div className="overflow-x-auto">
                         <table className="w-full text-base">
@@ -475,12 +469,12 @@ export default function SobrePage() {
                             </thead>
                             <tbody className="text-base">
                                 {[
-                                    { nivel: "Entrada Mín", calc: "prêmio × 0.90", ex: "R$ 0,32",          log: "Spread do book" },
-                                    { nivel: "Entrada Máx", calc: "prêmio × 1.10", ex: "R$ 0,38",          log: "Spread do book" },
-                                    { nivel: "Alvo 1",      calc: "prêmio × 1.25", ex: "R$ 0,44 (+25%)",   log: "Realização parcial (50%)" },
-                                    { nivel: "Alvo 2",      calc: "prêmio × 2.50", ex: "R$ 0,88 (+150%)",  log: "Alvo técnico principal" },
-                                    { nivel: "Alvo Final",  calc: "prêmio × 5.00", ex: "R$ 1,75 (+400%)",  log: "Especulação remanescente" },
-                                    { nivel: "Stop Loss",   calc: "prêmio × 0.58", ex: "R$ 0,20 (−42%)",   log: "Proteção absoluta" },
+                                    { nivel: "Entrada Mín", calc: "prêmio × 0.965", ex: "R$ 0,34",          log: "Spread do book (±3,5%)" },
+                                    { nivel: "Entrada Máx", calc: "prêmio × 1.035", ex: "R$ 0,36",          log: "Spread do book (±3,5%)" },
+                                    { nivel: "Alvo 1",      calc: "prêmio × 1.25",  ex: "R$ 0,44 (+25%)",   log: "Realização parcial (50%)" },
+                                    { nivel: "Alvo 2",      calc: "prêmio × 3.50",  ex: "R$ 1,23 (+250%)",  log: "Alvo técnico principal" },
+                                    { nivel: "Alvo Final",  calc: "prêmio × 8.00",  ex: "R$ 2,80 (+700%)",  log: "Especulação remanescente" },
+                                    { nivel: "Stop Loss",   calc: "prêmio × 0.57",  ex: "R$ 0,20 (−43%)",   log: "Proteção absoluta" },
                                 ].map(({ nivel, calc, ex, log }) => (
                                     <tr key={nivel} style={{ borderBottom: "1px solid var(--dw-rule-soft)" }}>
                                         <td className="py-4 px-2 font-semibold text-dw-ink">{nivel}</td>
@@ -493,9 +487,10 @@ export default function SobrePage() {
                         </table>
                     </div>
                     <div className="mt-6 p-5 rounded-lg text-base leading-relaxed" style={{ background: "var(--dw-bg-soft)", color: "var(--dw-ink-mid)" }}>
-                        <strong className="text-dw-ink">Filtro R/R obrigatório:</strong> Se R/R do Alvo 1 {"<"} 0.8× → sinal descartado automaticamente.{" "}
-                        A matemática da expectância com R/R=0.8 e 82% acerto: <strong className="text-dw-ink">(0.82 × 0.8) − (0.18 × 1.0) = +0.476 por operação</strong> —
-                        ou seja, +47,6% de retorno esperado por trade, em média, no longo prazo.
+                        <strong className="text-dw-ink">Nota sobre R/R:</strong> como alvos e stop são percentuais fixos
+                        sobre o mesmo prêmio, a razão R/R é <em>constante</em> e não discrimina sinais — por isso <strong className="text-dw-ink">não há filtro de R/R</strong>.
+                        Os valores de R/R seguem exibidos no sinal apenas como informação. A decisão de emitir é tomada
+                        pelo <strong className="text-dw-ink">score</strong> (≥ 5) e pela banda de <strong className="text-dw-ink">delta</strong> (0,15–0,45, faixa OTM ideal).
                     </div>
                 </div>
             </section>
