@@ -1,9 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import {
-  legIntrinsic, legSign, calculateStrategy, calculatePayoffCurve,
-  getLongCallLegs, getBullCallSpreadLegs, type Leg,
+  legIntrinsic, legSign, calculateStrategy, calculatePayoffCurve, type Leg,
   STRATEGY_DEFS, instantiateLegs, defaultStrikes, type StrategyId,
+  // Construtores mantidos — usados como referência de regressão da migração
+  getLongCallLegs, getShortCallLegs, getLongPutLegs, getShortPutLegs,
+  getCoveredCallLegs, getProtectivePutLegs,
+  getStraddleLegs, getShortStraddleLegs, getStrangleLegs, getShortStrangleLegs,
+  getBullCallSpreadLegs, getBearPutSpreadLegs, getBullPutSpreadLegs, getBearCallSpreadLegs,
+  getButterflyCallLegs, getIronCondorLegs,
 } from '@/lib/strategies';
+
+/** Chave canônica de uma perna, p/ comparar listas como multiconjuntos. */
+const normLegs = (legs: Leg[]) =>
+  legs.map((l) => `${l.type}:${l.side}:${l.strike}:${l.quantity}`).sort();
 
 const longCall: Leg = { type: 'call', strike: 100, side: 'long', quantity: 1 };
 const longPut: Leg = { type: 'put', strike: 100, side: 'long', quantity: 1 };
@@ -164,5 +173,94 @@ describe('novas estratégias — sanidade do payoff', () => {
     const r = mk('boxSpread');
     expect(typeof r.maxProfit).toBe('number');
     expect(typeof r.maxLoss).toBe('number');
+  });
+
+  it('sintético vendido tem perda ilimitada na alta', () => {
+    expect(mk('syntheticShort').maxLoss).toBe('Ilimitado');
+  });
+
+  it('call ratio backspread tem alta ilimitada', () => {
+    expect(mk('callRatioBackspread').maxProfit).toBe('Infinito');
+  });
+
+  it('strip tem alta ilimitada (perna de call comprada)', () => {
+    expect(mk('strip').maxProfit).toBe('Infinito');
+  });
+
+  it('iron butterfly tem lucro e perda finitos', () => {
+    const r = mk('ironButterfly');
+    expect(typeof r.maxProfit).toBe('number');
+    expect(typeof r.maxLoss).toBe('number');
+  });
+
+  it('long condor tem lucro e perda finitos', () => {
+    const r = mk('longCondor');
+    expect(typeof r.maxProfit).toBe('number');
+    expect(typeof r.maxLoss).toBe('number');
+  });
+});
+
+// ── Regressão: a migração data-driven preserva as 16 estratégias originais ─────
+
+describe('migração — registro instancia as mesmas pernas dos construtores antigos', () => {
+  const cases: Array<[StrategyId, number[], Leg[]]> = [
+    ['longCall',       [100],              getLongCallLegs(100)],
+    ['shortCall',      [100],              getShortCallLegs(100)],
+    ['longPut',        [100],              getLongPutLegs(100)],
+    ['shortPut',       [100],              getShortPutLegs(100)],
+    ['coveredCall',    [100],              getCoveredCallLegs(100)],
+    ['protectivePut',  [100],              getProtectivePutLegs(100)],
+    ['straddle',       [100],              getStraddleLegs(100)],
+    ['shortStraddle',  [100],              getShortStraddleLegs(100)],
+    ['strangle',       [95, 105],          getStrangleLegs(95, 105)],
+    ['shortStrangle',  [95, 105],          getShortStrangleLegs(95, 105)],
+    ['bullCall',       [95, 105],          getBullCallSpreadLegs(95, 105)],
+    ['bearPut',        [95, 105],          getBearPutSpreadLegs(95, 105)],
+    ['bullPutSpread',  [95, 105],          getBullPutSpreadLegs(95, 105)],
+    ['bearCallSpread', [95, 105],          getBearCallSpreadLegs(95, 105)],
+    ['butterflyCall',  [90, 100, 110],     getButterflyCallLegs(90, 100, 110)],
+    ['ironCondor',     [90, 95, 105, 110], getIronCondorLegs(90, 95, 105, 110)],
+  ];
+
+  it.each(cases)('%s gera as mesmas pernas', (id, strikes, expected) => {
+    expect(normLegs(instantiateLegs(STRATEGY_DEFS[id], strikes))).toEqual(normLegs(expected));
+  });
+
+  it('defaultStrikes mapeia os offsets para strikes em torno de S', () => {
+    expect(defaultStrikes(STRATEGY_DEFS.ironCondor, 100)).toEqual([90, 95, 105, 110]);
+    expect(defaultStrikes(STRATEGY_DEFS.straddle, 42)).toEqual([42]);
+  });
+});
+
+// ── Payoff travado e replicação sintética (vencimento) ────────────────────────
+
+describe('payoff no vencimento — travadas e sintéticas', () => {
+  const expCurve = (id: StrategyId) => {
+    const d = STRATEGY_DEFS[id];
+    const legs = instantiateLegs(d, defaultStrikes(d, 100));
+    return calculatePayoffCurve(legs, 100, 30 / 365, 0.3, 0.1, 0, 0.4, 80, d.stockUnits)
+      .map((p) => p.payoffExpiration);
+  };
+
+  it.each(['boxSpread', 'conversion', 'reversal'] as StrategyId[])(
+    '%s tem payoff constante no vencimento (travado)',
+    (id) => {
+      const vals = expCurve(id);
+      const spread = Math.max(...vals) - Math.min(...vals);
+      expect(spread).toBeLessThan(0.01);
+    },
+  );
+
+  it('sintético comprado replica a ação (inclinação ≈ 1)', () => {
+    const vals = expCurve('syntheticLong');
+    const d = STRATEGY_DEFS.syntheticLong;
+    const curve = calculatePayoffCurve(
+      instantiateLegs(d, defaultStrikes(d, 100)), 100, 30 / 365, 0.3, 0.1, 0, 0.4, 80, d.stockUnits,
+    );
+    const lo = curve[10], hi = curve[curve.length - 10];
+    const slope = (hi.payoffExpiration - lo.payoffExpiration) / (hi.S - lo.S);
+    expect(slope).toBeCloseTo(1, 2);
+    // e não é constante (ao contrário das travadas)
+    expect(Math.max(...vals) - Math.min(...vals)).toBeGreaterThan(1);
   });
 });
