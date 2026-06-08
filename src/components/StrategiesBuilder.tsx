@@ -14,32 +14,11 @@ import {
   ReferenceLine,
 } from 'recharts';
 import {
-  StrategyName,
+  StrategyId,
   StrategyCategory,
-  STRATEGY_META,
-  // Existing
-  getStraddleLegs,
-  getStrangleLegs,
-  getBullCallSpreadLegs,
-  getBearPutSpreadLegs,
-  getIronCondorLegs,
-  // New — Puras
-  getLongCallLegs,
-  getShortCallLegs,
-  getLongPutLegs,
-  getShortPutLegs,
-  // New — Com Ação
-  getCoveredCallLegs,
-  getProtectivePutLegs,
-  // New — Spreads de crédito
-  getBullPutSpreadLegs,
-  getBearCallSpreadLegs,
-  // New — Volatilidade vendida
-  getShortStraddleLegs,
-  getShortStrangleLegs,
-  // New — Butterfly
-  getButterflyCallLegs,
-  // Core
+  STRATEGY_DEFS,
+  instantiateLegs,
+  defaultStrikes,
   calculateStrategy,
   calculatePayoffCurve,
 } from '@/lib/strategies';
@@ -53,32 +32,17 @@ const DIVIDEND_YIELD_PCT = 0;
 
 // ── Strategy Card Grid Config ─────────────────────────────────────────────────
 
-const CATEGORIES: { key: StrategyCategory; label: string; strategies: StrategyName[] }[] = [
-  {
-    key: 'puras',
-    label: '📌 Posições Puras',
-    strategies: ['longCall', 'shortCall', 'longPut', 'shortPut'],
-  },
-  {
-    key: 'acao',
-    label: '🏦 Com Ação (Stock)',
-    strategies: ['coveredCall', 'protectivePut'],
-  },
-  {
-    key: 'spreads',
-    label: '📊 Spreads',
-    strategies: ['bullCall', 'bearPut', 'bullPutSpread', 'bearCallSpread'],
-  },
-  {
-    key: 'volatilidade',
-    label: '🌊 Volatilidade',
-    strategies: ['straddle', 'strangle', 'shortStraddle', 'shortStrangle', 'butterflyCall'],
-  },
-  {
-    key: 'complexas',
-    label: '🦅 Complexas',
-    strategies: ['ironCondor'],
-  },
+const CATEGORIES: { key: StrategyCategory; label: string; strategies: StrategyId[] }[] = [
+  { key: 'puras', label: '📌 Posições Puras', strategies: ['longCall', 'shortCall', 'longPut', 'shortPut'] },
+  { key: 'acao', label: '🏦 Com Ação (Stock)', strategies: ['coveredCall', 'protectivePut'] },
+  { key: 'spreads', label: '📊 Spreads', strategies: ['bullCall', 'bearPut', 'bullPutSpread', 'bearCallSpread'] },
+  { key: 'volatilidade', label: '🌊 Volatilidade', strategies: ['straddle', 'strangle', 'shortStraddle', 'shortStrangle', 'butterflyCall'] },
+  { key: 'complexas', label: '🦅 Complexas', strategies: ['ironCondor'] },
+  { key: 'razao', label: '⚖️ Razão / Backspread', strategies: ['callRatioBackspread', 'putRatioBackspread', 'callFrontRatioSpread', 'putFrontRatioSpread'] },
+  { key: 'borboletasAvancadas', label: '🦋 Borboletas & Condores Avançados', strategies: ['ironButterfly', 'longCondor', 'brokenWingButterfly'] },
+  { key: 'creditoHibridas', label: '🦎 Crédito Híbridas', strategies: ['jadeLizard', 'collar', 'seagull', 'riskReversal'] },
+  { key: 'direcionalVol', label: '🎯 Direcionais (Vol)', strategies: ['strap', 'strip'] },
+  { key: 'sinteticas', label: '🔁 Sintéticas / Arbitragem', strategies: ['boxSpread', 'conversion', 'reversal', 'syntheticLong', 'syntheticShort'] },
 ];
 
 const PROFILE_STYLE: Record<string, { color: string; bg: string; border: string }> = {
@@ -92,7 +56,7 @@ const PROFILE_STYLE: Record<string, { color: string; bg: string; border: string 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function StrategiesBuilder() {
-  const [strategy, setStrategy] = useState<StrategyName>('straddle');
+  const [strategy, setStrategy] = useState<StrategyId>('straddle');
 
   // Market parameters
   const [S, setS]         = useState(100);
@@ -101,49 +65,28 @@ export default function StrategiesBuilder() {
   const r = SELIC_PCT;
   const q = DIVIDEND_YIELD_PCT;
 
-  // Strike states (K1–K5 shared across strategies)
-  // K1 — single-strike strategies (Long/Short Call/Put, Straddles, Covered Call, Protective Put)
-  //       and Butterfly center
-  // K2 — lower strike for dual-strike strategies / Iron Condor put short
-  // K3 — upper strike for dual-strike strategies / Iron Condor call short
-  // K4 — Butterfly left wing / Iron Condor put long
-  // K5 — Butterfly right wing / Iron Condor call long
-  const [K1, setK1] = useState(100);
-  const [K2, setK2] = useState(95);
-  const [K3, setK3] = useState(105);
-  const [K4, setK4] = useState(90);
-  const [K5, setK5] = useState(110);
+  // Strikes da estrutura — array dimensionado pela estratégia selecionada
+  const [strikes, setStrikes] = useState<number[]>(() => defaultStrikes(STRATEGY_DEFS.straddle, 100));
 
-  const meta        = STRATEGY_META[strategy];
-  const stockUnits  = meta.hasStockComponent ? 1 : 0;
+  function selectStrategy(id: StrategyId) {
+    setStrategy(id);
+    setStrikes(defaultStrikes(STRATEGY_DEFS[id], S));
+  }
+  function setStrike(i: number, v: number) {
+    setStrikes((prev) => prev.map((s, j) => (j === i ? v : s)));
+  }
+
+  const def        = STRATEGY_DEFS[strategy];
+  const stockUnits = def.stockUnits;
+  const numLegs    = def.legs.length + (stockUnits !== 0 ? 1 : 0);
+  const hasStock   = stockUnits !== 0;
 
   const legs = useMemo(() => {
-    switch (strategy) {
-      // Posições Puras
-      case 'longCall':      return getLongCallLegs(K1);
-      case 'shortCall':     return getShortCallLegs(K1);
-      case 'longPut':       return getLongPutLegs(K1);
-      case 'shortPut':      return getShortPutLegs(K1);
-      // Com Ação
-      case 'coveredCall':   return getCoveredCallLegs(K1);
-      case 'protectivePut': return getProtectivePutLegs(K1);
-      // Straddle / Short Straddle — single strike
-      case 'straddle':      return getStraddleLegs(K1);
-      case 'shortStraddle': return getShortStraddleLegs(K1);
-      // Dual-strike
-      case 'strangle':      return getStrangleLegs(K2, K3);
-      case 'shortStrangle': return getShortStrangleLegs(K2, K3);
-      case 'bullCall':      return getBullCallSpreadLegs(K2, K3);
-      case 'bearPut':       return getBearPutSpreadLegs(K2, K3);
-      case 'bullPutSpread': return getBullPutSpreadLegs(K2, K3);
-      case 'bearCallSpread':return getBearCallSpreadLegs(K2, K3);
-      // Butterfly: left=K4, center=K1, right=K5
-      case 'butterflyCall': return getButterflyCallLegs(K4, K1, K5);
-      // Iron Condor: put_long=K4, put_short=K2, call_short=K3, call_long=K5
-      case 'ironCondor':    return getIronCondorLegs(K4, K2, K3, K5);
-      default:              return [];
-    }
-  }, [strategy, K1, K2, K3, K4, K5]);
+    const d = STRATEGY_DEFS[strategy];
+    // guarda o render transitório logo após trocar de estratégia
+    const s = strikes.length === d.strikeOffsets.length ? strikes : defaultStrikes(d, S);
+    return instantiateLegs(d, s);
+  }, [strategy, strikes, S]);
 
   const result = useMemo(
     () => calculateStrategy(legs, S, T / 365, sigma / 100, r / 100, q / 100, stockUnits),
@@ -155,27 +98,7 @@ export default function StrategiesBuilder() {
     [legs, S, T, sigma, r, q, stockUnits],
   );
 
-  const profileStyle = PROFILE_STYLE[meta.profile] ?? PROFILE_STYLE.neutro;
-
-  // ── Strike panel helpers ───────────────────────────────────────────────────
-
-  const isSingleStrike = ['longCall','shortCall','longPut','shortPut',
-    'straddle','shortStraddle','coveredCall','protectivePut'].includes(strategy);
-
-  const isDualStrike = ['strangle','shortStrangle','bullCall','bearPut',
-    'bullPutSpread','bearCallSpread'].includes(strategy);
-
-  const isButterfly   = strategy === 'butterflyCall';
-  const isIronCondor  = strategy === 'ironCondor';
-
-  const dualStrikeLabels: Record<string, [string, string]> = {
-    strangle:       ['Strike Put (K₁)',              'Strike Call (K₂)'],
-    shortStrangle:  ['Strike Put (K₁)',              'Strike Call (K₂)'],
-    bullCall:       ['Strike Call Longa (K₁)',        'Strike Call Curta (K₂)'],
-    bearPut:        ['Strike Put Longa (K₁)',         'Strike Put Curta (K₂)'],
-    bullPutSpread:  ['Strike Put Longa — inferior (K₁)', 'Strike Put Curta — superior (K₂)'],
-    bearCallSpread: ['Strike Call Curta — inferior (K₁)','Strike Call Longa — superior (K₂)'],
-  };
+  const profileStyle = PROFILE_STYLE[def.profile] ?? PROFILE_STYLE.neutro;
 
   return (
     <div className="strategies-builder bg-white border border-dw-rule rounded-xl p-6 shadow-sm mb-6">
@@ -195,13 +118,13 @@ export default function StrategiesBuilder() {
             </div>
             <div className="flex flex-wrap gap-2">
               {cat.strategies.map((strat) => {
-                const m          = STRATEGY_META[strat];
+                const m          = STRATEGY_DEFS[strat];
                 const isSelected = strategy === strat;
                 const ps         = PROFILE_STYLE[m.profile];
                 return (
                   <button
                     key={strat}
-                    onClick={() => setStrategy(strat)}
+                    onClick={() => selectStrategy(strat)}
                     className={[
                       'flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-all',
                       isSelected
@@ -242,32 +165,37 @@ export default function StrategiesBuilder() {
       {/* ── Selected Strategy Info Banner ─────────────────────────────────── */}
       <div className="flex flex-wrap items-start gap-3 mb-6 p-4 rounded-xl border"
         style={{ background: profileStyle.bg, borderColor: profileStyle.border }}>
-        <div className="text-3xl leading-none">{meta.icon}</div>
+        <div className="text-3xl leading-none">{def.icon}</div>
         <div className="flex-1 min-w-0">
           <div className="font-bold text-dw-ink text-sm">
-            {meta.label}
-            <span className="text-dw-ink-muted font-normal ml-2">· {meta.labelPT}</span>
+            {def.label}
+            <span className="text-dw-ink-muted font-normal ml-2">· {def.labelPT}</span>
           </div>
-          <div className="text-xs text-dw-ink-muted mt-0.5">{meta.description}</div>
+          <div className="text-xs text-dw-ink-muted mt-0.5">{def.description}</div>
         </div>
         <div className="flex flex-wrap gap-1.5 items-center">
           <span
             className="text-[10px] font-bold uppercase px-2 py-1 rounded-full border"
             style={{ color: profileStyle.color, background: 'white', borderColor: profileStyle.border }}
           >
-            {meta.profile}
+            {def.profile}
           </span>
           <span className="text-[10px] text-dw-ink-muted border border-dw-rule-soft rounded-full px-2 py-1 bg-white">
-            {meta.numLegs} perna{meta.numLegs !== 1 ? 's' : ''}
+            {numLegs} perna{numLegs !== 1 ? 's' : ''}
           </span>
-          {meta.unlimitedLoss && (
+          {def.unlimitedLoss && (
             <span className="text-[10px] font-bold text-red-700 bg-red-50 border border-red-300 rounded-full px-2 py-1">
               ⚠️ Risco Ilimitado
             </span>
           )}
-          {meta.hasStockComponent && (
+          {hasStock && (
             <span className="text-[10px] text-purple-700 bg-purple-50 border border-purple-200 rounded-full px-2 py-1">
               🏦 Inclui posição em ação
+            </span>
+          )}
+          {def.locked && (
+            <span className="text-[10px] text-slate-700 bg-slate-100 border border-slate-300 rounded-full px-2 py-1">
+              🔒 Payoff travado
             </span>
           )}
         </div>
@@ -285,52 +213,21 @@ export default function StrategiesBuilder() {
               Strikes da Estrutura
             </label>
 
-            {/* Single-strike strategies */}
-            {isSingleStrike && (
-              <SliderControl
-                label={
-                  strategy === 'coveredCall'   ? 'Strike da Call Vendida (K)' :
-                  strategy === 'protectivePut' ? 'Strike da Put Protetora (K)' :
-                  'Strike (K)'
-                }
-                value={K1} min={50} max={200} step={1} onChange={setK1} suffix=" R$"
-              />
-            )}
-
-            {/* Dual-strike strategies */}
-            {isDualStrike && (() => {
-              const [label2, label3] = dualStrikeLabels[strategy] ?? ['Strike 1 (K₁)', 'Strike 2 (K₂)'];
-              return (
-                <>
-                  <SliderControl label={label2} value={K2} min={50} max={200} step={1} onChange={setK2} suffix=" R$" />
-                  <div className="my-3" />
-                  <SliderControl label={label3} value={K3} min={50} max={200} step={1} onChange={setK3} suffix=" R$" />
-                </>
-              );
-            })()}
-
-            {/* Butterfly: left (K4) · center (K1) · right (K5) */}
-            {isButterfly && (
-              <>
-                <SliderControl label="Asa Esquerda (K₁)" value={K4} min={50} max={200} step={1} onChange={setK4} suffix=" R$" />
-                <div className="my-3" />
-                <SliderControl label="Strike Central (K₂ — pico)" value={K1} min={50} max={200} step={1} onChange={setK1} suffix=" R$" />
-                <div className="my-3" />
-                <SliderControl label="Asa Direita (K₃)" value={K5} min={50} max={200} step={1} onChange={setK5} suffix=" R$" />
-              </>
-            )}
-
-            {/* Iron Condor: K4 · K2 · K3 · K5 */}
-            {isIronCondor && (
-              <>
-                <SliderControl label="Put Longa — Asa inf. (K₁)" value={K4} min={50} max={200} step={1} onChange={setK4} suffix=" R$" />
-                <div className="my-3" />
-                <SliderControl label="Put Curta (K₂)"             value={K2} min={50} max={200} step={1} onChange={setK2} suffix=" R$" />
-                <div className="my-3" />
-                <SliderControl label="Call Curta (K₃)"            value={K3} min={50} max={200} step={1} onChange={setK3} suffix=" R$" />
-                <div className="my-3" />
-                <SliderControl label="Call Longa — Asa sup. (K₄)" value={K5} min={50} max={200} step={1} onChange={setK5} suffix=" R$" />
-              </>
+            {def.strikeLabels.length === 0 ? (
+              <p className="text-xs text-dw-ink-muted">Sem strikes (estrutura personalizada).</p>
+            ) : (
+              def.strikeLabels.map((label, i) => (
+                <div key={`${strategy}-${i}`}>
+                  {i > 0 && <div className="my-3" />}
+                  <SliderControl
+                    label={label}
+                    value={strikes[i] ?? defaultStrikes(def, S)[i]}
+                    min={50} max={200} step={1}
+                    onChange={(v) => setStrike(i, v)}
+                    suffix=" R$"
+                  />
+                </div>
+              ))
             )}
           </div>
 
@@ -361,10 +258,10 @@ export default function StrategiesBuilder() {
               color="var(--dw-green)"
             />
             <SummaryCard
-              label={`Max Loss${meta.unlimitedLoss ? ' ⚠️' : ''}`}
+              label={`Max Loss${def.unlimitedLoss ? ' ⚠️' : ''}`}
               value={typeof result.maxLoss === 'number' ? fmtCcy(Math.abs(result.maxLoss)) : result.maxLoss}
-              color={meta.unlimitedLoss ? '#B91C1C' : 'var(--dw-red)'}
-              highlight={meta.unlimitedLoss}
+              color={def.unlimitedLoss ? '#B91C1C' : 'var(--dw-red)'}
+              highlight={def.unlimitedLoss}
             />
             <SummaryCard
               label="Breakevens"
