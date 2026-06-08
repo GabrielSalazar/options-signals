@@ -8,6 +8,13 @@ import {
 import { fetchSignalHistory, fetchAnalytics } from '@/lib/api';
 import { Signal } from '@/types/signals';
 import dynamic from 'next/dynamic';
+import { useAssetAnalysis } from '@/hooks/useAssetAnalysis';
+import { TickerSelector } from '@/components/TickerSelector';
+import { AssetAnalyzer } from '@/components/AssetAnalyzer';
+import { OptionAnalyzer } from '@/components/OptionAnalyzer';
+import { VolatilityPanel } from '@/components/VolatilityPanel';
+import { AnalyticsCrossAlert } from '@/components/AnalyticsCrossAlert';
+import type { AssetVerdict, OptionVerdict } from '@/lib/types/analytics';
 
 const IVSurface = dynamic(() => import('@/components/IVSurface'), {
   ssr: false,
@@ -49,6 +56,12 @@ export default function AnalyticsPage() {
   const [stats, setStats] = useState<AnalyticsStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Calculadoras state ─────────────────────────────────────────────────────
+  const [calcTicker, setCalcTicker] = useState<string | null>(null);
+  const [assetVerdict, setAssetVerdict] = useState<AssetVerdict | null>(null);
+  const [optionVerdict, setOptionVerdict] = useState<OptionVerdict | null>(null);
+  const { data: analysisPayload, loading: analysisLoading, error: analysisError } = useAssetAnalysis(calcTicker);
 
   const analyze = useCallback(async () => {
     const t = tickerInput.trim().toUpperCase();
@@ -290,6 +303,58 @@ export default function AnalyticsPage() {
               optType: signals[0].tipo_sinal.toLowerCase() as 'call' | 'put'
            } : undefined}
         />
+      </div>
+
+      {/* ── Calculadoras de Ativo e Opção ── */}
+      <div className="my-6 space-y-4">
+        <div>
+          <div className="label mb-1">Calculadoras</div>
+          <h3 className="font-serif text-lg mb-1">Ativo barato? Opção vale a pena?</h3>
+          <p className="text-xs mb-4" style={{ color: 'var(--dw-ink-muted)' }}>
+            Análise técnica/estatística do ativo + calculadora de IV e preço justo da opção.
+          </p>
+        </div>
+
+        {/* Ticker selector das calculadoras */}
+        <div className="card flex items-center gap-3 flex-wrap">
+          <span className="text-sm" style={{ color: 'var(--dw-ink-muted)' }}>Ativo para análise:</span>
+          <TickerSelector
+            value={calcTicker ?? ''}
+            onChange={(t) => setCalcTicker(t || null)}
+            placeholder="Ex: PETR4"
+          />
+          {analysisLoading && (
+            <span className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin"
+              style={{ borderColor: 'var(--dw-rule)', borderTopColor: 'var(--dw-blue)' }} />
+          )}
+          {analysisError && (
+            <span className="text-sm" style={{ color: 'var(--dw-red)' }}>{analysisError}</span>
+          )}
+        </div>
+
+        {/* Alerta cruzado */}
+        {analysisPayload && (
+          <AnalyticsCrossAlert assetVerdict={assetVerdict} optionVerdict={optionVerdict} />
+        )}
+
+        {/* Painéis A e B */}
+        {analysisPayload && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <AssetAnalyzer payload={analysisPayload} onVerdict={setAssetVerdict} />
+            <OptionAnalyzer payload={analysisPayload} onVerdict={setOptionVerdict} />
+          </div>
+        )}
+
+        {/* Painel C — HV vs IV */}
+        {analysisPayload && (
+          <VolatilityPanel payload={analysisPayload} />
+        )}
+
+        {!calcTicker && (
+          <div className="card flex items-center justify-center" style={{ height: 120, background: 'var(--dw-bg-soft)', border: '1px solid var(--dw-rule)' }}>
+            <p className="text-sm" style={{ color: 'var(--dw-ink-muted)' }}>Selecione um ativo acima para iniciar a análise.</p>
+          </div>
+        )}
       </div>
 
       {/* IV Surface */}

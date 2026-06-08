@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  normalCDF, callPrice, putPrice, calcAll, getMoneyness,
+  normalCDF, callPrice, putPrice, calcAll, getMoneyness, impliedVol,
 } from '@/lib/black-scholes';
 
 const approx = (a: number, b: number, tol = 1e-3) =>
@@ -66,6 +66,40 @@ describe('calcAll', () => {
     const expired = calcAll(S, K, 0, sigma, r, q, 'call');
     expect(expired.price).toBe(0);
     expect(expired.delta).toBe(0);
+  });
+});
+
+describe('impliedVol', () => {
+  const S = 100, K = 100, T = 30 / 365, r = 0.1, q = 0;
+
+  it('round-trip call: impliedVol(callPrice(σ)) ≈ σ', () => {
+    for (const sigma of [0.15, 0.30, 0.50, 0.80]) {
+      const price = callPrice(S, K, T, sigma, r, q);
+      const iv = impliedVol(price, S, K, T, r, 'call', q, sigma);
+      expect(Math.abs(iv - sigma)).toBeLessThan(1e-4);
+    }
+  });
+
+  it('round-trip put: impliedVol(putPrice(σ)) ≈ σ', () => {
+    for (const sigma of [0.20, 0.40]) {
+      const price = putPrice(S, K, T, sigma, r, q);
+      const iv = impliedVol(price, S, K, T, r, 'put', q, sigma);
+      expect(Math.abs(iv - sigma)).toBeLessThan(1e-4);
+    }
+  });
+
+  it('retorna NaN para marketPrice = 0', () => {
+    expect(impliedVol(0, S, K, T, r, 'call')).toBeNaN();
+  });
+
+  it('retorna NaN para T = 0', () => {
+    expect(impliedVol(5, S, K, 0, r, 'call')).toBeNaN();
+  });
+
+  it('funciona com strike OTM (K=110)', () => {
+    const price = callPrice(S, 110, T, 0.3, r, q);
+    const iv = impliedVol(price, S, 110, T, r, 'call', q);
+    expect(Math.abs(iv - 0.3)).toBeLessThan(1e-4);
   });
 });
 

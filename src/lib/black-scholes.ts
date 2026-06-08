@@ -214,6 +214,53 @@ export function calcProbITM(
   return tipo === 'call' ? normalCDF(d2) : normalCDF(-d2);
 }
 
+// ── Implied Volatility Solver ───────────────────────────────────────────────
+
+/**
+ * Newton-Raphson IV solver with bisection fallback.
+ * Returns NaN if no solution exists (e.g. marketPrice ≤ 0 or below intrinsic).
+ *
+ * Note: calcVega returns vega per 1% vol change (÷100), so raw vega per unit σ = calcVega × 100.
+ */
+export function impliedVol(
+  marketPrice: number,
+  S: number,
+  K: number,
+  T: number,
+  r: number,
+  type: 'call' | 'put',
+  q: number = 0,
+  sigma0: number = 0.3,
+): number {
+  if (marketPrice <= 0 || T <= 0) return NaN;
+
+  const bs = (s: number) =>
+    type === 'call' ? callPrice(S, K, T, s, r, q) : putPrice(S, K, T, s, r, q);
+
+  // Newton-Raphson
+  let sigma = sigma0;
+  for (let i = 0; i < 100; i++) {
+    const price = bs(sigma);
+    const diff = price - marketPrice;
+    if (Math.abs(diff) < 1e-6) return sigma;
+    const vega = calcVega(S, K, T, sigma, r, q) * 100; // per unit σ
+    if (Math.abs(vega) < 1e-10) break;
+    sigma = sigma - diff / vega;
+    if (sigma <= 0) { sigma = 0.001; break; }
+  }
+
+  // Bisection fallback [0.001, 5.0]
+  let lo = 0.001, hi = 5.0;
+  if (Math.sign(bs(lo) - marketPrice) === Math.sign(bs(hi) - marketPrice)) return NaN;
+  for (let i = 0; i < 100; i++) {
+    const mid = (lo + hi) / 2;
+    if (hi - lo < 1e-6) return mid;
+    if (Math.sign(bs(mid) - marketPrice) === Math.sign(bs(lo) - marketPrice)) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
 // ── All-in-one calculator ───────────────────────────────────────────────────
 
 export interface BSResult {
