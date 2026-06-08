@@ -1,8 +1,14 @@
 """Endpoints de dados de mercado: cotações de índices/ações e opções líquidas."""
 import logging
+import numpy as np
+import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from fastapi import APIRouter, HTTPException
+
+from backend.services.data_providers import fetch_brapi_historical, _fetch_chain
+from backend.domain.options_math import estimar_iv_historica
+from backend.domain.indicators import _rsi_manual
 
 logger = logging.getLogger("b3_api")
 router = APIRouter(prefix="/market", tags=["Market"])
@@ -107,3 +113,109 @@ def get_options_chain(ticker: str):
             "negocios": int(op_negocios) if op_negocios else 0
         })
     return {"chain": opcoes}
+
+
+@router.get("/analysis/{ticker}")
+def get_market_analysis(ticker: str):
+    """
+    Retorna análise completa do ativo: indicadores técnicos calculados sobre
+    histórico de 6 meses + chain de opções.
+    Contrato de resposta: AssetAnalysisPayload (ver docs/superpowers/specs).
+    """
+    import backend.api.routers.market as _self
+
+    # --- Dados históricos ---
+    df = _self.fetch_brapi_historical(ticker, "6mo")
+
+    if df is None or df.empty:
+        raise HTTPException(status_code=404, detail=f"Ticker '{ticker}' não encontrado ou sem dados históricos.")
+
+    if len(df) < 60:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Dados insuficientes para '{ticker}': {len(df)} pregões disponíveis, mínimo 60."
+        )
+
+    close = df["Close"]
+
+    # --- Preço atual ---
+    preco_atual = float(close.iloc[-1])
+
+    # --- Volatilidade histórica ---
+    hv_20 = _self.estimar_iv_historica(df, janela=20)
+    hv_60 = _self.estimar_iv_historica(df, janela=60)
+
+    # --- Médias móveis simples ---
+    def _sma(series: pd.Series, window: int) -> float:
+        if len(series) >= window:
+            return float(series.rolling(window).mean().iloc[-1])
+        return float(series.mean())
+
+    ma20 = _sma(close, 20)
+    ma50 = _sma(close, 50)
+    ma200 = _sma(close, 200) if len(close) >= 200 else _sma(close, len(close))
+
+    # --- σ₂₀: desvio padrão dos log-retornos × √252 (janela 20 dias) ---
+    log_returns = np.log(close / close.shift(1)).dropna()
+    sigma_20 = float(log_returns.tail(20).std() * np.sqrt(252)) if len(log_returns) >= 20 else hv_20
+
+    # --- RSI₁₄ ---
+    rsi14 = float(_self._rsi_manual(close, period=14).iloc[-1])
+    if np.isnan(rsi14):
+        rsi14 = 50.0
+
+    # --- Bollinger %B (20 períodos, 2σ) ---
+    bb_mid = close.rolling(20).mean()
+    bb_std = close.rolling(20).std()
+    bb_upper = bb_mid + 2 * bb_std
+    bb_lower = bb_mid - 2 * bb_std
+    bb_range = (bb_upper - bb_lower).iloc[-1]
+    if bb_range and not np.isnan(bb_range) and bb_range > 0:
+        bollinger_pct_b = float((preco_atual - float(bb_lower.iloc[-1])) / bb_range)
+    else:
+        bollinger_pct_b = 0.5
+
+    # --- Z-Score vs MA20 ---
+    z_score_20 = float((preco_atual - ma20) / (sigma_20 + 1e-9)) if sigma_20 > 0 else 0.0
+
+    # --- Faixa 52 semanas (252 pregões) ---
+    ultimos_252 = close.tail(252)
+    faixa_52s_min = float(ultimos_252.min())
+    faixa_52s_max = float(ultimos_252.max())
+
+    # --- Chain de opções (falha silenciosa) ---
+    chain_items = []
+    try:
+        raw_chain = _self._fetch_chain(ticker)
+        for op in raw_chain:
+            if len(op) < 10:
+                continue
+            _, _, op_tipo, _, _, op_strike, _, _, op_preco, op_negocios = op[:10]
+            if op_tipo not in ("CALL", "PUT"):
+                continue
+            chain_items.append({
+                "strike": float(op_strike) if op_strike else 0.0,
+                "preco": float(op_preco) if op_preco else 0.0,
+                "tipo": op_tipo.lower(),
+                "negocios": int(op_negocios) if op_negocios else 0,
+            })
+    except Exception as e:
+        logger.warning(f"Chain de {ticker} falhou silenciosamente: {e}")
+        chain_items = []
+
+    return {
+        "ticker": ticker.upper(),
+        "preco_atual": round(preco_atual, 4),
+        "hv_20": round(hv_20, 6),
+        "hv_60": round(hv_60, 6),
+        "ma20": round(ma20, 4),
+        "ma50": round(ma50, 4),
+        "ma200": round(ma200, 4),
+        "sigma_20": round(sigma_20, 6),
+        "rsi14": round(rsi14, 2),
+        "bollinger_pct_b": round(bollinger_pct_b, 6),
+        "z_score_20": round(z_score_20, 6),
+        "faixa_52s_min": round(faixa_52s_min, 4),
+        "faixa_52s_max": round(faixa_52s_max, 4),
+        "chain": chain_items,
+    }
