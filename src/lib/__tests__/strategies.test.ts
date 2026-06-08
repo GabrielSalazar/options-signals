@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   legIntrinsic, legSign, calculateStrategy, calculatePayoffCurve,
   getLongCallLegs, getBullCallSpreadLegs, type Leg,
+  STRATEGY_DEFS, instantiateLegs, defaultStrikes, type StrategyId,
 } from '@/lib/strategies';
 
 const longCall: Leg = { type: 'call', strike: 100, side: 'long', quantity: 1 };
@@ -90,5 +91,78 @@ describe('calculateStrategy — stockUnits (com sinal)', () => {
     const at = (c: { S: number; payoffExpiration: number }[]) =>
       c.reduce((p, x) => (Math.abs(x.S - 130) < Math.abs(p.S - 130) ? x : p));
     expect(at(curve1).payoffExpiration).toBeGreaterThan(at(curve0).payoffExpiration);
+  });
+});
+
+describe('STRATEGY_DEFS — invariantes do registro', () => {
+  const ids = Object.keys(STRATEGY_DEFS) as StrategyId[];
+
+  it('strikeLabels e strikeOffsets têm o mesmo tamanho', () => {
+    for (const id of ids) {
+      const d = STRATEGY_DEFS[id];
+      expect(d.strikeOffsets.length).toBe(d.strikeLabels.length);
+    }
+  });
+
+  it('todo strikeRef está dentro da contagem de strikes declarada', () => {
+    for (const id of ids) {
+      const d = STRATEGY_DEFS[id];
+      for (const leg of d.legs) {
+        expect(leg.strikeRef).toBeGreaterThanOrEqual(0);
+        expect(leg.strikeRef).toBeLessThan(d.strikeLabels.length);
+      }
+    }
+  });
+
+  it('strikeOffsets são não-decrescentes (strikes ascendentes)', () => {
+    for (const id of ids) {
+      const o = STRATEGY_DEFS[id].strikeOffsets;
+      for (let i = 1; i < o.length; i++) expect(o[i]).toBeGreaterThanOrEqual(o[i - 1]);
+    }
+  });
+
+  it('contém as 35 entradas (custom + 16 atuais + 18 novas)', () => {
+    expect(ids.length).toBe(35);
+  });
+});
+
+describe('instantiateLegs', () => {
+  it('iron butterfly → 4 pernas em 3 strikes distintos', () => {
+    const legs = instantiateLegs(STRATEGY_DEFS.ironButterfly, [90, 100, 110]);
+    expect(legs.length).toBe(4);
+    expect(new Set(legs.map((l) => l.strike))).toEqual(new Set([90, 100, 110]));
+  });
+
+  it('call ratio backspread → 2 calls compradas no strike superior', () => {
+    const legs = instantiateLegs(STRATEGY_DEFS.callRatioBackspread, [100, 110]);
+    const longLeg = legs.find((l) => l.side === 'long');
+    expect(longLeg?.quantity).toBe(2);
+    expect(longLeg?.strike).toBe(110);
+  });
+
+  it('reversal tem stockUnits = -1', () => {
+    expect(STRATEGY_DEFS.reversal.stockUnits).toBe(-1);
+  });
+});
+
+describe('novas estratégias — sanidade do payoff', () => {
+  const mk = (id: StrategyId, S = 100) => {
+    const d = STRATEGY_DEFS[id];
+    const legs = instantiateLegs(d, defaultStrikes(d, S));
+    return calculateStrategy(legs, S, 30 / 365, 0.3, 0.1, 0, d.stockUnits);
+  };
+
+  it('strap tem alta ilimitada', () => {
+    expect(mk('strap').maxProfit).toBe('Infinito');
+  });
+
+  it('call front ratio spread tem perda ilimitada', () => {
+    expect(mk('callFrontRatioSpread').maxLoss).toBe('Ilimitado');
+  });
+
+  it('box spread tem lucro e perda finitos (payoff travado)', () => {
+    const r = mk('boxSpread');
+    expect(typeof r.maxProfit).toBe('number');
+    expect(typeof r.maxLoss).toBe('number');
   });
 });
