@@ -256,12 +256,21 @@ export default function EstrategiasPage() {
               <h4 className="font-bold text-dw-blue mb-4 text-lg border-b-2 border-dw-rule pb-2 flex items-center gap-2">
                 <span>⚖️</span> Razão / Backspread
               </h4>
-              <p className="mb-1"><strong>Call Ratio Backspread</strong> — vende 1 call e compra 2 acima (geralmente crédito). Viés de alta forte + long vol; lucro ilimitado p/ cima, perda limitada no strike das compradas.</p>
-              <p className="mb-1"><strong>Put Ratio Backspread</strong> — compra 2 puts e vende 1 acima. Baixa forte + long vol; grande lucro na queda.</p>
-              <p className="mb-1"><strong>Call Front Ratio Spread</strong> — compra 1 call e vende 2 acima. Neutro/leve alta, short vol; <strong>risco ilimitado</strong> p/ cima (call a descoberto).</p>
-              <p className="mb-1"><strong>Put Front Ratio Spread</strong> — compra 1 put e vende 2 abaixo. Neutro/leve baixa, short vol; risco grande p/ baixo.</p>
-              <div className="mb-4 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
-                <strong>Exemplo:</strong> PETR4 a R$36. Call Ratio Backspread: vende 1 call R$36 e compra 2 calls R$40, montando por crédito para uma alta explosiva.
+              <p className="mb-1"><strong>Call Ratio Backspread</strong> <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle text-emerald-600 bg-emerald-50 border-emerald-200">alta</span> <span className="text-[10px] font-normal px-1.5 py-0.5 rounded border align-middle text-green-700 bg-green-50 border-green-200">Crédito (Recebendo)</span> — vende 1 call e compra 2 acima (geralmente crédito). Viés de alta forte + long vol; lucro ilimitado p/ cima, perda limitada no strike das compradas.</p>
+              <div className="mb-3 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> PETR4 a R$36 — vende 1 call R$36 e compra 2 calls R$40, por crédito, mirando uma alta explosiva pós-balanço.
+              </div>
+              <p className="mb-1"><strong>Put Ratio Backspread</strong> <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle text-rose-600 bg-rose-50 border-rose-200">baixa</span> <span className="text-[10px] font-normal px-1.5 py-0.5 rounded border align-middle text-green-700 bg-green-50 border-green-200">Crédito (Recebendo)</span> — compra 2 puts e vende 1 acima. Baixa forte + long vol; grande lucro na queda.</p>
+              <div className="mb-3 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> VALE3 a R$58 — compra 2 puts R$54 e vende 1 put R$58 (crédito), apostando em queda forte com proteção se o papel subir.
+              </div>
+              <p className="mb-1"><strong>Call Front Ratio Spread</strong> <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle text-amber-600 bg-amber-50 border-amber-200">renda</span> <span className="text-[10px] font-normal px-1.5 py-0.5 rounded border align-middle text-green-700 bg-green-50 border-green-200">Crédito (Recebendo)</span> — compra 1 call e vende 2 acima. Neutro/leve alta, short vol; <strong>risco ilimitado</strong> p/ cima (call a descoberto).</p>
+              <div className="mb-3 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> ABEV3 a R$12 — compra 1 call R$12 e vende 2 calls R$13, recebendo prêmio; lucro máximo nos R$13, mas risco se disparar.
+              </div>
+              <p className="mb-1"><strong>Put Front Ratio Spread</strong> <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle text-amber-600 bg-amber-50 border-amber-200">renda</span> <span className="text-[10px] font-normal px-1.5 py-0.5 rounded border align-middle text-green-700 bg-green-50 border-green-200">Crédito (Recebendo)</span> — compra 1 put e vende 2 abaixo. Neutro/leve baixa, short vol; risco grande p/ baixo.</p>
+              <div className="mb-3 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> BBDC4 a R$14 — compra 1 put R$14 e vende 2 puts R$13 (crédito); ganho máximo se fechar nos R$13.
               </div>
             </div>
 
@@ -269,11 +278,17 @@ export default function EstrategiasPage() {
               <h4 className="font-bold text-dw-blue mb-4 text-lg border-b-2 border-dw-rule pb-2 flex items-center gap-2">
                 <span>🦋</span> Borboletas &amp; Condores Avançados
               </h4>
-              <p className="mb-1"><strong>Iron Butterfly</strong> — vende straddle ATM e compra as asas (put OTM + call OTM). Neutro, short vol; lucro máximo no strike central.</p>
-              <p className="mb-1"><strong>Long Condor</strong> — compra as pontas e vende o miolo (mesmo tipo). Neutro; lucro num intervalo amplo, risco = débito.</p>
-              <p className="mb-1"><strong>Broken Wing Butterfly</strong> — borboleta com asas de larguras diferentes; pode zerar o risco de um lado se montada por crédito.</p>
-              <div className="mb-4 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
-                <strong>Exemplo:</strong> VALE3 a R$60. Iron Butterfly: vende call e put R$60, compra put R$56 e call R$64. Lucro máximo se fechar nos R$60.
+              <p className="mb-1"><strong>Iron Butterfly</strong> <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle text-amber-600 bg-amber-50 border-amber-200">renda</span> <span className="text-[10px] font-normal px-1.5 py-0.5 rounded border align-middle text-green-700 bg-green-50 border-green-200">Crédito (Recebendo)</span> — vende straddle ATM e compra as asas (put OTM + call OTM). Neutro, short vol; lucro máximo no strike central.</p>
+              <div className="mb-3 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> VALE3 a R$60 — vende call e put R$60 (ATM) e compra put R$56 + call R$64. Lucro máximo se expirar nos R$60.
+              </div>
+              <p className="mb-1"><strong>Long Condor</strong> <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle text-blue-600 bg-blue-50 border-blue-200">neutro</span> <span className="text-[10px] font-normal px-1.5 py-0.5 rounded border align-middle text-red-700 bg-red-50 border-red-200">Débito (Pagando)</span> — compra as pontas e vende o miolo (mesmo tipo). Neutro; lucro num intervalo amplo, risco = débito.</p>
+              <div className="mb-3 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> BOVA11 a R$130 — compra call R$120, vende R$127 e R$133, compra R$140. Lucra com o índice entre R$127 e R$133.
+              </div>
+              <p className="mb-1"><strong>Broken Wing Butterfly</strong> <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle text-blue-600 bg-blue-50 border-blue-200">neutro</span> <span className="text-[10px] font-normal px-1.5 py-0.5 rounded border align-middle text-slate-700 bg-slate-100 border-slate-300">Misto</span> — borboleta com asas de larguras diferentes; pode zerar o risco de um lado se montada por crédito.</p>
+              <div className="mb-3 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> PETR4 a R$36 — compra call R$36, vende 2x call R$38 e compra call R$42 (asa direita mais larga), por crédito, anulando o risco de baixa.
               </div>
             </div>
 
@@ -281,10 +296,13 @@ export default function EstrategiasPage() {
               <h4 className="font-bold text-dw-blue mb-4 text-lg border-b-2 border-dw-rule pb-2 flex items-center gap-2">
                 <span>🎯</span> Direcionais (Vol)
               </h4>
-              <p className="mb-1"><strong>Strap</strong> — 2 calls + 1 put no mesmo strike. Long vol com viés de alta; ganho assimétrico p/ cima.</p>
-              <p className="mb-1"><strong>Strip</strong> — 2 puts + 1 call no mesmo strike. Long vol com viés de baixa; ganho assimétrico p/ baixo.</p>
-              <div className="mb-4 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
-                <strong>Exemplo:</strong> Prévia de balanço da BBAS3 a R$28. Strap: compra 2 calls R$28 e 1 put R$28, apostando em movimento forte com viés de alta.
+              <p className="mb-1"><strong>Strap</strong> <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle text-emerald-600 bg-emerald-50 border-emerald-200">alta</span> <span className="text-[10px] font-normal px-1.5 py-0.5 rounded border align-middle text-red-700 bg-red-50 border-red-200">Débito (Pagando)</span> — 2 calls + 1 put no mesmo strike. Long vol com viés de alta; ganho assimétrico p/ cima.</p>
+              <div className="mb-3 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> BBAS3 a R$28 (pré-balanço) — compra 2 calls R$28 e 1 put R$28, apostando em movimento forte com viés de alta.
+              </div>
+              <p className="mb-1"><strong>Strip</strong> <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle text-rose-600 bg-rose-50 border-rose-200">baixa</span> <span className="text-[10px] font-normal px-1.5 py-0.5 rounded border align-middle text-red-700 bg-red-50 border-red-200">Débito (Pagando)</span> — 2 puts + 1 call no mesmo strike. Long vol com viés de baixa; ganho assimétrico p/ baixo.</p>
+              <div className="mb-3 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> BOVA11 a R$130 (cenário de risco) — compra 2 puts R$130 e 1 call R$130, apostando em queda forte sem abrir mão de ganho na alta.
               </div>
             </div>
           </div>
@@ -295,12 +313,21 @@ export default function EstrategiasPage() {
               <h4 className="font-bold text-dw-blue mb-4 text-lg border-b-2 border-dw-rule pb-2 flex items-center gap-2">
                 <span>🦎</span> Crédito Híbridas
               </h4>
-              <p className="mb-1"><strong>Jade Lizard</strong> — put OTM vendida + call spread de alta. Neutro/alta, short vol; sem risco de alta se o crédito ≥ largura do call spread.</p>
-              <p className="mb-1"><strong>Collar</strong> — ação + put protetora + call coberta. Neutro/protegido; trava a posição numa banda (piso e teto).</p>
-              <p className="mb-1"><strong>Seagull</strong> — call spread comprado + put vendida (bullish). Alta financiada pela put.</p>
-              <p className="mb-1"><strong>Risk Reversal</strong> — vende put OTM e compra call OTM. Direcional sintético via skew, quase sem custo.</p>
-              <div className="mb-4 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
-                <strong>Exemplo:</strong> ITUB4 a R$32. Collar: tem a ação, compra put R$30 (piso) e vende call R$34 (teto), reduzindo o custo do seguro.
+              <p className="mb-1"><strong>Jade Lizard</strong> <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle text-amber-600 bg-amber-50 border-amber-200">renda</span> <span className="text-[10px] font-normal px-1.5 py-0.5 rounded border align-middle text-green-700 bg-green-50 border-green-200">Crédito (Recebendo)</span> — put OTM vendida + call spread de alta. Neutro/alta, short vol; sem risco de alta se o crédito ≥ largura do call spread.</p>
+              <div className="mb-3 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> MGLU3 a R$4,50 — vende put R$4,00 e um call spread R$5,00/R$5,50; se o crédito cobrir os R$0,50, não há risco na alta.
+              </div>
+              <p className="mb-1"><strong>Collar</strong> <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle text-purple-600 bg-purple-50 border-purple-200">hedge</span> <span className="text-[10px] font-normal px-1.5 py-0.5 rounded border align-middle text-slate-700 bg-slate-100 border-slate-300">Misto</span> — ação + put protetora + call coberta. Neutro/protegido; trava a posição numa banda (piso e teto).</p>
+              <div className="mb-3 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> ITUB4 a R$32 — tem a ação, compra put R$30 (piso) e vende call R$34 (teto), reduzindo o custo do seguro.
+              </div>
+              <p className="mb-1"><strong>Seagull</strong> <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle text-emerald-600 bg-emerald-50 border-emerald-200">alta</span> <span className="text-[10px] font-normal px-1.5 py-0.5 rounded border align-middle text-slate-700 bg-slate-100 border-slate-300">Misto</span> — call spread comprado + put vendida (bullish). Alta financiada pela put.</p>
+              <div className="mb-3 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> PETR4 a R$36 — compra o call spread R$36/R$40 financiado pela venda da put R$32; aposta de alta com custo baixo.
+              </div>
+              <p className="mb-1"><strong>Risk Reversal</strong> <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle text-emerald-600 bg-emerald-50 border-emerald-200">alta</span> <span className="text-[10px] font-normal px-1.5 py-0.5 rounded border align-middle text-slate-700 bg-slate-100 border-slate-300">Misto</span> — vende put OTM e compra call OTM. Direcional sintético via skew, quase sem custo.</p>
+              <div className="mb-3 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> VALE3 a R$58 — vende put R$54 e compra call R$62, montando uma comprada sintética quase sem custo.
               </div>
             </div>
 
@@ -308,12 +335,25 @@ export default function EstrategiasPage() {
               <h4 className="font-bold text-dw-blue mb-4 text-lg border-b-2 border-dw-rule pb-2 flex items-center gap-2">
                 <span>🔁</span> Sintéticas / Arbitragem
               </h4>
-              <p className="mb-1"><strong>Box Spread</strong> — bull call spread + bear put spread nos mesmos strikes. Renda fixa sintética; payoff travado = Δstrikes.</p>
-              <p className="mb-1"><strong>Conversão</strong> — ação + put − call no mesmo strike. Captura desvio de paridade put-call.</p>
-              <p className="mb-1"><strong>Reversão</strong> — inverso da conversão (vende ação + vende put + compra call).</p>
-              <p className="mb-1"><strong>Sintético Comprado/Vendido</strong> — replica a ação com opções (+call −put / −call +put), com menos capital.</p>
-              <div className="mb-4 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
-                <strong>Exemplo:</strong> Box Spread em BOVA11: bull call spread R$125/135 + bear put spread R$125/135 — payoff travado em R$10, equivalente a uma taxa pré-fixada.
+              <p className="mb-1"><strong>Box Spread</strong> <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle text-blue-600 bg-blue-50 border-blue-200">neutro</span> <span className="text-[10px] font-normal px-1.5 py-0.5 rounded border align-middle text-slate-700 bg-slate-100 border-slate-300">Travado</span> — bull call spread + bear put spread nos mesmos strikes. Renda fixa sintética; payoff travado = Δstrikes.</p>
+              <div className="mb-3 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> BOVA11 — bull call spread R$125/135 + bear put spread R$125/135; payoff travado em R$10, equivalente a uma taxa pré-fixada.
+              </div>
+              <p className="mb-1"><strong>Conversão</strong> <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle text-blue-600 bg-blue-50 border-blue-200">neutro</span> <span className="text-[10px] font-normal px-1.5 py-0.5 rounded border align-middle text-slate-700 bg-slate-100 border-slate-300">Travado</span> — ação + put − call no mesmo strike. Captura desvio de paridade put-call.</p>
+              <div className="mb-3 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> PETR4 a R$36 — compra a ação, compra put R$36 e vende call R$36, travando o resultado e capturando o desvio de paridade.
+              </div>
+              <p className="mb-1"><strong>Reversão</strong> <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle text-blue-600 bg-blue-50 border-blue-200">neutro</span> <span className="text-[10px] font-normal px-1.5 py-0.5 rounded border align-middle text-slate-700 bg-slate-100 border-slate-300">Travado</span> — inverso da conversão (vende ação + vende put + compra call).</p>
+              <div className="mb-3 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> VALE3 a R$58 — vende a ação, vende put R$58 e compra call R$58; captura o desvio de paridade no sentido oposto.
+              </div>
+              <p className="mb-1"><strong>Sintético Comprado</strong> <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle text-emerald-600 bg-emerald-50 border-emerald-200">alta</span> <span className="text-[10px] font-normal px-1.5 py-0.5 rounded border align-middle text-slate-700 bg-slate-100 border-slate-300">Misto</span> — compra call + vende put no mesmo strike. Replica a ação com menos capital.</p>
+              <div className="mb-3 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> ITUB4 a R$32 — compra call R$32 e vende put R$32, replicando a compra da ação com bem menos caixa.
+              </div>
+              <p className="mb-1"><strong>Sintético Vendido</strong> <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle text-rose-600 bg-rose-50 border-rose-200">baixa</span> <span className="text-[10px] font-normal px-1.5 py-0.5 rounded border align-middle text-slate-700 bg-slate-100 border-slate-300">Misto</span> — vende call + compra put no mesmo strike. Replica a venda da ação; risco ilimitado na alta.</p>
+              <div className="mb-3 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> ABEV3 a R$12 — vende call R$12 e compra put R$12, replicando a venda da ação para lucrar na queda.
               </div>
             </div>
           </div>
