@@ -16,16 +16,17 @@ interface Props {
   sigma: number; // in %
   r: number; // in %
   q: number; // in %
+  stockUnits: number; // +1 long, -1 short, 0 nenhum
 }
 
-export default function HedgingSimulator({ legs, S0, T, sigma, r, q }: Props) {
+export default function HedgingSimulator({ legs, S0, T, sigma, r, q, stockUnits }: Props) {
   const [multiplier, setMultiplier] = useState(1000); // 1000 estruturas
   const [realizedVol, setRealizedVol] = useState(sigma); // Vol realizada (em %)
 
   // Portfolio Current Greeks (aggregate of 1 unit of strategy)
   const baseResult = useMemo(() => {
-    return calculateStrategy(legs, S0, T / 365, sigma / 100, r / 100, q / 100);
-  }, [legs, S0, T, sigma, r, q]);
+    return calculateStrategy(legs, S0, T / 365, sigma / 100, r / 100, q / 100, stockUnits);
+  }, [legs, S0, T, sigma, r, q, stockUnits]);
 
   // Delta Hedging logic
   const totalDelta = baseResult.greeks.delta * multiplier;
@@ -79,11 +80,11 @@ export default function HedgingSimulator({ legs, S0, T, sigma, r, q }: Props) {
 
       // Re-evaluate Portfolio at new S and new T
       const timeRemaining = (T - t) / 365;
-      const res = calculateStrategy(legs, nextS, timeRemaining > 0 ? timeRemaining : 0.0001, impliedVolDec, rDec, qDec);
+      const res = calculateStrategy(legs, nextS, timeRemaining > 0 ? timeRemaining : 0.0001, impliedVolDec, rDec, qDec, stockUnits);
       const newPortfolioValue = res.totalCost * multiplier;
-      
-      // PnL of portfolio compared to entry
-      const portfolioPnl = newPortfolioValue - currentPortfolioCost;
+
+      // PnL do portfólio vs. entrada (opções) + P&L da ação (stockUnits·ΔS)
+      const portfolioPnl = newPortfolioValue - currentPortfolioCost + stockUnits * (nextS - S0) * multiplier;
 
       // Net PnL
       const netPnl = portfolioPnl + accumulatedHedgePnl;
@@ -103,7 +104,7 @@ export default function HedgingSimulator({ legs, S0, T, sigma, r, q }: Props) {
     }
 
     return pathData;
-  }, [legs, S0, T, sigma, realizedVol, multiplier, r, q, baseResult.totalCost, baseResult.greeks.delta]);
+  }, [legs, S0, T, sigma, realizedVol, multiplier, r, q, stockUnits, baseResult.totalCost, baseResult.greeks.delta]);
 
   return (
     <div className="hedging-simulator mt-8 bg-white border border-dw-rule rounded-xl p-6 shadow-sm">

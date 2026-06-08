@@ -33,10 +33,11 @@ export interface MonteCarloParams {
   legs: Leg[]; // options portfolio
   r: number; // risk-free rate
   q: number; // dividend yield
+  stockUnits?: number; // +1 long, -1 short, 0 nenhum (default 0)
 }
 
 export function runMonteCarlo({
-  S0, mu, sigma, T, steps, numPaths, legs, r, q
+  S0, mu, sigma, T, steps, numPaths, legs, r, q, stockUnits = 0
 }: MonteCarloParams): MonteCarloResult {
   const dt = T / steps;
   const drift = (mu - 0.5 * sigma * sigma) * dt;
@@ -86,7 +87,7 @@ export function runMonteCarlo({
     for (const leg of legs) {
       payoff += legIntrinsic(leg, ST) * leg.quantity * legSign(leg);
     }
-    const pnl = payoff - entryCost;
+    const pnl = payoff - entryCost + stockUnits * (ST - S0);
     pnlDistribution[p] = pnl;
     sumPnl += pnl;
     if (pnl > 0) wins++;

@@ -19,9 +19,10 @@ interface Props {
   sigma: number;
   r: number;
   q: number;
+  stockUnits: number;
 }
 
-export default function RiskSimulator({ legs, S0, T, sigma, r, q }: Props) {
+export default function RiskSimulator({ legs, S0, T, sigma, r, q, stockUnits }: Props) {
   const [numPaths, setNumPaths] = useState(10000);
   const [mu, setMu] = useState(10); // Drift (annualized return expectation)
 
@@ -35,7 +36,8 @@ export default function RiskSimulator({ legs, S0, T, sigma, r, q }: Props) {
     legs,
     r: r / 100,
     q: q / 100,
-  }), [S0, mu, sigma, T, numPaths, legs, r, q]);
+    stockUnits,
+  }), [S0, mu, sigma, T, numPaths, legs, r, q, stockUnits]);
 
   // Run calculation (could be heavy on main thread if numPaths is very large, but 10k is fast)
   const result = useMemo(() => {

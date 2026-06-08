@@ -337,10 +337,10 @@ export default function StrategiesBuilder() {
       </div>
 
       {/* Risco e Simulação Monte Carlo */}
-      <RiskSimulator legs={legs} S0={S} T={T} sigma={sigma} r={r} q={q} />
+      <RiskSimulator legs={legs} S0={S} T={T} sigma={sigma} r={r} q={q} stockUnits={stockUnits} />
 
       {/* Delta Hedging e Gamma Scalping */}
-      <HedgingSimulator legs={legs} S0={S} T={T} sigma={sigma} r={r} q={q} />
+      <HedgingSimulator legs={legs} S0={S} T={T} sigma={sigma} r={r} q={q} stockUnits={stockUnits} />
     </div>
   );
 }

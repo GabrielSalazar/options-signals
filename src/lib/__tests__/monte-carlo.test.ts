@@ -39,3 +39,14 @@ describe('runMonteCarlo', () => {
     expect(res.cvar95).toBeLessThanOrEqual(res.var95 + 1e-6);
   });
 });
+
+describe('runMonteCarlo — stockUnits', () => {
+  const base = { S0: 100, mu: 0.3, sigma: 0.3, T: 1, steps: 50, numPaths: 8000, legs: [], r: 0.1, q: 0 };
+
+  it('ação comprada → P&L médio positivo; vendida → negativo (mu>0)', () => {
+    const long  = runMonteCarlo({ ...base, stockUnits: 1 });
+    const short = runMonteCarlo({ ...base, stockUnits: -1 });
+    expect(long.meanPnl).toBeGreaterThan(0);
+    expect(short.meanPnl).toBeLessThan(0);
+  });
+});
