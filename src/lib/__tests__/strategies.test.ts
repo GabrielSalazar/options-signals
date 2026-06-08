@@ -72,3 +72,23 @@ describe('calculatePayoffCurve', () => {
     }
   });
 });
+
+describe('calculateStrategy — stockUnits (com sinal)', () => {
+  const call = getLongCallLegs(100);
+  const base   = calculateStrategy(call, 100, 30 / 365, 0.3, 0.1, 0, 0);
+  const longS  = calculateStrategy(call, 100, 30 / 365, 0.3, 0.1, 0, 1);
+  const shortS = calculateStrategy(call, 100, 30 / 365, 0.3, 0.1, 0, -1);
+
+  it('ação comprada soma +1 ao delta; vendida subtrai 1', () => {
+    expect(longS.greeks.delta).toBeCloseTo(base.greeks.delta + 1, 6);
+    expect(shortS.greeks.delta).toBeCloseTo(base.greeks.delta - 1, 6);
+  });
+
+  it('ação comprada melhora o P&L na alta vs. sem ação', () => {
+    const curve0 = calculatePayoffCurve(call, 100, 30 / 365, 0.3, 0.1, 0, 0.4, 50, 0);
+    const curve1 = calculatePayoffCurve(call, 100, 30 / 365, 0.3, 0.1, 0, 0.4, 50, 1);
+    const at = (c: { S: number; payoffExpiration: number }[]) =>
+      c.reduce((p, x) => (Math.abs(x.S - 130) < Math.abs(p.S - 130) ? x : p));
+    expect(at(curve1).payoffExpiration).toBeGreaterThan(at(curve0).payoffExpiration);
+  });
+});

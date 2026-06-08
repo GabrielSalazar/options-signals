@@ -115,7 +115,7 @@ export default function StrategiesBuilder() {
   const [K5, setK5] = useState(110);
 
   const meta        = STRATEGY_META[strategy];
-  const stockOffset = meta.hasStockComponent;
+  const stockUnits  = meta.hasStockComponent ? 1 : 0;
 
   const legs = useMemo(() => {
     switch (strategy) {
@@ -146,13 +146,13 @@ export default function StrategiesBuilder() {
   }, [strategy, K1, K2, K3, K4, K5]);
 
   const result = useMemo(
-    () => calculateStrategy(legs, S, T / 365, sigma / 100, r / 100, q / 100, stockOffset),
-    [legs, S, T, sigma, r, q, stockOffset],
+    () => calculateStrategy(legs, S, T / 365, sigma / 100, r / 100, q / 100, stockUnits),
+    [legs, S, T, sigma, r, q, stockUnits],
   );
 
   const chartData = useMemo(
-    () => calculatePayoffCurve(legs, S, T / 365, sigma / 100, r / 100, q / 100, 0.4, 150, stockOffset),
-    [legs, S, T, sigma, r, q, stockOffset],
+    () => calculatePayoffCurve(legs, S, T / 365, sigma / 100, r / 100, q / 100, 0.4, 150, stockUnits),
+    [legs, S, T, sigma, r, q, stockUnits],
   );
 
   const profileStyle = PROFILE_STYLE[meta.profile] ?? PROFILE_STYLE.neutro;

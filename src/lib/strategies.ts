@@ -302,8 +302,9 @@ export const getButterflyCallLegs = (K1: number, K2: number, K3: number): Leg[] 
 // ── Core Calculator ───────────────────────────────────────────────────────────
 
 /**
- * @param stockOffset — se true, adiciona (S − S_center) ao payoff para modelar
- *   a posição em ação no Covered Call e Protective Put.
+ * @param stockUnits — unidades de ação com sinal (+1 long, -1 short, 0 nenhum).
+ *   Adiciona stockUnits·(S − S_center) ao payoff e stockUnits ao delta, modelando
+ *   a posição em ação (Covered Call, Protective Put, Collar, Conversão, Reversão).
  */
 export function calculateStrategy(
   legs: Leg[],
@@ -312,7 +313,7 @@ export function calculateStrategy(
   sigma: number,
   r: number,
   q: number,
-  stockOffset: boolean = false,
+  stockUnits: number = 0,
 ): StrategyResult {
   let totalCost = 0;
   let delta = 0;
@@ -336,10 +337,10 @@ export function calculateStrategy(
     legsResult.push({ price: res.price, total: res.price * factor });
   }
 
-  // Delta da posição em ação = 1 (não inclui gregas de 2ª ordem da ação)
-  if (stockOffset) delta += 1;
+  // Delta da posição em ação = stockUnits (não inclui gregas de 2ª ordem da ação)
+  delta += stockUnits;
 
-  const { maxProfit, maxLoss, breakevens } = analyzeExpiration(legs, totalCost, S, stockOffset);
+  const { maxProfit, maxLoss, breakevens } = analyzeExpiration(legs, totalCost, S, stockUnits);
 
   return {
     totalCost,
@@ -368,7 +369,7 @@ export function calculatePayoffCurve(
   q: number,
   rangePercent: number = 0.4,
   points: number = 150,
-  stockOffset: boolean = false,
+  stockUnits: number = 0,
 ): PayoffPoint[] {
   const curve: PayoffPoint[] = [];
   const start = Math.max(0.01, S_center * (1 - rangePercent));
@@ -407,8 +408,8 @@ export function calculatePayoffCurve(
       payoffToday += valToday * sign * qty;
     }
 
-    // Stock component: (S − S₀) models P&L of the underlying position
-    const stockPnL = stockOffset ? (s - S_center) : 0;
+    // Stock component: stockUnits·(S − S₀) models P&L of the underlying position
+    const stockPnL = stockUnits * (s - S_center);
 
     curve.push({
       S: parseFloat(s.toFixed(2)),
@@ -426,7 +427,7 @@ function analyzeExpiration(
   legs: Leg[],
   entryCost: number,
   S_center: number,
-  stockOffset: boolean = false,
+  stockUnits: number = 0,
 ) {
   const strikes = Array.from(new Set(legs.map((l) => l.strike))).sort((a, b) => a - b);
   const minStrike = strikes.length > 0 ? strikes[0] : S_center;
@@ -447,7 +448,7 @@ function analyzeExpiration(
     for (const leg of legs) {
       expVal += legIntrinsic(leg, s) * legSign(leg) * leg.quantity;
     }
-    const pnl = expVal + (stockOffset ? (s - S_center) : 0) - entryCost;
+    const pnl = expVal + stockUnits * (s - S_center) - entryCost;
     maxP = Math.max(maxP, pnl);
     maxL = Math.min(maxL, pnl);
     payoffs.push({ s, pnl });
@@ -478,7 +479,7 @@ function analyzeExpiration(
     for (const leg of legs) {
       expVal += legIntrinsic(leg, s) * legSign(leg) * leg.quantity;
     }
-    const pnl = expVal + (stockOffset ? (s - S_center) : 0) - entryCost;
+    const pnl = expVal + stockUnits * (s - S_center) - entryCost;
 
     if (prevS !== -1 && ((prevPnl < 0 && pnl > 0) || (prevPnl > 0 && pnl < 0))) {
       const interpS = prevS - prevPnl * ((s - prevS) / (pnl - prevPnl));
