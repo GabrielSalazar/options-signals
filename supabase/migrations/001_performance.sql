@@ -50,5 +50,17 @@ CREATE INDEX IF NOT EXISTS idx_signals_recent_active
   ON signals (timestamp DESC)
   WHERE score >= 5;
 
--- 5. Enable Realtime for the signals table
-ALTER PUBLICATION supabase_realtime ADD TABLE signals;
+-- 5. Enable Realtime for the signals table (idempotente)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_publication_tables
+    WHERE pubname    = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename  = 'signals'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE signals;
+  END IF;
+END
+$$;
