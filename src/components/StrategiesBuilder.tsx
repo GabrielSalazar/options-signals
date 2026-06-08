@@ -234,7 +234,7 @@ export default function StrategiesBuilder() {
           {/* Market Parameters */}
           <div className="p-4 bg-dw-bg-soft border border-dw-rule-soft rounded-xl">
             <label className="block text-xs font-bold text-dw-blue uppercase tracking-widest mb-4">Mercado</label>
-            <SliderControl label="Preço do Ativo (S)" value={S} min={50} max={200} step={1} onChange={setS} suffix=" R$" />
+            <SliderControl label="Preço do Ativo (S)" value={S} min={1} max={200} step={1} onChange={setS} suffix=" R$" />
             <div className="my-3" />
             <SliderControl label="Volatilidade (σ)" value={sigma} min={5} max={100} step={1} onChange={setSigma} suffix="%" />
             <div className="my-3" />
