@@ -244,6 +244,82 @@ export default function EstrategiasPage() {
           </div>
         </div>
       </div>
+
+      {/* Documentação — Estratégias Avançadas (novas categorias) */}
+      <div className="card mt-6">
+        <h3 className="font-serif text-lg text-dw-ink mb-4">Estratégias Avançadas</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-dw-ink-mid leading-relaxed">
+
+          {/* Coluna 1 */}
+          <div>
+            <div className="mb-8">
+              <h4 className="font-bold text-dw-blue mb-4 text-lg border-b-2 border-dw-rule pb-2 flex items-center gap-2">
+                <span>⚖️</span> Razão / Backspread
+              </h4>
+              <p className="mb-1"><strong>Call Ratio Backspread</strong> — vende 1 call e compra 2 acima (geralmente crédito). Viés de alta forte + long vol; lucro ilimitado p/ cima, perda limitada no strike das compradas.</p>
+              <p className="mb-1"><strong>Put Ratio Backspread</strong> — compra 2 puts e vende 1 acima. Baixa forte + long vol; grande lucro na queda.</p>
+              <p className="mb-1"><strong>Call Front Ratio Spread</strong> — compra 1 call e vende 2 acima. Neutro/leve alta, short vol; <strong>risco ilimitado</strong> p/ cima (call a descoberto).</p>
+              <p className="mb-1"><strong>Put Front Ratio Spread</strong> — compra 1 put e vende 2 abaixo. Neutro/leve baixa, short vol; risco grande p/ baixo.</p>
+              <div className="mb-4 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> PETR4 a R$36. Call Ratio Backspread: vende 1 call R$36 e compra 2 calls R$40, montando por crédito para uma alta explosiva.
+              </div>
+            </div>
+
+            <div className="mb-8">
+              <h4 className="font-bold text-dw-blue mb-4 text-lg border-b-2 border-dw-rule pb-2 flex items-center gap-2">
+                <span>🦋</span> Borboletas &amp; Condores Avançados
+              </h4>
+              <p className="mb-1"><strong>Iron Butterfly</strong> — vende straddle ATM e compra as asas (put OTM + call OTM). Neutro, short vol; lucro máximo no strike central.</p>
+              <p className="mb-1"><strong>Long Condor</strong> — compra as pontas e vende o miolo (mesmo tipo). Neutro; lucro num intervalo amplo, risco = débito.</p>
+              <p className="mb-1"><strong>Broken Wing Butterfly</strong> — borboleta com asas de larguras diferentes; pode zerar o risco de um lado se montada por crédito.</p>
+              <div className="mb-4 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> VALE3 a R$60. Iron Butterfly: vende call e put R$60, compra put R$56 e call R$64. Lucro máximo se fechar nos R$60.
+              </div>
+            </div>
+
+            <div className="mb-8">
+              <h4 className="font-bold text-dw-blue mb-4 text-lg border-b-2 border-dw-rule pb-2 flex items-center gap-2">
+                <span>🎯</span> Direcionais (Vol)
+              </h4>
+              <p className="mb-1"><strong>Strap</strong> — 2 calls + 1 put no mesmo strike. Long vol com viés de alta; ganho assimétrico p/ cima.</p>
+              <p className="mb-1"><strong>Strip</strong> — 2 puts + 1 call no mesmo strike. Long vol com viés de baixa; ganho assimétrico p/ baixo.</p>
+              <div className="mb-4 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> Prévia de balanço da BBAS3 a R$28. Strap: compra 2 calls R$28 e 1 put R$28, apostando em movimento forte com viés de alta.
+              </div>
+            </div>
+          </div>
+
+          {/* Coluna 2 */}
+          <div>
+            <div className="mb-8">
+              <h4 className="font-bold text-dw-blue mb-4 text-lg border-b-2 border-dw-rule pb-2 flex items-center gap-2">
+                <span>🦎</span> Crédito Híbridas
+              </h4>
+              <p className="mb-1"><strong>Jade Lizard</strong> — put OTM vendida + call spread de alta. Neutro/alta, short vol; sem risco de alta se o crédito ≥ largura do call spread.</p>
+              <p className="mb-1"><strong>Collar</strong> — ação + put protetora + call coberta. Neutro/protegido; trava a posição numa banda (piso e teto).</p>
+              <p className="mb-1"><strong>Seagull</strong> — call spread comprado + put vendida (bullish). Alta financiada pela put.</p>
+              <p className="mb-1"><strong>Risk Reversal</strong> — vende put OTM e compra call OTM. Direcional sintético via skew, quase sem custo.</p>
+              <div className="mb-4 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> ITUB4 a R$32. Collar: tem a ação, compra put R$30 (piso) e vende call R$34 (teto), reduzindo o custo do seguro.
+              </div>
+            </div>
+
+            <div className="mb-8">
+              <h4 className="font-bold text-dw-blue mb-4 text-lg border-b-2 border-dw-rule pb-2 flex items-center gap-2">
+                <span>🔁</span> Sintéticas / Arbitragem
+              </h4>
+              <p className="mb-1"><strong>Box Spread</strong> — bull call spread + bear put spread nos mesmos strikes. Renda fixa sintética; payoff travado = Δstrikes.</p>
+              <p className="mb-1"><strong>Conversão</strong> — ação + put − call no mesmo strike. Captura desvio de paridade put-call.</p>
+              <p className="mb-1"><strong>Reversão</strong> — inverso da conversão (vende ação + vende put + compra call).</p>
+              <p className="mb-1"><strong>Sintético Comprado/Vendido</strong> — replica a ação com opções (+call −put / −call +put), com menos capital.</p>
+              <div className="mb-4 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
+                <strong>Exemplo:</strong> Box Spread em BOVA11: bull call spread R$125/135 + bear put spread R$125/135 — payoff travado em R$10, equivalente a uma taxa pré-fixada.
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
     </div>
   );
 }
