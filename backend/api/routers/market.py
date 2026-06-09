@@ -261,16 +261,59 @@ def get_market_analysis(ticker: str):
         import math
         import yfinance as yf
         yf_ticker_str = ticker if ticker.upper().endswith(".SA") else f"{ticker.upper()}.SA"
-        info = yf.Ticker(yf_ticker_str).info
-        lpa = info.get("trailingEps") or info.get("forwardEps")
-        vpa = info.get("bookValue")
-        fcl_total = info.get("freeCashflow")
-        shares = info.get("sharesOutstanding")
+        t = yf.Ticker(yf_ticker_str)
+        info = t.info or {}
+
+        # LPA: tenta info primeiro, depois calcula via DRE
+        lpa: float | None = info.get("trailingEps") or info.get("forwardEps")
+        if not lpa:
+            try:
+                inc = t.income_stmt
+                if inc is not None and not inc.empty:
+                    lucro_col = next((c for c in inc.index if "Net Income" in str(c)), None)
+                    lucro = float(inc.loc[lucro_col].iloc[0]) if lucro_col else None
+                    shares_info = info.get("sharesOutstanding") or info.get("impliedSharesOutstanding")
+                    if lucro and shares_info:
+                        lpa = lucro / shares_info
+            except Exception:
+                pass
+
+        # VPA: tenta info primeiro, depois calcula via balanço
+        vpa: float | None = info.get("bookValue")
+        if not vpa:
+            try:
+                bal = t.balance_sheet
+                if bal is not None and not bal.empty:
+                    equity_col = next((c for c in bal.index if "Stockholders" in str(c) or "Equity" in str(c)), None)
+                    equity = float(bal.loc[equity_col].iloc[0]) if equity_col else None
+                    shares_info = info.get("sharesOutstanding") or info.get("impliedSharesOutstanding")
+                    if equity and shares_info:
+                        vpa = equity / shares_info
+            except Exception:
+                pass
+
+        # FCL: tenta info primeiro, depois calcula via fluxo de caixa
+        fcl_total: float | None = info.get("freeCashflow")
+        shares_out: float | None = info.get("sharesOutstanding") or info.get("impliedSharesOutstanding")
+        if not fcl_total:
+            try:
+                cf = t.cash_flow
+                if cf is not None and not cf.empty:
+                    op_col = next((c for c in cf.index if "Operating" in str(c) and "Cash" in str(c)), None)
+                    cap_col = next((c for c in cf.index if "Capital" in str(c) and "Expenditure" in str(c)), None)
+                    if op_col and cap_col:
+                        fcl_total = float(cf.loc[op_col].iloc[0]) + float(cf.loc[cap_col].iloc[0])
+                    elif op_col:
+                        fcl_total = float(cf.loc[op_col].iloc[0])
+            except Exception:
+                pass
+
         if lpa and lpa > 0 and vpa and vpa > 0:
             preco_graham = round(math.sqrt(22.5 * lpa * vpa), 2)
-        if fcl_total and fcl_total > 0 and shares and shares > 0:
-            fcl_por_acao = fcl_total / shares
+        if fcl_total and fcl_total > 0 and shares_out and shares_out > 0:
+            fcl_por_acao = fcl_total / shares_out
             preco_dcf = round(fcl_por_acao / (0.15 - 0.04), 2)
+        logger.info(f"Fundamentalistas {ticker}: LPA={lpa}, VPA={vpa}, FCL={fcl_total}, shares={shares_out} → Graham={preco_graham}, DCF={preco_dcf}")
     except Exception as e:
         logger.warning(f"Fundamentalistas de {ticker} falharam: {e}")
 
