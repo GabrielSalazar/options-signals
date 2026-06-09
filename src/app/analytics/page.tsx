@@ -307,16 +307,10 @@ export default function AnalyticsPage() {
 
       {/* ── Calculadoras de Ativo e Opção ── */}
       <div className="my-6 space-y-4">
-        <div>
-          <div className="label mb-1">Calculadoras</div>
-          <h3 className="font-serif text-lg mb-1">Ativo barato? Opção vale a pena?</h3>
-          <p className="text-xs mb-4" style={{ color: 'var(--dw-ink-muted)' }}>
-            Análise técnica/estatística do ativo + calculadora de IV e preço justo da opção.
-          </p>
-        </div>
-
         {/* Ticker selector das calculadoras */}
         <div className="card">
+          <div className="label mb-1">Calculadoras</div>
+          <h3 className="font-serif mb-4">Calculadoras de preço justo</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 13, color: 'var(--dw-ink-muted)', whiteSpace: 'nowrap' }}>Ativo para análise:</span>
             <TickerSelector
