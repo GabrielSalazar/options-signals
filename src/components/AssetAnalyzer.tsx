@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { scoreAsset } from '@/lib/asset-analysis';
 import type { AssetAnalysisPayload, AssetVerdict } from '@/lib/types/analytics';
 
@@ -48,13 +48,44 @@ function RangeBar({ value, min, max, label }: { value: number; min: number; max:
   );
 }
 
+function OscLabel({ text, tooltip }: { text: string; tooltip: string }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <span
+      style={{ position: 'relative', cursor: 'help', display: 'inline-block' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {text}
+      {hovered && (
+        <span style={{
+          position: 'absolute', bottom: 'calc(100% + 8px)', left: 0,
+          background: '#1a1f3a', color: '#e8eaf6',
+          fontSize: 11, lineHeight: 1.5,
+          padding: '7px 11px', borderRadius: 8,
+          width: 230, display: 'block', textAlign: 'left',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+          pointerEvents: 'none', zIndex: 100,
+          whiteSpace: 'normal', fontWeight: 400,
+        }}>
+          {tooltip}
+          <span style={{
+            position: 'absolute', top: '100%', left: 16,
+            border: '6px solid transparent', borderTopColor: '#1a1f3a', display: 'block',
+          }} />
+        </span>
+      )}
+    </span>
+  );
+}
+
 function RsiGauge({ rsi }: { rsi: number }) {
   const pct = Math.max(0, Math.min(100, rsi));
   const color = rsi < 30 ? 'var(--dw-green)' : rsi > 70 ? 'var(--dw-red)' : 'var(--dw-yellow)';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--dw-ink-muted)' }}>
-        <span>RSI 14</span>
+        <OscLabel text="RSI 14" tooltip="Índice de Força Relativa: mede a velocidade e magnitude das variações de preço. Abaixo de 30 = sobrevendido (possível reversão de alta); acima de 70 = sobrecomprado (possível reversão de baixa)." />
         <span style={{ fontWeight: 700, color }}>{rsi.toFixed(1)}</span>
       </div>
       <div style={{ position: 'relative', height: 6, width: '100%', borderRadius: 999, overflow: 'hidden', background: 'var(--dw-rule)' }}>
@@ -83,7 +114,7 @@ function BollingerBar({ pctB }: { pctB: number }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--dw-ink-muted)' }}>
-        <span>Bollinger %B</span>
+        <OscLabel text="Bollinger %B" tooltip="Posição do preço dentro das Bandas de Bollinger (20 períodos, 2σ). 0% = na banda inferior (sobrevendido), 100% = na banda superior (sobrecomprado). Abaixo de 20% sugere pressão compradora." />
         <span style={{ fontWeight: 700, color }}>{(pctB * 100).toFixed(0)}%</span>
       </div>
       <div style={{ position: 'relative', height: 6, width: '100%', borderRadius: 999, background: 'var(--dw-rule)' }}>
@@ -115,7 +146,7 @@ function MacdBar({ diff }: { diff: number }) {
   const label = bullish ? 'Bullish' : 'Bearish';
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
-      <span style={{ color: 'var(--dw-ink-muted)', fontSize: 12 }}>MACD (histograma)</span>
+      <OscLabel text="MACD (histograma)" tooltip="Diferença entre a linha MACD (EMA12−EMA26) e sua linha de sinal (EMA9). Positivo (bullish) = momentum de alta crescendo; negativo (bearish) = momentum de baixa. Cruzamento do zero sinaliza mudança de tendência." />
       <span style={{ fontWeight: 700, color }}>
         {diff > 0 ? '+' : ''}{diff.toFixed(3)}{' '}
         <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--dw-ink-muted)' }}>({label})</span>
@@ -131,7 +162,7 @@ function StochGauge({ k, d }: { k: number; d: number }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--dw-ink-muted)' }}>
-        <span>Stochastic K/D</span>
+        <OscLabel text="Stochastic K/D" tooltip="Oscilador de momentum 0–100. K = posição do preço na faixa dos últimos 14 períodos; D = média suavizada de K (3 dias). Abaixo de 20 = sobrevendido; acima de 80 = sobrecomprado." />
         <span style={{ fontWeight: 700, color: colorK }}>K {k.toFixed(0)} / D {d.toFixed(0)}</span>
       </div>
       <div style={{ position: 'relative', height: 6, width: '100%', borderRadius: 999, overflow: 'hidden', background: 'var(--dw-rule)' }}>
@@ -164,7 +195,7 @@ function AdxBar({ adx }: { adx: number }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--dw-ink-muted)' }}>
-        <span>ADX 14</span>
+        <OscLabel text="ADX 14" tooltip="Força da tendência (não indica direção). Abaixo de 25 = mercado lateral/sem tendência; 25–50 = tendência moderada; acima de 50 = tendência muito forte. Útil para confirmar breakouts." />
         <span style={{ fontWeight: 700, color }}>{adx.toFixed(1)} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--dw-ink-muted)' }}>({label})</span></span>
       </div>
       <div style={{ position: 'relative', height: 6, width: '100%', borderRadius: 999, overflow: 'hidden', background: 'var(--dw-rule)' }}>
@@ -190,7 +221,7 @@ function ZScoreBadge({ z }: { z: number }) {
   const label = z < -1 ? 'Abaixo da média' : z > 1 ? 'Acima da média' : 'Próximo da média';
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
-      <span style={{ color: 'var(--dw-ink-muted)', fontSize: 12 }}>Z-Score vs MA20</span>
+      <OscLabel text="Z-Score vs MA20" tooltip="Distância do preço atual em relação à média de 20 dias, medida em desvios-padrão. Z < −1 = ativo muito abaixo da média histórica recente; Z > +1 = muito acima. Neutro entre −1 e +1." />
       <span style={{ fontWeight: 700, color }}>
         {z.toFixed(2)}{' '}
         <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--dw-ink-muted)' }}>({label})</span>
