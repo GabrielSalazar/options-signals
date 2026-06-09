@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { scoreAsset } from '@/lib/asset-analysis';
 import type { AssetAnalysisPayload, AssetVerdict } from '@/lib/types/analytics';
 
@@ -125,7 +126,9 @@ function ZScoreBadge({ z }: { z: number }) {
 export function AssetAnalyzer({ payload, onVerdict }: Props) {
   const { score, verdict, breakdown } = scoreAsset(payload);
 
-  if (onVerdict) onVerdict(verdict);
+  useEffect(() => {
+    onVerdict?.(verdict);
+  }, [verdict, onVerdict]);
 
   const vs = verdictStyle[verdict];
   const { preco_atual, ma20, ma50, ma200, faixa_52s_min, faixa_52s_max, rsi14, bollinger_pct_b, z_score_20 } = payload;

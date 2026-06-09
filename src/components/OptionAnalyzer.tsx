@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { impliedVol, calcAll } from '@/lib/black-scholes';
 import type { AssetAnalysisPayload, OptionVerdict } from '@/lib/types/analytics';
 
@@ -126,7 +126,9 @@ export function OptionAnalyzer({ payload, onVerdict }: Props) {
     return { iv, fair, bs, breakEven, moneynessRaw, dte, rank, verdict, fairSigma };
   }, [payload, tipo, strikeStr, expiryStr, priceStr]);
 
-  if (onVerdict) onVerdict(result?.verdict ?? null);
+  useEffect(() => {
+    onVerdict?.(result?.verdict ?? null);
+  }, [result?.verdict, onVerdict]);
 
   const sectionStyle: React.CSSProperties = {
     background: 'var(--dw-bg-soft)',
