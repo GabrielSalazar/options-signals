@@ -284,17 +284,6 @@ export function AssetAnalyzer({ payload, onVerdict }: Props) {
         <div>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--dw-ink)', margin: 0 }}>{payload.ticker}</h3>
           <p style={{ fontSize: 13, color: 'var(--dw-ink-muted)', margin: 0 }}>R$ {preco_atual.toFixed(2)}</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 2 }}>
-            <p style={{ fontSize: 12, color: 'var(--dw-ink-muted)', margin: 0 }}>
-              Preço justo (MAs): <span style={{ fontWeight: 600, color: 'var(--dw-ink)' }}>R$ {preco_justo_mas.toFixed(2)}</span>
-            </p>
-            <p style={{ fontSize: 12, color: 'var(--dw-ink-muted)', margin: 0 }}>
-              Preço justo (Graham): <span style={{ fontWeight: 600, color: 'var(--dw-ink)' }}>{preco_graham != null ? `R$ ${preco_graham.toFixed(2)}` : 'N/D'}</span>
-            </p>
-            <p style={{ fontSize: 12, color: 'var(--dw-ink-muted)', margin: 0 }}>
-              Preço justo (DCF): <span style={{ fontWeight: 600, color: 'var(--dw-ink)' }}>{preco_dcf != null ? `R$ ${preco_dcf.toFixed(2)}` : 'N/D'}</span>
-            </p>
-          </div>
         </div>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6,
@@ -312,6 +301,25 @@ export function AssetAnalyzer({ payload, onVerdict }: Props) {
       {/* 52-week range */}
       <div style={sectionStyle}>
         <RangeBar value={preco_atual} min={faixa_52s_min} max={faixa_52s_max} label="Posição na faixa 52 semanas" />
+      </div>
+
+      {/* Preços justos */}
+      <div style={{ ...sectionStyle, gap: 8 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: '#3b5bdb', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
+          Preços justos
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+          {([
+            { label: 'Médias (MAs)', value: `R$ ${preco_justo_mas.toFixed(2)}` },
+            { label: 'Graham', value: preco_graham != null ? `R$ ${preco_graham.toFixed(2)}` : 'N/D' },
+            { label: 'DCF', value: preco_dcf != null ? `R$ ${preco_dcf.toFixed(2)}` : 'N/D' },
+          ] as const).map(({ label, value }) => (
+            <div key={label} style={{ textAlign: 'center', background: 'rgba(59,91,219,0.06)', borderRadius: 8, padding: '8px 4px' }}>
+              <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{value}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Moving averages */}
