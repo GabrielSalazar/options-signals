@@ -8,29 +8,38 @@ interface Props {
   onVerdict?: (v: AssetVerdict) => void;
 }
 
-const verdictStyle: Record<AssetVerdict, { label: string; class: string }> = {
-  barato: { label: '🟢 Barato', class: 'bg-emerald-900/40 text-emerald-300 border-emerald-700' },
-  neutro: { label: '🟡 Neutro', class: 'bg-yellow-900/40 text-yellow-300 border-yellow-700' },
-  caro:   { label: '🔴 Caro',   class: 'bg-red-900/40 text-red-300 border-red-700' },
+const verdictStyle: Record<AssetVerdict, { label: string; bg: string; color: string; border: string }> = {
+  barato: { label: 'Barato', bg: '#D1FAE5', color: '#065F46', border: '#6EE7B7' },
+  neutro: { label: 'Neutro', bg: '#FEF3C7', color: '#92400E', border: '#FCD34D' },
+  caro:   { label: 'Caro',   bg: '#FEE2E2', color: '#991B1B', border: '#FCA5A5' },
+};
+
+const verdictDot: Record<AssetVerdict, string> = {
+  barato: '#10B981',
+  neutro: '#F59E0B',
+  caro:   '#EF4444',
 };
 
 function RangeBar({ value, min, max, label }: { value: number; min: number; max: number; label: string }) {
   const range = max - min || 1;
   const pct = Math.max(0, Math.min(100, ((value - min) / range) * 100));
   return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-xs text-zinc-400">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--dw-ink-muted)' }}>
         <span>{label}</span>
-        <span>R$ {value.toFixed(2)}</span>
+        <span style={{ color: 'var(--dw-ink)', fontWeight: 600 }}>R$ {value.toFixed(2)}</span>
       </div>
-      <div className="relative h-2 w-full rounded-full bg-zinc-700">
-        <div className="absolute inset-y-0 left-0 rounded-full bg-zinc-500" style={{ width: `${pct}%` }} />
+      <div style={{ position: 'relative', height: 6, width: '100%', borderRadius: 999, background: 'var(--dw-rule)' }}>
         <div
-          className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-blue-400 border-2 border-white shadow"
-          style={{ left: `${pct}%` }}
+          style={{
+            position: 'absolute', top: '50%', transform: 'translateX(-50%) translateY(-50%)',
+            height: 14, width: 14, borderRadius: '50%', background: 'var(--dw-blue)',
+            border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+            left: `${pct}%`,
+          }}
         />
       </div>
-      <div className="flex justify-between text-xs text-zinc-500">
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--dw-ink-muted)' }}>
         <span>R$ {min.toFixed(2)}</span>
         <span>R$ {max.toFixed(2)}</span>
       </div>
@@ -40,23 +49,27 @@ function RangeBar({ value, min, max, label }: { value: number; min: number; max:
 
 function RsiGauge({ rsi }: { rsi: number }) {
   const pct = Math.max(0, Math.min(100, rsi));
-  const color = rsi < 30 ? 'text-emerald-400' : rsi > 70 ? 'text-red-400' : 'text-yellow-400';
+  const color = rsi < 30 ? 'var(--dw-green)' : rsi > 70 ? 'var(--dw-red)' : 'var(--dw-yellow)';
   return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-xs text-zinc-400">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--dw-ink-muted)' }}>
         <span>RSI 14</span>
-        <span className={`font-semibold ${color}`}>{rsi.toFixed(1)}</span>
+        <span style={{ fontWeight: 700, color }}>{rsi.toFixed(1)}</span>
       </div>
-      <div className="relative h-2 w-full rounded-full bg-zinc-700">
-        <div className="absolute inset-y-0 left-0 w-[30%] rounded-l-full bg-emerald-800/50" />
-        <div className="absolute inset-y-0 left-[30%] w-[40%] bg-yellow-800/50" />
-        <div className="absolute inset-y-0 left-[70%] w-[30%] rounded-r-full bg-red-800/50" />
+      <div style={{ position: 'relative', height: 6, width: '100%', borderRadius: 999, overflow: 'hidden', background: 'var(--dw-rule)' }}>
+        <div style={{ position: 'absolute', inset: 0, left: 0, width: '30%', background: 'rgba(16,185,129,0.25)' }} />
+        <div style={{ position: 'absolute', inset: 0, left: '30%', width: '40%', background: 'rgba(245,158,11,0.20)' }} />
+        <div style={{ position: 'absolute', inset: 0, left: '70%', width: '30%', background: 'rgba(239,68,68,0.25)' }} />
         <div
-          className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-white border-2 border-zinc-400 shadow"
-          style={{ left: `${pct}%` }}
+          style={{
+            position: 'absolute', top: '50%', transform: 'translateX(-50%) translateY(-50%)',
+            height: 14, width: 14, borderRadius: '50%', background: 'white',
+            border: '2px solid var(--dw-ink-muted)', boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+            left: `${pct}%`,
+          }}
         />
       </div>
-      <div className="flex justify-between text-xs text-zinc-500">
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--dw-ink-muted)' }}>
         <span>Sobrevendido</span><span>Neutro</span><span>Sobrecomprado</span>
       </div>
     </div>
@@ -65,17 +78,22 @@ function RsiGauge({ rsi }: { rsi: number }) {
 
 function BollingerBar({ pctB }: { pctB: number }) {
   const pct = Math.max(0, Math.min(100, pctB * 100));
-  const color = pctB < 0.20 ? 'text-emerald-400' : pctB > 0.80 ? 'text-red-400' : 'text-zinc-300';
+  const color = pctB < 0.20 ? 'var(--dw-green)' : pctB > 0.80 ? 'var(--dw-red)' : 'var(--dw-ink-mid)';
   return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-xs text-zinc-400">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--dw-ink-muted)' }}>
         <span>Bollinger %B</span>
-        <span className={`font-semibold ${color}`}>{(pctB * 100).toFixed(0)}%</span>
+        <span style={{ fontWeight: 700, color }}>{(pctB * 100).toFixed(0)}%</span>
       </div>
-      <div className="relative h-2 w-full rounded-full bg-zinc-700">
-        <div className="absolute inset-y-0 left-0 rounded-full bg-blue-500/60" style={{ width: `${pct}%` }} />
+      <div style={{ position: 'relative', height: 6, width: '100%', borderRadius: 999, background: 'var(--dw-rule)' }}>
+        <div
+          style={{
+            position: 'absolute', inset: 0, left: 0, borderRadius: 999,
+            width: `${pct}%`, background: 'var(--dw-blue)',
+          }}
+        />
       </div>
-      <div className="flex justify-between text-xs text-zinc-500">
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--dw-ink-muted)' }}>
         <span>Banda inferior</span><span>Banda superior</span>
       </div>
     </div>
@@ -83,12 +101,15 @@ function BollingerBar({ pctB }: { pctB: number }) {
 }
 
 function ZScoreBadge({ z }: { z: number }) {
-  const color = z < -1 ? 'text-emerald-400' : z > 0 ? 'text-red-400' : 'text-yellow-400';
+  const color = z < -1 ? 'var(--dw-green)' : z > 0 ? 'var(--dw-red)' : 'var(--dw-yellow)';
   const label = z < -1 ? 'Abaixo da média' : z > 1 ? 'Acima da média' : 'Próximo da média';
   return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="text-zinc-400 text-xs">Z-Score vs MA20</span>
-      <span className={`font-semibold ${color}`}>{z.toFixed(2)} <span className="text-xs font-normal text-zinc-400">({label})</span></span>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
+      <span style={{ color: 'var(--dw-ink-muted)', fontSize: 12 }}>Z-Score vs MA20</span>
+      <span style={{ fontWeight: 700, color }}>
+        {z.toFixed(2)}{' '}
+        <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--dw-ink-muted)' }}>({label})</span>
+      </span>
     </div>
   );
 }
@@ -96,10 +117,9 @@ function ZScoreBadge({ z }: { z: number }) {
 export function AssetAnalyzer({ payload, onVerdict }: Props) {
   const { score, verdict, breakdown } = scoreAsset(payload);
 
-  // Notify parent on mount / change
   if (onVerdict) onVerdict(verdict);
 
-  const { label, class: cls } = verdictStyle[verdict];
+  const vs = verdictStyle[verdict];
   const { preco_atual, ma20, ma50, ma200, faixa_52s_min, faixa_52s_max, rsi14, bollinger_pct_b, z_score_20 } = payload;
 
   const maChip = (label: string, ma: number) => {
@@ -108,46 +128,93 @@ export function AssetAnalyzer({ payload, onVerdict }: Props) {
     return (
       <span
         key={label}
-        className={`px-2 py-0.5 rounded text-xs font-medium ${positive ? 'bg-red-900/40 text-red-300' : 'bg-emerald-900/40 text-emerald-300'}`}
+        style={{
+          padding: '2px 8px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+          background: positive ? '#FEE2E2' : '#D1FAE5',
+          color: positive ? '#991B1B' : '#065F46',
+        }}
       >
         {label} {positive ? '+' : ''}{pct.toFixed(1)}%
       </span>
     );
   };
 
+  const sectionStyle: React.CSSProperties = {
+    background: 'var(--dw-bg-soft)',
+    border: '1px solid var(--dw-rule-soft)',
+    borderRadius: 10,
+    padding: 16,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+  };
+
   return (
-    <div className="rounded-xl border border-zinc-700 bg-zinc-800/60 p-5 space-y-5">
-      <div className="flex items-center justify-between">
+    <div style={{
+      background: 'var(--dw-white)',
+      border: '1px solid var(--dw-rule)',
+      borderRadius: 12,
+      padding: 20,
+      boxShadow: '0 1px 4px rgba(15,17,23,0.07), 0 1px 2px rgba(15,17,23,0.04)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 16,
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h3 className="text-base font-semibold text-white">{payload.ticker}</h3>
-          <p className="text-xs text-zinc-400">R$ {preco_atual.toFixed(2)}</p>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--dw-ink)', margin: 0 }}>{payload.ticker}</h3>
+          <p style={{ fontSize: 13, color: 'var(--dw-ink-muted)', margin: 0 }}>R$ {preco_atual.toFixed(2)}</p>
         </div>
-        <div className={`px-3 py-1.5 rounded-lg border text-sm font-semibold ${cls}`}>
-          {label}
-          <span className="ml-2 text-xs font-normal opacity-70">({score}/10)</span>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '6px 14px', borderRadius: 8,
+          background: vs.bg, color: vs.color,
+          border: `1px solid ${vs.border}`,
+          fontSize: 13, fontWeight: 700,
+        }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: verdictDot[verdict], display: 'inline-block' }} />
+          {vs.label}
+          <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.75 }}>({score}/10)</span>
         </div>
       </div>
 
-      <RangeBar value={preco_atual} min={faixa_52s_min} max={faixa_52s_max} label="Posição na faixa 52 semanas" />
+      {/* 52-week range */}
+      <div style={sectionStyle}>
+        <RangeBar value={preco_atual} min={faixa_52s_min} max={faixa_52s_max} label="Posição na faixa 52 semanas" />
+      </div>
 
-      <div className="space-y-1">
-        <p className="text-xs text-zinc-400">Médias móveis</p>
-        <div className="flex flex-wrap gap-1.5">
+      {/* Moving averages */}
+      <div style={sectionStyle}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--dw-blue)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
+          Médias móveis
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {maChip('MA20', ma20)}
           {maChip('MA50', ma50)}
           {maChip('MA200', ma200)}
         </div>
       </div>
 
-      <RsiGauge rsi={rsi14} />
-      <BollingerBar pctB={bollinger_pct_b} />
-      <ZScoreBadge z={z_score_20} />
+      {/* Oscillators */}
+      <div style={sectionStyle}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--dw-blue)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
+          Osciladores
+        </p>
+        <RsiGauge rsi={rsi14} />
+        <BollingerBar pctB={bollinger_pct_b} />
+        <ZScoreBadge z={z_score_20} />
+      </div>
 
-      <div className="grid grid-cols-5 gap-1 pt-1 border-t border-zinc-700">
+      {/* Score breakdown */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, paddingTop: 4, borderTop: '1px solid var(--dw-rule-soft)' }}>
         {(Object.entries(breakdown) as [string, number][]).map(([k, v]) => (
-          <div key={k} className="text-center">
-            <div className="text-xs text-zinc-500 capitalize">{k}</div>
-            <div className={`text-sm font-bold ${v === 2 ? 'text-emerald-400' : v === 1 ? 'text-yellow-400' : 'text-red-400'}`}>{v}/2</div>
+          <div key={k} style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: 'var(--dw-ink-muted)', textTransform: 'capitalize' }}>{k}</div>
+            <div style={{
+              fontSize: 14, fontWeight: 700,
+              color: v === 2 ? 'var(--dw-green)' : v === 1 ? 'var(--dw-yellow)' : 'var(--dw-red)',
+            }}>{v}/2</div>
           </div>
         ))}
       </div>

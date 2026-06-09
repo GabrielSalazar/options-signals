@@ -115,6 +115,32 @@ def get_options_chain(ticker: str):
     return {"chain": opcoes}
 
 
+def _fetch_historical_with_fallback(ticker: str) -> "pd.DataFrame":
+    """Tenta brapi primeiro; se vazio, tenta yfinance como fallback."""
+    import yfinance as yf
+    import backend.services.data_providers as dp
+
+    df = dp.fetch_brapi_historical(ticker, "6mo")
+    if df is not None and not df.empty:
+        return df
+
+    # fallback yfinance
+    yf_ticker = ticker if ticker.endswith(".SA") else f"{ticker}.SA"
+    try:
+        df_yf = yf.download(yf_ticker, period="6mo", interval="1d",
+                            progress=False, auto_adjust=True)
+        if df_yf is not None and not df_yf.empty:
+            df_yf.index.name = "date"
+            # yfinance multi-level columns quando só 1 ticker: achatamos
+            if isinstance(df_yf.columns, pd.MultiIndex):
+                df_yf.columns = df_yf.columns.get_level_values(0)
+            return df_yf[["Open", "High", "Low", "Close", "Volume"]].dropna()
+    except Exception as e:
+        logger.warning(f"yfinance fallback falhou para {ticker}: {e}")
+
+    return pd.DataFrame()
+
+
 @router.get("/analysis/{ticker}")
 def get_market_analysis(ticker: str):
     """
@@ -124,8 +150,8 @@ def get_market_analysis(ticker: str):
     """
     import backend.api.routers.market as _self
 
-    # --- Dados históricos ---
-    df = _self.fetch_brapi_historical(ticker, "6mo")
+    # --- Dados históricos (brapi com fallback yfinance) ---
+    df = _fetch_historical_with_fallback(ticker)
 
     if df is None or df.empty:
         raise HTTPException(status_code=404, detail=f"Ticker '{ticker}' não encontrado ou sem dados históricos.")

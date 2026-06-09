@@ -4,7 +4,33 @@ import { useMemo, useState } from 'react';
 import { impliedVol, calcAll } from '@/lib/black-scholes';
 import type { AssetAnalysisPayload, OptionVerdict } from '@/lib/types/analytics';
 
-const R = 0.1075; // Taxa Selic aproximada (sem live fetch)
+const R = 0.1075;
+
+function thirdFriday(year: number, month: number): Date {
+  const d = new Date(year, month, 1);
+  const dow = d.getDay();
+  const toFriday = (5 - dow + 7) % 7;
+  d.setDate(1 + toFriday + 14);
+  return d;
+}
+
+function nextB3Expiries(count = 6): { label: string; value: string }[] {
+  const today = new Date();
+  const results: { label: string; value: string }[] = [];
+  let year = today.getFullYear();
+  let month = today.getMonth();
+  while (results.length < count) {
+    const d = thirdFriday(year, month);
+    if (d > today) {
+      const iso = d.toISOString().split('T')[0];
+      const label = d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '');
+      results.push({ label, value: iso });
+    }
+    month++;
+    if (month > 11) { month = 0; year++; }
+  }
+  return results;
+}
 
 interface Props {
   payload: AssetAnalysisPayload | null;
@@ -25,6 +51,23 @@ function ivRank(iv: number, chain: AssetAnalysisPayload['chain'], S: number, T: 
   const below = ivs.filter((v) => v <= iv).length;
   return Math.round((below / ivs.length) * 100);
 }
+
+const verdictStyle: Record<OptionVerdict, { label: string; bg: string; color: string; border: string; dot: string }> = {
+  barata: { label: 'Opção Barata', bg: '#D1FAE5', color: '#065F46', border: '#6EE7B7', dot: '#10B981' },
+  neutra: { label: 'Neutra',       bg: '#FEF3C7', color: '#92400E', border: '#FCD34D', dot: '#F59E0B' },
+  cara:   { label: 'Opção Cara',   bg: '#FEE2E2', color: '#991B1B', border: '#FCA5A5', dot: '#EF4444' },
+};
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', borderRadius: 8,
+  border: '1.5px solid var(--dw-rule)',
+  background: 'var(--dw-white)',
+  padding: '8px 12px',
+  fontSize: 13,
+  color: 'var(--dw-ink)',
+  outline: 'none',
+  boxSizing: 'border-box',
+};
 
 export function OptionAnalyzer({ payload, onVerdict }: Props) {
   const [tipo, setTipo] = useState<'call' | 'put'>('call');
@@ -63,84 +106,158 @@ export function OptionAnalyzer({ payload, onVerdict }: Props) {
     return { iv, fair, bs, breakEven, moneynessRaw, dte, rank, verdict, fairSigma };
   }, [payload, tipo, strikeStr, expiryStr, priceStr]);
 
-  // Notify parent
   if (onVerdict) onVerdict(result?.verdict ?? null);
 
-  const verdictStyle: Record<OptionVerdict, { label: string; class: string }> = {
-    barata: { label: '🟢 Opção Barata', class: 'bg-emerald-900/40 text-emerald-300 border-emerald-700' },
-    neutra: { label: '🟡 Neutra',       class: 'bg-yellow-900/40 text-yellow-300 border-yellow-700' },
-    cara:   { label: '🔴 Opção Cara',   class: 'bg-red-900/40 text-red-300 border-red-700' },
+  const sectionStyle: React.CSSProperties = {
+    background: 'var(--dw-bg-soft)',
+    border: '1px solid var(--dw-rule-soft)',
+    borderRadius: 10,
+    padding: 16,
   };
 
-  const inputCls = 'w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500';
-
   return (
-    <div className="rounded-xl border border-zinc-700 bg-zinc-800/60 p-5 space-y-4">
-      <h3 className="text-base font-semibold text-white">Calculadora de Opção</h3>
+    <div style={{
+      background: 'var(--dw-white)',
+      border: '1px solid var(--dw-rule)',
+      borderRadius: 12,
+      padding: 20,
+      boxShadow: '0 1px 4px rgba(15,17,23,0.07), 0 1px 2px rgba(15,17,23,0.04)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 16,
+    }}>
+      <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--dw-ink)', margin: 0 }}>
+        Calculadora de Opção
+      </h3>
 
       {!payload && (
-        <p className="text-sm text-zinc-500">Analise um ativo primeiro para habilitar esta calculadora.</p>
+        <p style={{ fontSize: 13, color: 'var(--dw-ink-muted)', margin: 0 }}>
+          Analise um ativo primeiro para habilitar esta calculadora.
+        </p>
       )}
 
       {payload && (
         <>
-          <div className="grid grid-cols-2 gap-3">
+          {/* Inputs */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {/* Tipo */}
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Tipo</label>
-              <div className="flex gap-2">
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--dw-blue)', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 6 }}>
+                Tipo
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                 {(['call', 'put'] as const).map((t) => (
                   <button
                     key={t}
                     onClick={() => setTipo(t)}
-                    className={`flex-1 py-2 rounded-md text-sm font-medium border transition-colors ${
-                      tipo === t
-                        ? 'bg-blue-700 border-blue-500 text-white'
-                        : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-500'
-                    }`}
+                    style={{
+                      padding: '9px 0',
+                      border: tipo === t ? `2px solid var(--dw-ink)` : '2px solid var(--dw-rule)',
+                      background: tipo === t ? 'var(--dw-ink)' : 'var(--dw-white)',
+                      color: tipo === t ? '#fff' : 'var(--dw-ink-mid)',
+                      borderRadius: 8, fontSize: 13, fontWeight: 600,
+                      cursor: 'pointer', transition: 'all 0.15s',
+                    }}
                   >
                     {t.toUpperCase()}
                   </button>
                 ))}
               </div>
             </div>
+
+            {/* Strike */}
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Strike (R$)</label>
-              <input type="number" value={strikeStr} onChange={(e) => setStrikeStr(e.target.value)} placeholder="38.00" className={inputCls} step="0.50" />
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--dw-blue)', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 6 }}>
+                Strike (R$)
+              </label>
+              <input
+                type="number" value={strikeStr}
+                onChange={(e) => setStrikeStr(e.target.value)}
+                placeholder="38.00" step="0.50"
+                style={inputStyle}
+              />
             </div>
-            <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Vencimento</label>
-              <input type="date" value={expiryStr} onChange={(e) => setExpiryStr(e.target.value)} className={inputCls} />
+
+            {/* Vencimento */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--dw-blue)', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 6 }}>
+                Vencimento B3 (3ª sexta)
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {nextB3Expiries(6).map(({ label, value }) => (
+                  <button
+                    key={value}
+                    onClick={() => setExpiryStr(value)}
+                    style={{
+                      padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                      cursor: 'pointer', transition: 'all 0.15s',
+                      border: expiryStr === value ? '2px solid var(--dw-blue)' : '1.5px solid var(--dw-rule)',
+                      background: expiryStr === value ? 'var(--dw-blue-soft)' : 'var(--dw-white)',
+                      color: expiryStr === value ? 'var(--dw-blue)' : 'var(--dw-ink-mid)',
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="date" value={expiryStr}
+                onChange={(e) => setExpiryStr(e.target.value)}
+                style={{ ...inputStyle, fontSize: 12 }}
+              />
             </div>
+
+            {/* Prêmio */}
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Prêmio de mercado (R$)</label>
-              <input type="number" value={priceStr} onChange={(e) => setPriceStr(e.target.value)} placeholder="1.45" className={inputCls} step="0.01" />
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--dw-blue)', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 6 }}>
+                Prêmio de mercado (R$)
+              </label>
+              <input
+                type="number" value={priceStr}
+                onChange={(e) => setPriceStr(e.target.value)}
+                placeholder="1.45" step="0.01"
+                style={inputStyle}
+              />
             </div>
           </div>
 
-          {result && (
-            <div className="space-y-3 pt-2 border-t border-zinc-700">
-              <div className={`px-3 py-2 rounded-lg border text-sm font-semibold ${verdictStyle[result.verdict].class}`}>
-                {verdictStyle[result.verdict].label}
-              </div>
+          {/* Results */}
+          {result && (() => {
+            const vs = verdictStyle[result.verdict];
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* Verdict badge */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 14px', borderRadius: 8,
+                  background: vs.bg, color: vs.color, border: `1px solid ${vs.border}`,
+                  fontSize: 13, fontWeight: 700,
+                }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: vs.dot, display: 'inline-block' }} />
+                  {vs.label}
+                </div>
 
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <Row label="IV calculada" value={`${(result.iv * 100).toFixed(1)}%`} />
-                <Row label="HV 20d (referência)" value={`${(result.fairSigma * 100).toFixed(1)}%`} />
-                <Row label="IV / HV" value={`${(result.iv / result.fairSigma).toFixed(2)}×`} highlight />
-                <Row label="Preço justo BS" value={`R$ ${result.fair.price.toFixed(2)}`} />
-                <Row label="Break-even vencimento" value={`R$ ${result.breakEven.toFixed(2)}`} />
-                <Row label="DTE" value={`${result.dte} dias`} />
-                <Row label="Moneyness" value={`${result.moneynessRaw >= 0 ? 'ITM' : 'OTM'} ${Math.abs(result.moneynessRaw).toFixed(1)}%`} />
-                {result.rank !== null && <Row label="IV Rank na chain" value={`${result.rank}º percentil`} />}
-              </div>
+                {/* Metrics grid */}
+                <div style={{ ...sectionStyle, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+                  <Row label="IV calculada" value={`${(result.iv * 100).toFixed(1)}%`} />
+                  <Row label="HV 20d (referência)" value={`${(result.fairSigma * 100).toFixed(1)}%`} />
+                  <Row label="IV / HV" value={`${(result.iv / result.fairSigma).toFixed(2)}×`} highlight />
+                  <Row label="Preço justo BS" value={`R$ ${result.fair.price.toFixed(2)}`} />
+                  <Row label="Break-even" value={`R$ ${result.breakEven.toFixed(2)}`} />
+                  <Row label="DTE" value={`${result.dte} dias`} />
+                  <Row label="Moneyness" value={`${result.moneynessRaw >= 0 ? 'ITM' : 'OTM'} ${Math.abs(result.moneynessRaw).toFixed(1)}%`} />
+                  {result.rank !== null && <Row label="IV Rank na chain" value={`${result.rank}º percentil`} />}
+                </div>
 
-              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-zinc-700/50">
-                <Greek label="Delta" value={result.bs.delta.toFixed(3)} />
-                <Greek label="Theta/dia" value={`R$ ${result.bs.theta.toFixed(3)}`} />
-                <Greek label="Vega/1%" value={`R$ ${result.bs.vega.toFixed(3)}`} />
+                {/* Greeks mini */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                  <GreekCard label="Delta" value={result.bs.delta.toFixed(3)} />
+                  <GreekCard label="Theta/dia" value={`R$ ${result.bs.theta.toFixed(3)}`} />
+                  <GreekCard label="Vega/1%" value={`R$ ${result.bs.vega.toFixed(3)}`} />
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </>
       )}
     </div>
@@ -150,17 +267,22 @@ export function OptionAnalyzer({ payload, onVerdict }: Props) {
 function Row({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <>
-      <span className="text-zinc-400">{label}</span>
-      <span className={`text-right font-medium ${highlight ? 'text-blue-300' : 'text-white'}`}>{value}</span>
+      <span style={{ fontSize: 12, color: 'var(--dw-ink-muted)' }}>{label}</span>
+      <span style={{ fontSize: 13, fontWeight: 600, textAlign: 'right', color: highlight ? 'var(--dw-blue)' : 'var(--dw-ink)' }}>
+        {value}
+      </span>
     </>
   );
 }
 
-function Greek({ label, value }: { label: string; value: string }) {
+function GreekCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-zinc-900/60 p-2 text-center">
-      <div className="text-xs text-zinc-500">{label}</div>
-      <div className="text-sm font-semibold text-white">{value}</div>
+    <div style={{
+      background: 'var(--dw-bg-soft)', border: '1px solid var(--dw-rule-soft)',
+      borderRadius: 8, padding: '10px 12px', textAlign: 'center',
+    }}>
+      <div style={{ fontSize: 11, color: 'var(--dw-ink-muted)', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--dw-ink)' }}>{value}</div>
     </div>
   );
 }
