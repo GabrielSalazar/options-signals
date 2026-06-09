@@ -316,14 +316,41 @@ function Row({ label, value, highlight }: { label: string; value: string; highli
 
 function GreekCard({ label, value, tooltip }: { label: string; value: string; tooltip?: string }) {
   return (
-    <div title={tooltip} style={{
-      background: 'rgba(59,91,219,0.08)',
-      border: '1.5px solid rgba(59,91,219,0.22)',
-      borderRadius: 8, padding: '10px 12px', textAlign: 'center',
-      cursor: tooltip ? 'help' : undefined,
-    }}>
-      <div style={{ fontSize: 11, color: 'var(--dw-blue)', marginBottom: 2, fontWeight: 600 }}>{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--dw-blue)' }}>{value}</div>
+    <div style={{ position: 'relative', cursor: tooltip ? 'help' : undefined }} className="greek-card-wrapper">
+      <div style={{
+        background: 'rgba(59,91,219,0.08)',
+        border: '1.5px solid rgba(59,91,219,0.22)',
+        borderRadius: 8, padding: '10px 12px', textAlign: 'center',
+      }}>
+        <div style={{ fontSize: 11, color: 'var(--dw-blue)', marginBottom: 2, fontWeight: 600 }}>{label}</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--dw-blue)' }}>{value}</div>
+      </div>
+      {tooltip && (
+        <div className="greek-tooltip" style={{
+          position: 'absolute', bottom: 'calc(100% + 8px)', left: '50%',
+          transform: 'translateX(-50%)',
+          background: '#1a1f3a', color: '#e8eaf6',
+          fontSize: 12, lineHeight: 1.5,
+          padding: '8px 12px', borderRadius: 8,
+          width: 240, textAlign: 'left',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+          pointerEvents: 'none',
+          opacity: 0, transition: 'opacity 0.15s',
+          zIndex: 100,
+          whiteSpace: 'normal',
+        }}>
+          {tooltip}
+          <div style={{
+            position: 'absolute', top: '100%', left: '50%',
+            transform: 'translateX(-50%)',
+            border: '6px solid transparent',
+            borderTopColor: '#1a1f3a',
+          }} />
+        </div>
+      )}
+      <style>{`
+        .greek-card-wrapper:hover .greek-tooltip { opacity: 1 !important; }
+      `}</style>
     </div>
   );
 }
