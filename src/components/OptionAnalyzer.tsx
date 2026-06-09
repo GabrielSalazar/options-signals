@@ -273,7 +273,13 @@ export function OptionAnalyzer({ payload, onVerdict }: Props) {
                   <Row label="IV calculada" value={`${(result.iv * 100).toFixed(1)}%`} />
                   <Row label="HV 20d (referência)" value={`${(result.fairSigma * 100).toFixed(1)}%`} />
                   <Row label="IV / HV" value={`${(result.iv / result.fairSigma).toFixed(2)}×`} highlight />
-                  <Row label="Preço justo BS" value={`R$ ${result.fair.price.toFixed(2)}`} />
+                  <Row label="Preço justo BS" value={
+                    result.fair.price < 0.005
+                      ? `R$ ${result.fair.price.toFixed(5)}`
+                      : result.fair.price < 0.10
+                      ? `R$ ${result.fair.price.toFixed(3)}`
+                      : `R$ ${result.fair.price.toFixed(2)}`
+                  } />
                   <Row label="Break-even" value={`R$ ${result.breakEven.toFixed(2)}`} />
                   <Row label="DTE" value={`${result.dte} dias`} />
                   <Row label="Moneyness" value={`${result.moneynessRaw >= 0 ? 'ITM' : 'OTM'} ${Math.abs(result.moneynessRaw).toFixed(1)}%`} />
