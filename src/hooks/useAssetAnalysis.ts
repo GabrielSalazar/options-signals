@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import type { AssetAnalysisPayload } from '@/lib/types/analytics';
-import { getBackendUrl } from '@/lib/api';
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -39,7 +38,7 @@ export function useAssetAnalysis(ticker: string | null): {
     setLoading(true);
     setError(null);
 
-    fetch(`${getBackendUrl()}/market/analysis/${key}`)
+    fetch(`/api/market/analysis/${key}`)
       .then((res) => {
         if (!res.ok) {
           return res.json().then((body) => {
