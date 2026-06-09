@@ -27,14 +27,18 @@ export function TickerSelector({ value, onChange, placeholder = 'Ex: PETR4' }: P
   }, []);
 
   return (
-    <div className="flex items-center gap-2">
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value.toUpperCase())}
         placeholder={placeholder}
         list={listId}
-        className="w-36 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        style={{
+          width: 144, borderRadius: 8, padding: '8px 12px', fontSize: 13,
+          border: '1.5px solid var(--dw-rule)', background: 'var(--dw-bg-soft)',
+          color: 'var(--dw-ink)', outline: 'none', fontFamily: 'var(--font-jetbrains-mono, monospace)',
+        }}
       />
       <datalist id={listId}>
         {suggestions.map((t) => (

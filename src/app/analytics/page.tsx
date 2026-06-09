@@ -316,20 +316,22 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Ticker selector das calculadoras */}
-        <div className="card flex items-center gap-3 flex-wrap">
-          <span className="text-sm" style={{ color: 'var(--dw-ink-muted)' }}>Ativo para análise:</span>
-          <TickerSelector
-            value={calcTicker ?? ''}
-            onChange={(t) => setCalcTicker(t || null)}
-            placeholder="Ex: PETR4"
-          />
-          {analysisLoading && (
-            <span className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin"
-              style={{ borderColor: 'var(--dw-rule)', borderTopColor: 'var(--dw-blue)' }} />
-          )}
-          {analysisError && (
-            <span className="text-sm" style={{ color: 'var(--dw-red)' }}>{analysisError}</span>
-          )}
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, color: 'var(--dw-ink-muted)', whiteSpace: 'nowrap' }}>Ativo para análise:</span>
+            <TickerSelector
+              value={calcTicker ?? ''}
+              onChange={(t) => setCalcTicker(t || null)}
+              placeholder="Ex: PETR4"
+            />
+            {analysisLoading && (
+              <span className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin"
+                style={{ borderColor: 'var(--dw-rule)', borderTopColor: 'var(--dw-blue)' }} />
+            )}
+            {analysisError && (
+              <span style={{ fontSize: 13, color: 'var(--dw-red)' }}>{analysisError}</span>
+            )}
+          </div>
         </div>
 
         {/* Alerta cruzado */}
