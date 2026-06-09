@@ -116,7 +116,8 @@ def get_options_chain(ticker: str):
 
 
 def _fetch_historical_with_fallback(ticker: str) -> "pd.DataFrame":
-    """Tenta brapi primeiro; se vazio, tenta yfinance como fallback."""
+    """Tenta brapi → yfinance → Yahoo Finance HTTP direto."""
+    import time
     import yfinance as yf
     import backend.services.data_providers as dp
 
@@ -124,19 +125,42 @@ def _fetch_historical_with_fallback(ticker: str) -> "pd.DataFrame":
     if df is not None and not df.empty:
         return df
 
-    # fallback yfinance
     yf_ticker = ticker if ticker.endswith(".SA") else f"{ticker}.SA"
+
+    # Fallback 1: yfinance
     try:
         df_yf = yf.download(yf_ticker, period="6mo", interval="1d",
                             progress=False, auto_adjust=True)
         if df_yf is not None and not df_yf.empty:
             df_yf.index.name = "date"
-            # yfinance multi-level columns quando só 1 ticker: achatamos
             if isinstance(df_yf.columns, pd.MultiIndex):
                 df_yf.columns = df_yf.columns.get_level_values(0)
             return df_yf[["Open", "High", "Low", "Close", "Volume"]].dropna()
     except Exception as e:
         logger.warning(f"yfinance fallback falhou para {ticker}: {e}")
+
+    # Fallback 2: Yahoo Finance Chart API via HTTP direto
+    try:
+        import requests as _req
+        now = int(time.time())
+        period1 = now - 180 * 86400
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_ticker}"
+        r = _req.get(url, params={"period1": period1, "period2": now, "interval": "1d"},
+                     headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+        r.raise_for_status()
+        result = r.json().get("chart", {}).get("result", [])
+        if result:
+            ts = result[0]["timestamp"]
+            q = result[0]["indicators"]["quote"][0]
+            adj = result[0]["indicators"].get("adjclose", [{}])[0].get("adjclose", q["close"])
+            df_http = pd.DataFrame({
+                "Open": q["open"], "High": q["high"], "Low": q["low"],
+                "Close": adj, "Volume": q["volume"],
+            }, index=pd.to_datetime(ts, unit="s"))
+            df_http.index.name = "date"
+            return df_http.dropna()
+    except Exception as e:
+        logger.warning(f"Yahoo Finance HTTP fallback falhou para {ticker}: {e}")
 
     return pd.DataFrame()
 
