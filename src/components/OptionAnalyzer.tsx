@@ -303,6 +303,37 @@ export function OptionAnalyzer({ payload, onVerdict }: Props) {
   );
 }
 
+function FieldLabel({ text, tooltip }: { text: string; tooltip: string }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <span
+      style={{ position: 'relative', cursor: 'help', display: 'inline-block' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {text}
+      {hovered && (
+        <span style={{
+          position: 'absolute', bottom: 'calc(100% + 8px)', left: 0,
+          background: '#1a1f3a', color: '#e8eaf6',
+          fontSize: 11, lineHeight: 1.5,
+          padding: '7px 11px', borderRadius: 8,
+          width: 260, display: 'block', textAlign: 'left',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+          pointerEvents: 'none', zIndex: 100,
+          whiteSpace: 'normal', fontWeight: 400,
+        }}>
+          {tooltip}
+          <span style={{
+            position: 'absolute', top: '100%', left: 16,
+            border: '6px solid transparent', borderTopColor: '#1a1f3a', display: 'block',
+          }} />
+        </span>
+      )}
+    </span>
+  );
+}
+
 function Row({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <>

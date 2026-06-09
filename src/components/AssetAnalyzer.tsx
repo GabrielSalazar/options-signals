@@ -28,7 +28,7 @@ function RangeBar({ value, min, max, label }: { value: number; min: number; max:
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--dw-ink-muted)' }}>
         <span>{label}</span>
-        <span style={{ color: 'var(--dw-ink)', fontWeight: 600 }}>R$ {value.toFixed(2)}</span>
+        <span style={{ color: 'var(--dw-ink)', fontWeight: 600 }}>Atual R$ {value.toFixed(2)}</span>
       </div>
       <div style={{ position: 'relative', height: 6, width: '100%', borderRadius: 999, background: 'var(--dw-rule)' }}>
         <div
@@ -41,8 +41,8 @@ function RangeBar({ value, min, max, label }: { value: number; min: number; max:
         />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--dw-ink-muted)' }}>
-        <span>R$ {min.toFixed(2)}</span>
-        <span>R$ {max.toFixed(2)}</span>
+        <span>Mínima R$ {min.toFixed(2)}</span>
+        <span>Máxima R$ {max.toFixed(2)}</span>
       </div>
     </div>
   );
