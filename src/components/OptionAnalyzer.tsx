@@ -75,6 +75,26 @@ export function OptionAnalyzer({ payload, onVerdict }: Props) {
   const [expiryStr, setExpiryStr] = useState('');
   const [priceStr, setPriceStr] = useState('');
 
+  const calcError = useMemo((): string | null => {
+    if (!payload || !strikeStr || !expiryStr || !priceStr) return null;
+    const strike = parseFloat(strikeStr);
+    const price  = parseFloat(priceStr);
+    if (isNaN(strike) || isNaN(price) || price <= 0) return null;
+    const S = payload.preco_atual;
+    const T = daysToYears(expiryStr);
+    if (T <= 0) return 'Vencimento deve ser uma data futura.';
+    const intrinsic = tipo === 'call'
+      ? Math.max(0, S - strike)
+      : Math.max(0, strike - S);
+    if (price < intrinsic - 0.01) {
+      return `Prêmio R$${price.toFixed(2)} abaixo do valor intrínseco (R$${intrinsic.toFixed(2)}). ` +
+        `Impossível calcular IV — verifique strike ou prêmio.`;
+    }
+    const iv = impliedVol(price, S, strike, T, R, tipo);
+    if (isNaN(iv)) return 'Não foi possível calcular IV. Ajuste os parâmetros.';
+    return null;
+  }, [payload, tipo, strikeStr, expiryStr, priceStr]);
+
   const result = useMemo(() => {
     if (!payload) return null;
     const strike = parseFloat(strikeStr);
@@ -220,6 +240,17 @@ export function OptionAnalyzer({ payload, onVerdict }: Props) {
               />
             </div>
           </div>
+
+          {/* Error feedback */}
+          {calcError && (
+            <div style={{
+              padding: '10px 14px', borderRadius: 8, fontSize: 12,
+              background: '#FEE2E2', color: '#991B1B',
+              border: '1px solid #FCA5A5',
+            }}>
+              {calcError}
+            </div>
+          )}
 
           {/* Results */}
           {result && (() => {
