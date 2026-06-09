@@ -23,6 +23,8 @@ export interface AssetAnalysisPayload {
   stoch_k: number;
   stoch_d: number;
   adx: number;
+  preco_graham: number | null;
+  preco_dcf: number | null;
   chain: ChainItem[];
 }
 

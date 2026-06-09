@@ -254,6 +254,26 @@ def get_market_analysis(ticker: str):
     adx_val = float(_adx_manual(df["High"], df["Low"], close, period=14).iloc[-1])
     if np.isnan(adx_val): adx_val = 0.0
 
+    # --- Fundamentalistas: Graham e DCF ---
+    preco_graham: float | None = None
+    preco_dcf: float | None = None
+    try:
+        import math
+        import yfinance as yf
+        yf_ticker_str = ticker if ticker.upper().endswith(".SA") else f"{ticker.upper()}.SA"
+        info = yf.Ticker(yf_ticker_str).info
+        lpa = info.get("trailingEps") or info.get("forwardEps")
+        vpa = info.get("bookValue")
+        fcl_total = info.get("freeCashflow")
+        shares = info.get("sharesOutstanding")
+        if lpa and lpa > 0 and vpa and vpa > 0:
+            preco_graham = round(math.sqrt(22.5 * lpa * vpa), 2)
+        if fcl_total and fcl_total > 0 and shares and shares > 0:
+            fcl_por_acao = fcl_total / shares
+            preco_dcf = round(fcl_por_acao / (0.15 - 0.04), 2)
+    except Exception as e:
+        logger.warning(f"Fundamentalistas de {ticker} falharam: {e}")
+
     # --- Chain de opções (falha silenciosa) ---
     chain_items = []
     try:
@@ -292,5 +312,7 @@ def get_market_analysis(ticker: str):
         "stoch_k": round(stoch_k_val, 2),
         "stoch_d": round(stoch_d_val, 2),
         "adx": round(adx_val, 2),
+        "preco_graham": preco_graham,
+        "preco_dcf": preco_dcf,
         "chain": chain_items,
     }

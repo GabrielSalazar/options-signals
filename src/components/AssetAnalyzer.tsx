@@ -238,7 +238,8 @@ export function AssetAnalyzer({ payload, onVerdict }: Props) {
   }, [verdict, onVerdict]);
 
   const vs = verdictStyle[verdict];
-  const { preco_atual, ma20, ma50, ma200, faixa_52s_min, faixa_52s_max, rsi14, bollinger_pct_b, z_score_20, macd_diff, stoch_k, stoch_d, adx } = payload;
+  const { preco_atual, ma20, ma50, ma200, faixa_52s_min, faixa_52s_max, rsi14, bollinger_pct_b, z_score_20, macd_diff, stoch_k, stoch_d, adx, preco_graham, preco_dcf } = payload;
+  const preco_justo_mas = (ma20 + ma50 + ma200) / 3;
 
   const maChip = (label: string, ma: number) => {
     const pct = ((preco_atual - ma) / ma) * 100;
@@ -283,6 +284,17 @@ export function AssetAnalyzer({ payload, onVerdict }: Props) {
         <div>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--dw-ink)', margin: 0 }}>{payload.ticker}</h3>
           <p style={{ fontSize: 13, color: 'var(--dw-ink-muted)', margin: 0 }}>R$ {preco_atual.toFixed(2)}</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 2 }}>
+            <p style={{ fontSize: 12, color: 'var(--dw-ink-muted)', margin: 0 }}>
+              Preço justo (MAs): <span style={{ fontWeight: 600, color: 'var(--dw-ink)' }}>R$ {preco_justo_mas.toFixed(2)}</span>
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--dw-ink-muted)', margin: 0 }}>
+              Preço justo (Graham): <span style={{ fontWeight: 600, color: 'var(--dw-ink)' }}>{preco_graham != null ? `R$ ${preco_graham.toFixed(2)}` : 'N/D'}</span>
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--dw-ink-muted)', margin: 0 }}>
+              Preço justo (DCF): <span style={{ fontWeight: 600, color: 'var(--dw-ink)' }}>{preco_dcf != null ? `R$ ${preco_dcf.toFixed(2)}` : 'N/D'}</span>
+            </p>
+          </div>
         </div>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6,
