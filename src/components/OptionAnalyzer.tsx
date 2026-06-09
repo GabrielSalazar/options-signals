@@ -290,9 +290,9 @@ export function OptionAnalyzer({ payload, onVerdict }: Props) {
 
                 {/* Greeks mini */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                  <GreekCard label="Delta" value={result.bs.delta.toFixed(3)} />
-                  <GreekCard label="Theta/dia" value={`R$ ${result.bs.theta.toFixed(3)}`} />
-                  <GreekCard label="Vega/1%" value={`R$ ${result.bs.vega.toFixed(3)}`} />
+                  <GreekCard label="Delta" value={result.bs.delta.toFixed(3)} tooltip="Variação esperada no prêmio para cada R$ 1,00 de movimento no ativo. Delta 0.2 → prêmio sobe ~R$ 0,20 se o ativo subir R$ 1,00." />
+                  <GreekCard label="Theta/dia" value={`R$ ${result.bs.theta.toFixed(3)}`} tooltip="Perda de valor da opção por dia de passagem do tempo (decaimento temporal). Theta −R$ 0,07 → opção perde R$ 0,07 por dia sem movimento do ativo." />
+                  <GreekCard label="Vega/1%" value={`R$ ${result.bs.vega.toFixed(3)}`} tooltip="Variação no prêmio para cada 1% de mudança na volatilidade implícita. Vega R$ 0,06 → prêmio sobe R$ 0,06 se a IV aumentar 1 ponto percentual." />
                 </div>
               </div>
             );
@@ -314,12 +314,13 @@ function Row({ label, value, highlight }: { label: string; value: string; highli
   );
 }
 
-function GreekCard({ label, value }: { label: string; value: string }) {
+function GreekCard({ label, value, tooltip }: { label: string; value: string; tooltip?: string }) {
   return (
-    <div style={{
+    <div title={tooltip} style={{
       background: 'rgba(59,91,219,0.08)',
       border: '1.5px solid rgba(59,91,219,0.22)',
       borderRadius: 8, padding: '10px 12px', textAlign: 'center',
+      cursor: tooltip ? 'help' : undefined,
     }}>
       <div style={{ fontSize: 11, color: 'var(--dw-blue)', marginBottom: 2, fontWeight: 600 }}>{label}</div>
       <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--dw-blue)' }}>{value}</div>
