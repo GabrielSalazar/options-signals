@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException
 
 from backend.services.data_providers import fetch_brapi_historical, _fetch_chain
 from backend.domain.options_math import estimar_iv_historica
-from backend.domain.indicators import _rsi_manual
+from backend.domain.indicators import _rsi_manual, _stoch_manual, _adx_manual
 
 logger = logging.getLogger("b3_api")
 router = APIRouter(prefix="/market", tags=["Market"])
@@ -233,6 +233,27 @@ def get_market_analysis(ticker: str):
     faixa_52s_min = float(ultimos_252.min())
     faixa_52s_max = float(ultimos_252.max())
 
+    # --- MACD (12/26/9) ---
+    ema12 = close.ewm(span=12, adjust=False).mean()
+    ema26 = close.ewm(span=26, adjust=False).mean()
+    macd_line = ema12 - ema26
+    macd_signal_line = macd_line.ewm(span=9, adjust=False).mean()
+    macd_diff_val = float((macd_line - macd_signal_line).iloc[-1])
+    if np.isnan(macd_diff_val):
+        macd_diff_val = 0.0
+
+    # --- Stochastic K/D (14/3) ---
+    stoch_k_series = _stoch_manual(df["High"], df["Low"], close, k=14)
+    stoch_d_series = stoch_k_series.rolling(3).mean()
+    stoch_k_val = float(stoch_k_series.iloc[-1])
+    stoch_d_val = float(stoch_d_series.iloc[-1])
+    if np.isnan(stoch_k_val): stoch_k_val = 50.0
+    if np.isnan(stoch_d_val): stoch_d_val = 50.0
+
+    # --- ADX (14) ---
+    adx_val = float(_adx_manual(df["High"], df["Low"], close, period=14).iloc[-1])
+    if np.isnan(adx_val): adx_val = 0.0
+
     # --- Chain de opções (falha silenciosa) ---
     chain_items = []
     try:
@@ -267,5 +288,9 @@ def get_market_analysis(ticker: str):
         "z_score_20": round(z_score_20, 6),
         "faixa_52s_min": round(faixa_52s_min, 4),
         "faixa_52s_max": round(faixa_52s_max, 4),
+        "macd_diff": round(macd_diff_val, 4),
+        "stoch_k": round(stoch_k_val, 2),
+        "stoch_d": round(stoch_d_val, 2),
+        "adx": round(adx_val, 2),
         "chain": chain_items,
     }

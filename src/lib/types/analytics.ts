@@ -19,6 +19,10 @@ export interface AssetAnalysisPayload {
   z_score_20: number;
   faixa_52s_min: number;
   faixa_52s_max: number;
+  macd_diff: number;
+  stoch_k: number;
+  stoch_d: number;
+  adx: number;
   chain: ChainItem[];
 }
 

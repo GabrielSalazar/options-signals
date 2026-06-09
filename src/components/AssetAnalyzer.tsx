@@ -109,6 +109,82 @@ function BollingerBar({ pctB }: { pctB: number }) {
   );
 }
 
+function MacdBar({ diff }: { diff: number }) {
+  const bullish = diff >= 0;
+  const color = bullish ? 'var(--dw-green)' : 'var(--dw-red)';
+  const label = bullish ? 'Bullish' : 'Bearish';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
+      <span style={{ color: 'var(--dw-ink-muted)', fontSize: 12 }}>MACD (histograma)</span>
+      <span style={{ fontWeight: 700, color }}>
+        {diff > 0 ? '+' : ''}{diff.toFixed(3)}{' '}
+        <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--dw-ink-muted)' }}>({label})</span>
+      </span>
+    </div>
+  );
+}
+
+function StochGauge({ k, d }: { k: number; d: number }) {
+  const pctK = Math.max(0, Math.min(100, k));
+  const pctD = Math.max(0, Math.min(100, d));
+  const colorK = k < 20 ? 'var(--dw-green)' : k > 80 ? 'var(--dw-red)' : 'var(--dw-ink-mid)';
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--dw-ink-muted)' }}>
+        <span>Stochastic K/D</span>
+        <span style={{ fontWeight: 700, color: colorK }}>K {k.toFixed(0)} / D {d.toFixed(0)}</span>
+      </div>
+      <div style={{ position: 'relative', height: 6, width: '100%', borderRadius: 999, overflow: 'hidden', background: 'var(--dw-rule)' }}>
+        <div style={{ position: 'absolute', inset: 0, left: 0, width: '20%', background: 'rgba(16,185,129,0.25)' }} />
+        <div style={{ position: 'absolute', inset: 0, left: '80%', width: '20%', background: 'rgba(239,68,68,0.25)' }} />
+        {/* D line marker */}
+        <div style={{
+          position: 'absolute', top: 0, bottom: 0, width: 2, background: 'rgba(245,158,11,0.7)',
+          left: `${pctD}%`, transform: 'translateX(-50%)',
+        }} />
+        {/* K dot */}
+        <div style={{
+          position: 'absolute', top: '50%', transform: 'translateX(-50%) translateY(-50%)',
+          height: 14, width: 14, borderRadius: '50%', background: 'var(--dw-blue)',
+          border: '2px solid white', boxShadow: '0 1px 3px rgba(59,91,219,0.4)',
+          left: `${pctK}%`,
+        }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--dw-ink-muted)' }}>
+        <span>Sobrevendido</span><span>Neutro</span><span>Sobrecomprado</span>
+      </div>
+    </div>
+  );
+}
+
+function AdxBar({ adx }: { adx: number }) {
+  const pct = Math.max(0, Math.min(100, adx));
+  const color = adx < 25 ? 'var(--dw-ink-muted)' : adx < 50 ? 'var(--dw-blue)' : 'var(--dw-blue)';
+  const label = adx < 25 ? 'Lateral' : adx < 50 ? 'Tendência' : 'Tendência forte';
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--dw-ink-muted)' }}>
+        <span>ADX 14</span>
+        <span style={{ fontWeight: 700, color }}>{adx.toFixed(1)} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--dw-ink-muted)' }}>({label})</span></span>
+      </div>
+      <div style={{ position: 'relative', height: 6, width: '100%', borderRadius: 999, overflow: 'hidden', background: 'var(--dw-rule)' }}>
+        <div style={{ position: 'absolute', inset: 0, left: 0, width: '25%', background: 'rgba(107,114,128,0.20)' }} />
+        <div style={{ position: 'absolute', inset: 0, left: '25%', width: '25%', background: 'rgba(59,91,219,0.18)' }} />
+        <div style={{ position: 'absolute', inset: 0, left: '50%', width: '50%', background: 'rgba(59,91,219,0.32)' }} />
+        <div style={{
+          position: 'absolute', top: '50%', transform: 'translateX(-50%) translateY(-50%)',
+          height: 14, width: 14, borderRadius: '50%', background: 'var(--dw-blue)',
+          border: '2px solid white', boxShadow: '0 1px 3px rgba(59,91,219,0.4)',
+          left: `${pct}%`,
+        }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--dw-ink-muted)' }}>
+        <span>0 Lateral</span><span>25</span><span>50</span><span>100 Forte</span>
+      </div>
+    </div>
+  );
+}
+
 function ZScoreBadge({ z }: { z: number }) {
   const color = z < -1 ? 'var(--dw-green)' : z > 0 ? 'var(--dw-red)' : 'var(--dw-yellow)';
   const label = z < -1 ? 'Abaixo da média' : z > 1 ? 'Acima da média' : 'Próximo da média';
@@ -131,7 +207,7 @@ export function AssetAnalyzer({ payload, onVerdict }: Props) {
   }, [verdict, onVerdict]);
 
   const vs = verdictStyle[verdict];
-  const { preco_atual, ma20, ma50, ma200, faixa_52s_min, faixa_52s_max, rsi14, bollinger_pct_b, z_score_20 } = payload;
+  const { preco_atual, ma20, ma50, ma200, faixa_52s_min, faixa_52s_max, rsi14, bollinger_pct_b, z_score_20, macd_diff, stoch_k, stoch_d, adx } = payload;
 
   const maChip = (label: string, ma: number) => {
     const pct = ((preco_atual - ma) / ma) * 100;
@@ -215,6 +291,9 @@ export function AssetAnalyzer({ payload, onVerdict }: Props) {
         <RsiGauge rsi={rsi14} />
         <BollingerBar pctB={bollinger_pct_b} />
         <ZScoreBadge z={z_score_20} />
+        <MacdBar diff={macd_diff} />
+        <StochGauge k={stoch_k} d={stoch_d} />
+        <AdxBar adx={adx} />
       </div>
 
       {/* Score breakdown */}
