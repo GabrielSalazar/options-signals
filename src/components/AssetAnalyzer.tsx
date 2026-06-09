@@ -63,8 +63,8 @@ function RsiGauge({ rsi }: { rsi: number }) {
         <div
           style={{
             position: 'absolute', top: '50%', transform: 'translateX(-50%) translateY(-50%)',
-            height: 14, width: 14, borderRadius: '50%', background: 'white',
-            border: '2px solid var(--dw-ink-muted)', boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+            height: 14, width: 14, borderRadius: '50%', background: 'var(--dw-blue)',
+            border: '2px solid white', boxShadow: '0 1px 3px rgba(59,91,219,0.4)',
             left: `${pct}%`,
           }}
         />
@@ -90,6 +90,14 @@ function BollingerBar({ pctB }: { pctB: number }) {
           style={{
             position: 'absolute', inset: 0, left: 0, borderRadius: 999,
             width: `${pct}%`, background: 'var(--dw-blue)',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute', top: '50%', transform: 'translateX(-50%) translateY(-50%)',
+            height: 14, width: 14, borderRadius: '50%', background: 'var(--dw-blue)',
+            border: '2px solid white', boxShadow: '0 1px 3px rgba(59,91,219,0.4)',
+            left: `${pct}%`,
           }}
         />
       </div>
