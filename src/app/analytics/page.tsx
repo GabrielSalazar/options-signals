@@ -58,10 +58,16 @@ export default function AnalyticsPage() {
   const [error, setError] = useState<string | null>(null);
 
   // ── Calculadoras state ─────────────────────────────────────────────────────
+  const [calcTickerInput, setCalcTickerInput] = useState('');
   const [calcTicker, setCalcTicker] = useState<string | null>(null);
   const [assetVerdict, setAssetVerdict] = useState<AssetVerdict | null>(null);
   const [optionVerdict, setOptionVerdict] = useState<OptionVerdict | null>(null);
   const { data: analysisPayload, loading: analysisLoading, error: analysisError } = useAssetAnalysis(calcTicker);
+
+  const analyzeCalc = useCallback(() => {
+    const t = calcTickerInput.trim().toUpperCase();
+    if (t) setCalcTicker(t);
+  }, [calcTickerInput]);
 
   const analyze = useCallback(async () => {
     const t = tickerInput.trim().toUpperCase();
@@ -310,18 +316,25 @@ export default function AnalyticsPage() {
         {/* Ticker selector das calculadoras */}
         <div className="card">
           <div className="label mb-1">Calculadoras</div>
-          <h3 className="font-serif mb-4">Calculadoras de preço justo</h3>
+          <h3 className="mb-4">Calculadoras de preço justo</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 13, color: 'var(--dw-ink-muted)', whiteSpace: 'nowrap' }}>Ativo para análise:</span>
             <TickerSelector
-              value={calcTicker ?? ''}
-              onChange={(t) => setCalcTicker(t || null)}
+              value={calcTickerInput}
+              onChange={setCalcTickerInput}
+              onEnter={analyzeCalc}
               placeholder="Ex: PETR4"
             />
-            {analysisLoading && (
-              <span className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin"
-                style={{ borderColor: 'var(--dw-rule)', borderTopColor: 'var(--dw-blue)' }} />
-            )}
+            <button
+              onClick={analyzeCalc}
+              disabled={analysisLoading}
+              className="btn-demo flex items-center gap-2 disabled:opacity-50"
+              style={{ background: 'var(--dw-blue)' }}
+            >
+              {analysisLoading
+                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : <Search className="w-4 h-4" />}
+              Analisar
+            </button>
             {analysisError && (
               <span style={{ fontSize: 13, color: 'var(--dw-red)' }}>{analysisError}</span>
             )}

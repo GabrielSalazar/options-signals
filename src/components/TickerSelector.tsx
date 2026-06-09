@@ -6,10 +6,11 @@ import { getSupabase } from '@/lib/supabase';
 interface Props {
   value: string;
   onChange: (ticker: string) => void;
+  onEnter?: () => void;
   placeholder?: string;
 }
 
-export function TickerSelector({ value, onChange, placeholder = 'Ex: PETR4' }: Props) {
+export function TickerSelector({ value, onChange, onEnter, placeholder = 'Ex: PETR4' }: Props) {
   const listId = useId();
   const [suggestions, setSuggestions] = useState<string[]>([]);
 
@@ -32,6 +33,7 @@ export function TickerSelector({ value, onChange, placeholder = 'Ex: PETR4' }: P
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value.toUpperCase())}
+        onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
         placeholder={placeholder}
         list={listId}
         style={{
