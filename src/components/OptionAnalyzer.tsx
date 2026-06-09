@@ -315,11 +315,12 @@ function Row({ label, value, highlight }: { label: string; value: string; highli
 function GreekCard({ label, value }: { label: string; value: string }) {
   return (
     <div style={{
-      background: 'var(--dw-bg-soft)', border: '1px solid var(--dw-rule-soft)',
+      background: 'rgba(59,91,219,0.08)',
+      border: '1.5px solid rgba(59,91,219,0.22)',
       borderRadius: 8, padding: '10px 12px', textAlign: 'center',
     }}>
-      <div style={{ fontSize: 11, color: 'var(--dw-ink-muted)', marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--dw-ink)' }}>{value}</div>
+      <div style={{ fontSize: 11, color: 'var(--dw-blue)', marginBottom: 2, fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--dw-blue)' }}>{value}</div>
     </div>
   );
 }
