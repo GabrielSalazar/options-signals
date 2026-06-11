@@ -12,6 +12,8 @@ const base: AssetAnalysisPayload = {
   bollinger_pct_b: 0.10,
   z_score_20: -1.5,
   faixa_52s_min: 28, faixa_52s_max: 60,
+  macd_diff: -0.2, stoch_k: 20, stoch_d: 25, adx: 18,
+  preco_graham: null, preco_dcf: null,
   chain: [],
 };
 

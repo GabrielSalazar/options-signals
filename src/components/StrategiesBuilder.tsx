@@ -34,7 +34,7 @@ const DIVIDEND_YIELD_PCT = 0;
 
 const CATEGORIES: { key: StrategyCategory; label: string; strategies: StrategyId[] }[] = [
   { key: 'puras', label: '📌 Posições Puras', strategies: ['longCall', 'shortCall', 'longPut', 'shortPut'] },
-  { key: 'acao', label: '🏦 Com Ação (Stock)', strategies: ['coveredCall', 'protectivePut'] },
+  { key: 'acao', label: '🏦 Com Ação (Stock)', strategies: ['coveredCall', 'protectivePut', 'fence'] },
   { key: 'spreads', label: '📊 Spreads', strategies: ['bullCall', 'bearPut', 'bullPutSpread', 'bearCallSpread'] },
   { key: 'volatilidade', label: '🌊 Volatilidade', strategies: ['straddle', 'strangle', 'shortStraddle', 'shortStrangle', 'butterflyCall'] },
   { key: 'complexas', label: '🦅 Complexas', strategies: ['ironCondor'] },

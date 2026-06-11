@@ -45,7 +45,7 @@ export type StrategyProfile = 'alta' | 'baixa' | 'neutro' | 'renda' | 'hedge';
 export type StrategyId =
   | 'custom'
   | 'longCall' | 'shortCall' | 'longPut' | 'shortPut'
-  | 'coveredCall' | 'protectivePut'
+  | 'coveredCall' | 'protectivePut' | 'fence'
   | 'bullCall' | 'bearPut' | 'bullPutSpread' | 'bearCallSpread'
   | 'straddle' | 'strangle' | 'shortStraddle' | 'shortStrangle' | 'butterflyCall'
   | 'ironCondor'
@@ -147,6 +147,18 @@ export const STRATEGY_DEFS: Record<StrategyId, StrategyDef> = {
     category: 'acao', profile: 'hedge', icon: '🛡️', unlimitedLoss: false, stockUnits: 1,
     legs: [{ type: 'put', side: 'long', qty: 1, strikeRef: 0 }],
     strikeLabels: ['Strike da Put Protetora (K)'], strikeOffsets: [0],
+  },
+  fence: {
+    id: 'fence', label: 'Fence', labelPT: 'Cerca (Collar Financiado)',
+    description: 'Collar com proteção financiada: ação + trava de baixa com put + call vendida. Hedge de custo reduzido (frequentemente zero-cost) com proteção apenas parcial — abaixo da put vendida o prejuízo volta a correr.',
+    category: 'acao', profile: 'hedge', icon: '🚧', unlimitedLoss: true, stockUnits: 1,
+    legs: [
+      { type: 'put',  side: 'short', qty: 1, strikeRef: 0 },
+      { type: 'put',  side: 'long',  qty: 1, strikeRef: 1 },
+      { type: 'call', side: 'short', qty: 1, strikeRef: 2 },
+    ],
+    strikeLabels: ['Put Vendida (K₁)', 'Put Protetora (K₂)', 'Call Coberta (K₃)'],
+    strikeOffsets: [-15, -5, 5],
   },
 
   // ── Spreads ──

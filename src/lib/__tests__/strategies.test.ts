@@ -130,8 +130,8 @@ describe('STRATEGY_DEFS — invariantes do registro', () => {
     }
   });
 
-  it('contém as 35 entradas (custom + 16 atuais + 18 novas)', () => {
-    expect(ids.length).toBe(35);
+  it('contém as 36 entradas (custom + 16 atuais + 18 novas + fence)', () => {
+    expect(ids.length).toBe(36);
   });
 });
 
@@ -197,6 +197,46 @@ describe('novas estratégias — sanidade do payoff', () => {
     const r = mk('longCondor');
     expect(typeof r.maxProfit).toBe('number');
     expect(typeof r.maxLoss).toBe('number');
+  });
+
+  it('fence: lucro finito e perda classificada como ilimitada (put vendida descoberta)', () => {
+    const r = mk('fence');
+    expect(typeof r.maxProfit).toBe('number');
+    expect(r.maxLoss).toBe('Ilimitado');
+  });
+});
+
+// ── Fence: payoff piecewise-linear nos 4 regimes (slopes [1, 0, 1, 0]) ─────────
+
+describe('fence — payoff piecewise (breakpoints [85, 95, 105])', () => {
+  const d = STRATEGY_DEFS.fence;
+  const S0 = 100;
+  const legs = instantiateLegs(d, defaultStrikes(d, S0)); // [Kp2=85, Kp1=95, Kc=105]
+
+  // Payoff de vencimento relativo (intrínseco + ação, sem o prêmio):
+  // o crédito/débito líquido é uma constante que não afeta a INCLINAÇÃO.
+  const rel = (s: number) =>
+    legs.reduce((acc, l) => acc + legIntrinsic(l, s) * legSign(l) * l.quantity, 0)
+    + d.stockUnits * (s - S0);
+  const slope = (a: number, b: number) => (rel(b) - rel(a)) / (b - a);
+
+  it('S_T < Kp2 (85): inclinação +1 — perda volta a correr', () => {
+    expect(slope(60, 80)).toBeCloseTo(1, 6);
+  });
+  it('Kp2 ≤ S_T < Kp1 (85–95): inclinação 0 — zona protegida', () => {
+    expect(slope(86, 94)).toBeCloseTo(0, 6);
+  });
+  it('Kp1 ≤ S_T < Kc (95–105): inclinação +1 — comporta-se como a ação', () => {
+    expect(slope(96, 104)).toBeCloseTo(1, 6);
+  });
+  it('S_T ≥ Kc (105): inclinação 0 — ganho travado', () => {
+    expect(slope(106, 130)).toBeCloseTo(0, 6);
+  });
+
+  it('métricas do spec: piso protegido = Kp1 − S0 e perda amortizada em 0 = −S0 + (Kp1 − Kp2)', () => {
+    // Valores relativos (sem prêmio). Kp1=95, Kp2=85, S0=100.
+    expect(rel(90)).toBeCloseTo(95 - 100, 6);                 // piso protegido = -5
+    expect(rel(0.0001)).toBeCloseTo(-100 + (95 - 85), 1);    // amortizada = -90
   });
 });
 
