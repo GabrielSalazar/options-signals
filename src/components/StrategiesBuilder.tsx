@@ -291,7 +291,7 @@ export default function StrategiesBuilder() {
               Gráfico de Payoff (P&amp;L)
             </h3>
             <ResponsiveContainer width="100%" height="90%">
-              <LineChart data={chartData} margin={{ top: 10, right: 20, bottom: 5, left: 10 }}>
+              <LineChart data={chartData} margin={{ top: 24, right: 20, bottom: 5, left: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--dw-rule)" opacity={0.6} />
                 <XAxis
                   dataKey="S"
