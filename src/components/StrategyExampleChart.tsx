@@ -74,7 +74,7 @@ function MiniPayoff({ id, s0, strikes }: Props) {
         <span>Strikes: {strikes.map((k) => k.toFixed(2).replace('.', ',')).join(' / ')}</span>
       </div>
       <ResponsiveContainer width="100%" height={170}>
-        <LineChart data={data} margin={{ top: 8, right: 10, bottom: 2, left: -10 }}>
+        <LineChart data={data} margin={{ top: 22, right: 10, bottom: 2, left: -10 }}>
           <defs>
             <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
               <stop offset={0} stopColor={GREEN} />
