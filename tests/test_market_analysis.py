@@ -207,3 +207,39 @@ def test_analysis_hv_positivo():
     data = response.json()
     assert data["hv_20"] > 0, "HV₂₀ deve ser positivo"
     assert data["hv_60"] > 0, "HV₆₀ deve ser positivo"
+
+
+# ---------------------------------------------------------------------------
+# Task 6: Endpoint /market/indicators/{ticker}
+# ---------------------------------------------------------------------------
+
+def _fake_df(n=120, base=40.0):
+    idx = pd.date_range("2024-01-01", periods=n, freq="B")
+    rng = np.random.default_rng(7)
+    close = base * np.cumprod(1 + rng.normal(0.0, 0.012, n))
+    high = close * 1.01; low = close * 0.99; open_ = close * 1.001
+    vol = rng.integers(1_000_000, 5_000_000, n).astype(float)
+    return pd.DataFrame({"Open": open_, "High": high, "Low": low, "Close": close, "Volume": vol}, index=idx)
+
+
+def test_indicators_endpoint_payload(monkeypatch):
+    import backend.api.routers.market as m
+    monkeypatch.setattr(m, "_fetch_historical_with_fallback", lambda t: _fake_df())
+    monkeypatch.setattr(m, "_fetch_chain", lambda t: [])  # sem chain → iv_atm null
+    r = client.get("/market/indicators/PETR4")
+    assert r.status_code == 200
+    data = r.json()
+    for key in ["ticker", "preco_atual", "rsi14", "adx", "atr14", "vwap",
+                "vwap_dist_pct", "expected_move", "faixa_1sigma", "dte_proximo_venc",
+                "iv_atm", "vol_read", "setups", "faixa_52s_min", "faixa_52s_max"]:
+        assert key in data, f"faltando {key}"
+    assert isinstance(data["setups"], list) and len(data["setups"]) == 9
+    assert data["iv_atm"] is None
+    assert data["vol_read"] in ("premio_gordo", "premio_barato", "neutro", "indisponivel")
+
+
+def test_indicators_404_sem_dados(monkeypatch):
+    import backend.api.routers.market as m
+    monkeypatch.setattr(m, "_fetch_historical_with_fallback", lambda t: pd.DataFrame())
+    r = client.get("/market/indicators/XXXX")
+    assert r.status_code == 404

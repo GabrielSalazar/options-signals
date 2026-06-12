@@ -8,7 +8,10 @@ from fastapi import APIRouter, HTTPException
 
 from backend.services.data_providers import fetch_brapi_historical, _fetch_chain
 from backend.domain.options_math import estimar_iv_historica
-from backend.domain.indicators import _rsi_manual, _stoch_manual, _adx_manual
+from backend.domain.indicators import _rsi_manual, _stoch_manual, _adx_manual, calcular_indicadores
+from backend.domain.setups import detectar_setups
+from backend.domain.options_math import mes_vencimento_ideal
+from backend.domain.greeks import implied_volatility
 
 logger = logging.getLogger("b3_api")
 router = APIRouter(prefix="/market", tags=["Market"])
@@ -359,3 +362,144 @@ def get_market_analysis(ticker: str):
         "preco_dcf": preco_dcf,
         "chain": chain_items,
     }
+
+
+@router.get("/indicators/{ticker}")
+def get_market_indicators(ticker: str):
+    """Indicadores técnicos + setups de price action + leitura de vol para a
+    sub-página 'Indicadores e Setup'. Contrato: IndicatorsPayload (ver spec)."""
+    import math
+    import backend.api.routers.market as _self
+
+    df = _self._fetch_historical_with_fallback(ticker)
+    if df is None or df.empty:
+        raise HTTPException(status_code=404, detail=f"Ticker '{ticker}' não encontrado.")
+    if len(df) < 60:
+        raise HTTPException(status_code=422, detail=f"Dados insuficientes para '{ticker}'.")
+
+    ind = calcular_indicadores(df)
+    close = ind["Close"]
+    preco_atual = float(close.iloc[-1])
+
+    def _last(col: str, default: float = 0.0) -> float:
+        if col in ind.columns:
+            v = float(ind[col].iloc[-1])
+            return v if not math.isnan(v) else default
+        return default
+
+    def _sma(series, window):
+        return float(series.rolling(window).mean().iloc[-1]) if len(series) >= window else float(series.mean())
+
+    ma20, ma50 = _sma(close, 20), _sma(close, 50)
+    ma200 = _sma(close, 200) if len(close) >= 200 else _sma(close, len(close))
+
+    hv_20 = _self.estimar_iv_historica(df, janela=20)
+    hv_60 = _self.estimar_iv_historica(df, janela=60)
+    log_ret = np.log(close / close.shift(1)).dropna()
+    sigma_20 = float(log_ret.tail(20).std() * np.sqrt(252)) if len(log_ret) >= 20 else hv_20
+
+    bb_mid = close.rolling(20).mean(); bb_std = close.rolling(20).std()
+    bb_up = bb_mid + 2 * bb_std; bb_lo = bb_mid - 2 * bb_std
+    rng_bb = float((bb_up - bb_lo).iloc[-1])
+    bollinger_pct_b = float((preco_atual - float(bb_lo.iloc[-1])) / rng_bb) if rng_bb > 0 else 0.5
+    z_score_20 = float((preco_atual - ma20) / (sigma_20 + 1e-9)) if sigma_20 > 0 else 0.0
+
+    vwap = _last("vwap", preco_atual)
+    vwap_dist_pct = (preco_atual - vwap) / vwap * 100 if vwap else 0.0
+
+    ult252 = close.tail(252)
+    faixa_min, faixa_max = float(ult252.min()), float(ult252.max())
+
+    # --- Expected move (base HV) e DTE do próximo vencimento ---
+    try:
+        _, _, dte = mes_vencimento_ideal()  # dte em dias úteis
+        if not dte or dte <= 0:
+            dte = 21
+    except Exception:
+        dte = 21
+    em = preco_atual * sigma_20 * math.sqrt(max(dte, 1) / 252)
+    faixa_1sigma = [round(preco_atual - em, 2), round(preco_atual + em, 2)]
+
+    # --- IV ATM via chain (degrada para null) ---
+    iv_atm = None
+    iv_hv_ratio = None
+    vol_read = "indisponivel"
+    try:
+        chain = _self._fetch_chain(ticker)
+        atm = _atm_iv_from_chain(chain, preco_atual, dte)
+        if atm is not None:
+            iv_atm = round(atm, 4)
+            iv_hv_ratio = round(iv_atm / hv_20, 2) if hv_20 > 0 else None
+    except Exception:
+        iv_atm = None
+    if iv_atm is not None and hv_20 > 0:
+        ratio = iv_atm / hv_20
+        vol_read = "premio_gordo" if ratio > 1.2 else "premio_barato" if ratio < 0.9 else "neutro"
+
+    setups = [
+        {"nome": s.nome, "status": s.status, "vies": s.vies, "descricao": s.descricao}
+        for s in detectar_setups(ind)
+    ]
+
+    return {
+        "ticker": ticker.upper(),
+        "preco_atual": round(preco_atual, 2),
+        "hora": pd.Timestamp.now(tz="America/Sao_Paulo").strftime("%H:%M"),
+        "rsi14": _last("rsi", 50.0) if "rsi" in ind.columns else round(_self._rsi_manual(close, 14).iloc[-1], 2),
+        "stoch_k": _last("stoch_k", 50.0),
+        "stoch_d": _last("stoch_d", 50.0),
+        "vol_ratio": round(_last("vol_ratio", 1.0), 2),
+        "ma20": round(ma20, 2), "ma50": round(ma50, 2), "ma200": round(ma200, 2),
+        "adx": round(_last("adx", 0.0), 2),
+        "macd_diff": round(_last("macd_diff", 0.0), 4),
+        "bollinger_pct_b": round(bollinger_pct_b, 4),
+        "z_score_20": round(z_score_20, 4),
+        "atr14": round(_last("atr", 0.0), 4),
+        "vwap": round(vwap, 2),
+        "vwap_dist_pct": round(vwap_dist_pct, 2),
+        "hv_20": round(hv_20, 4), "hv_60": round(hv_60, 4),
+        "sigma_20": round(sigma_20, 4),
+        "expected_move": round(em, 2),
+        "expected_move_pct": round(em / preco_atual * 100, 2),
+        "faixa_1sigma": faixa_1sigma,
+        "dte_proximo_venc": dte,
+        "iv_atm": iv_atm,
+        "iv_hv_ratio": iv_hv_ratio,
+        "vol_read": vol_read,
+        "faixa_52s_min": round(faixa_min, 2),
+        "faixa_52s_max": round(faixa_max, 2),
+        "setups": setups,
+    }
+
+
+def _atm_iv_from_chain(chain: list, spot: float, dte: int):
+    """IV ATM a partir da chain bruta da opcoes.net. Retorna None se não der.
+
+    Estrutura por linha (op[:10]): ticker, _, tipo, _, _, strike, _, _, preco, negocios.
+    A data de vencimento não está nesse slice — sem ela, usamos dte (estimado, dias
+    úteis) e o strike mais próximo do spot. Se a inversão de IV falhar, retorna None.
+    """
+    if not chain:
+        return None
+    melhores = []
+    for op in chain:
+        if len(op) < 10:
+            continue
+        _, _, tipo, _, _, strike, _, _, preco, neg = op[:10]
+        try:
+            strike = float(strike); preco = float(preco)
+        except (TypeError, ValueError):
+            continue
+        if tipo not in ("CALL", "PUT") or preco <= 0.01:
+            continue
+        melhores.append((abs(strike - spot), tipo, strike, preco))
+    if not melhores:
+        return None
+    melhores.sort(key=lambda x: x[0])
+    _, tipo, strike, preco = melhores[0]
+    try:
+        T = max(dte, 1) / 252  # dte em dias úteis → anos
+        iv = implied_volatility(spot, strike, T, preco, tipo.upper())
+        return float(iv) if iv and 0.01 < iv < 4.99 else None
+    except Exception:
+        return None
