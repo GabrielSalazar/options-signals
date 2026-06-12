@@ -94,3 +94,35 @@ def larry_93(df: pd.DataFrame) -> SetupResult:
         return SetupResult(nome, "armado", "baixa",
                            "Duas máximas crescentes em tendência de baixa — repique maduro, aguardando retomada.")
     return SetupResult(nome, "inativo", "neutro", "Sem padrão de continuação 9.3.")
+
+
+def inside_bar(df: pd.DataFrame) -> SetupResult:
+    """Candle atual contido no range do anterior."""
+    nome = "Inside Bar"
+    if len(df) < 2:
+        return SetupResult(nome, "inativo", "neutro", "Dados insuficientes.")
+    dentro = (float(df["High"].iloc[-1]) <= float(df["High"].iloc[-2])
+              and float(df["Low"].iloc[-1]) >= float(df["Low"].iloc[-2]))
+    if dentro:
+        tend = _tendencia_ema9(df)
+        vies = "alta" if tend == "up" else "baixa" if tend == "down" else "neutro"
+        return SetupResult(nome, "ativo", vies,
+                           "Barra interna — compressão de volatilidade; rompimento define a direção.")
+    return SetupResult(nome, "inativo", "neutro", "Sem barra interna no candle atual.")
+
+
+def rompimento(df: pd.DataFrame) -> SetupResult:
+    """Rompimento da resistência/suporte de 20 períodos."""
+    nome = "Rompimento 20"
+    if len(df) < 2 or "resistencia_20" not in df.columns:
+        return SetupResult(nome, "inativo", "neutro", "Dados insuficientes.")
+    close = float(df["Close"].iloc[-1])
+    resist = float(df["resistencia_20"].iloc[-2])
+    sup = float(df["suporte_20"].iloc[-2])
+    if close > resist:
+        return SetupResult(nome, "ativo", "alta",
+                           f"Rompimento da máxima de 20 períodos (R$ {resist:.2f}) — força compradora.")
+    if close < sup:
+        return SetupResult(nome, "ativo", "baixa",
+                           f"Perda do suporte de 20 períodos (R$ {sup:.2f}) — força vendedora.")
+    return SetupResult(nome, "inativo", "neutro", "Preço dentro do range de 20 períodos.")

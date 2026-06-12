@@ -1,6 +1,7 @@
 import pandas as pd
 from backend.domain.setups import SetupResult, _tendencia_ema9, larry_91
 from backend.domain.setups import larry_92, larry_93
+from backend.domain.setups import inside_bar, rompimento
 
 
 def _df(rows):
@@ -67,3 +68,26 @@ class TestLarry93:
         r = larry_93(df)
         assert r.status == "armado"
         assert r.vies == "alta"
+
+
+class TestInsideBar:
+    def test_ativo_quando_candle_dentro_do_anterior(self):
+        df = _df([(10, 14, 8, 12), (11, 13, 9, 10)])
+        df = _with_ema9(df, [10, 11])
+        r = inside_bar(df)
+        assert r.status == "ativo"
+
+    def test_inativo_quando_rompe(self):
+        df = _df([(10, 13, 9, 12), (11, 14, 9, 13)])
+        df = _with_ema9(df, [10, 11])
+        assert inside_bar(df).status == "inativo"
+
+
+class TestRompimento:
+    def test_rompe_resistencia(self):
+        df = _df([(10, 11, 9, 10)] * 3)
+        df["resistencia_20"] = [10.5, 10.5, 10.5]
+        df["suporte_20"] = [8, 8, 8]
+        df.loc[df.index[-1], "Close"] = 11.0  # close > resistencia anterior 10.5
+        r = rompimento(df)
+        assert r.status == "ativo" and r.vies == "alta"
