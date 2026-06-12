@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
+import Link from 'next/link';
 import { Search, TrendingUp, BarChart2 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -135,6 +136,12 @@ export default function AnalyticsPage() {
           <p className="mt-2 text-dw-ink-light text-base">
             Superfície de Volatilidade, GEX (Gamma Exposure) e Painel de Gregas.
           </p>
+          <Link
+            href="/analytics/indicadores"
+            className="inline-flex items-center gap-1.5 mt-3 text-sm font-bold text-dw-blue hover:underline"
+          >
+            Indicadores e Setup →
+          </Link>
         </div>
       </div>
 
