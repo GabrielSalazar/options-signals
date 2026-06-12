@@ -175,3 +175,30 @@ def doji(df: pd.DataFrame) -> SetupResult:
     if rng > 0 and abs(c - o) <= 0.1 * rng:
         return SetupResult(nome, "ativo", "neutro", "Doji — indecisão entre compra e venda.")
     return SetupResult(nome, "inativo", "neutro", "Sem doji no candle atual.")
+
+
+def pullback_media(df: pd.DataFrame) -> SetupResult:
+    """Reentrada a favor da tendência após repique à MME9 ou MME21."""
+    nome = "Pullback MME9/21"
+    if len(df) < 1 or "ema9" not in df.columns or "ema21" not in df.columns:
+        return SetupResult(nome, "inativo", "neutro", "Dados insuficientes.")
+    ema9 = float(df["ema9"].iloc[-1]); ema21 = float(df["ema21"].iloc[-1])
+    high = float(df["High"].iloc[-1]); low = float(df["Low"].iloc[-1]); close = float(df["Close"].iloc[-1])
+    atr = float(df["atr"].iloc[-1]) if "atr" in df.columns else (high - low)
+    tocou9 = low <= ema9 <= high or abs(close - ema9) < 0.5 * atr
+    tocou21 = low <= ema21 <= high or abs(close - ema21) < 0.5 * atr
+    if ema9 > ema21 and (tocou9 or tocou21):
+        return SetupResult(nome, "ativo", "alta", "Pullback à média em tendência de alta — reentrada compradora.")
+    if ema9 < ema21 and (tocou9 or tocou21):
+        return SetupResult(nome, "ativo", "baixa", "Repique à média em tendência de baixa — reentrada vendedora.")
+    return SetupResult(nome, "inativo", "neutro", "Preço longe das médias 9/21.")
+
+
+def detectar_setups(df: pd.DataFrame) -> list[SetupResult]:
+    """Executa todos os detectores na ordem canônica de exibição."""
+    return [
+        larry_91(df), larry_92(df), larry_93(df),
+        inside_bar(df), rompimento(df),
+        engolfo(df), pin_bar(df), doji(df),
+        pullback_media(df),
+    ]

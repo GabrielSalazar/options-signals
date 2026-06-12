@@ -3,6 +3,7 @@ from backend.domain.setups import SetupResult, _tendencia_ema9, larry_91
 from backend.domain.setups import larry_92, larry_93
 from backend.domain.setups import inside_bar, rompimento
 from backend.domain.setups import engolfo, pin_bar, doji
+from backend.domain.setups import pullback_media, detectar_setups
 
 
 def _df(rows):
@@ -113,3 +114,26 @@ class TestCandles:
         df = _df([(10, 11, 9, 10.02)])
         df = _with_ema9(df, [10])
         assert doji(df).status == "ativo"
+
+
+class TestPullbackEDetectar:
+    def test_pullback_em_alta_tocando_ema9(self):
+        df = _df([(10, 11, 9, 10), (11, 12, 10, 11), (11, 12, 10.5, 11)])
+        df["ema9"] = [9, 10, 11]
+        df["ema21"] = [8, 9, 10]      # ema9 > ema21 → tendência de alta
+        df["atr"] = [1.0, 1.0, 1.0]
+        r = pullback_media(df)
+        assert r.status == "ativo" and r.vies == "alta"
+
+    def test_detectar_retorna_todos_os_setups(self):
+        df = _df([(10, 11, 9, 10)] * 5)
+        df["ema9"] = [9, 9.5, 10, 10.5, 11]
+        df["ema21"] = [8, 8.5, 9, 9.5, 10]
+        df["atr"] = [1.0] * 5
+        df["resistencia_20"] = [11] * 5
+        df["suporte_20"] = [8] * 5
+        nomes = [s.nome for s in detectar_setups(df)]
+        assert nomes == [
+            "Larry 9.1", "Larry 9.2", "Larry 9.3", "Inside Bar",
+            "Rompimento 20", "Engolfo", "Pin Bar", "Doji", "Pullback MME9/21",
+        ]
