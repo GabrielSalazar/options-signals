@@ -126,3 +126,52 @@ def rompimento(df: pd.DataFrame) -> SetupResult:
         return SetupResult(nome, "ativo", "baixa",
                            f"Perda do suporte de 20 períodos (R$ {sup:.2f}) — força vendedora.")
     return SetupResult(nome, "inativo", "neutro", "Preço dentro do range de 20 períodos.")
+
+
+def engolfo(df: pd.DataFrame) -> SetupResult:
+    """Padrão de engolfo (engulfing) de alta ou baixa."""
+    nome = "Engolfo"
+    if len(df) < 2:
+        return SetupResult(nome, "inativo", "neutro", "Dados insuficientes.")
+    o1, c1 = float(df["Open"].iloc[-2]), float(df["Close"].iloc[-2])
+    o0, c0 = float(df["Open"].iloc[-1]), float(df["Close"].iloc[-1])
+    bull = c1 < o1 and c0 > o0 and o0 <= c1 and c0 >= o1
+    bear = c1 > o1 and c0 < o0 and o0 >= c1 and c0 <= o1
+    if bull:
+        return SetupResult(nome, "ativo", "alta", "Engolfo de alta — reversão compradora.")
+    if bear:
+        return SetupResult(nome, "ativo", "baixa", "Engolfo de baixa — reversão vendedora.")
+    return SetupResult(nome, "inativo", "neutro", "Sem engolfo no candle atual.")
+
+
+def pin_bar(df: pd.DataFrame) -> SetupResult:
+    """Martelo (sombra inferior longa) ou Shooting Star (sombra superior longa)."""
+    nome = "Pin Bar"
+    if len(df) < 1:
+        return SetupResult(nome, "inativo", "neutro", "Dados insuficientes.")
+    o = float(df["Open"].iloc[-1]); c = float(df["Close"].iloc[-1])
+    h = float(df["High"].iloc[-1]); l = float(df["Low"].iloc[-1])
+    corpo = abs(c - o)
+    rng = h - l
+    if rng <= 0:
+        return SetupResult(nome, "inativo", "neutro", "Candle sem range.")
+    sombra_inf = min(o, c) - l
+    sombra_sup = h - max(o, c)
+    if corpo > 0 and sombra_inf >= 2 * corpo and max(o, c) >= l + 0.66 * rng:
+        return SetupResult(nome, "ativo", "alta", "Martelo — rejeição de preços baixos.")
+    if corpo > 0 and sombra_sup >= 2 * corpo and min(o, c) <= l + 0.34 * rng:
+        return SetupResult(nome, "ativo", "baixa", "Shooting Star — rejeição de preços altos.")
+    return SetupResult(nome, "inativo", "neutro", "Sem pin bar no candle atual.")
+
+
+def doji(df: pd.DataFrame) -> SetupResult:
+    """Doji — corpo desprezível frente ao range (indecisão)."""
+    nome = "Doji"
+    if len(df) < 1:
+        return SetupResult(nome, "inativo", "neutro", "Dados insuficientes.")
+    o = float(df["Open"].iloc[-1]); c = float(df["Close"].iloc[-1])
+    h = float(df["High"].iloc[-1]); l = float(df["Low"].iloc[-1])
+    rng = h - l
+    if rng > 0 and abs(c - o) <= 0.1 * rng:
+        return SetupResult(nome, "ativo", "neutro", "Doji — indecisão entre compra e venda.")
+    return SetupResult(nome, "inativo", "neutro", "Sem doji no candle atual.")

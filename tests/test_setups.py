@@ -2,6 +2,7 @@ import pandas as pd
 from backend.domain.setups import SetupResult, _tendencia_ema9, larry_91
 from backend.domain.setups import larry_92, larry_93
 from backend.domain.setups import inside_bar, rompimento
+from backend.domain.setups import engolfo, pin_bar, doji
 
 
 def _df(rows):
@@ -91,3 +92,24 @@ class TestRompimento:
         df.loc[df.index[-1], "Close"] = 11.0  # close > resistencia anterior 10.5
         r = rompimento(df)
         assert r.status == "ativo" and r.vies == "alta"
+
+
+class TestCandles:
+    def test_engolfo_de_alta(self):
+        # anterior vermelho (open10>close9); atual verde engole (open8<=close9, close12>=open10)
+        df = _df([(10, 10, 9, 9), (8, 13, 8, 12)])
+        df = _with_ema9(df, [10, 9])
+        r = engolfo(df)
+        assert r.status == "ativo" and r.vies == "alta"
+
+    def test_martelo(self):
+        # corpo pequeno no topo, sombra inferior longa
+        df = _df([(10, 10, 8, 9.8)])
+        df = _with_ema9(df, [9])
+        r = pin_bar(df)
+        assert r.status == "ativo" and r.vies == "alta"
+
+    def test_doji(self):
+        df = _df([(10, 11, 9, 10.02)])
+        df = _with_ema9(df, [10])
+        assert doji(df).status == "ativo"
