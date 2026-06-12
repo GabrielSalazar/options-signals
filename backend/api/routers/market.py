@@ -12,6 +12,7 @@ from backend.domain.indicators import _rsi_manual, _stoch_manual, _adx_manual, c
 from backend.domain.setups import detectar_setups
 from backend.domain.options_math import mes_vencimento_ideal
 from backend.domain.greeks import implied_volatility
+from backend.domain.analytics import compute_statistical_indicators
 
 logger = logging.getLogger("b3_api")
 router = APIRouter(prefix="/market", tags=["Market"])
@@ -198,38 +199,19 @@ def get_market_analysis(ticker: str):
     hv_20 = _self.estimar_iv_historica(df, janela=20)
     hv_60 = _self.estimar_iv_historica(df, janela=60)
 
-    # --- Médias móveis simples ---
-    def _sma(series: pd.Series, window: int) -> float:
-        if len(series) >= window:
-            return float(series.rolling(window).mean().iloc[-1])
-        return float(series.mean())
-
-    ma20 = _sma(close, 20)
-    ma50 = _sma(close, 50)
-    ma200 = _sma(close, 200) if len(close) >= 200 else _sma(close, len(close))
-
-    # --- σ₂₀: desvio padrão dos log-retornos × √252 (janela 20 dias) ---
-    log_returns = np.log(close / close.shift(1)).dropna()
-    sigma_20 = float(log_returns.tail(20).std() * np.sqrt(252)) if len(log_returns) >= 20 else hv_20
+    # --- Médias móveis, volatilidade e Bollinger via helper ---
+    stats = compute_statistical_indicators(df)
+    ma20 = stats["ma20"]
+    ma50 = stats["ma50"]
+    ma200 = stats["ma200"]
+    sigma_20 = stats["sigma_20"]
+    bollinger_pct_b = stats["bb_pct_b"]
+    z_score_20 = stats["z_score_20"]
 
     # --- RSI₁₄ ---
     rsi14 = float(_self._rsi_manual(close, period=14).iloc[-1])
     if np.isnan(rsi14):
         rsi14 = 50.0
-
-    # --- Bollinger %B (20 períodos, 2σ) ---
-    bb_mid = close.rolling(20).mean()
-    bb_std = close.rolling(20).std()
-    bb_upper = bb_mid + 2 * bb_std
-    bb_lower = bb_mid - 2 * bb_std
-    bb_range = (bb_upper - bb_lower).iloc[-1]
-    if bb_range and not np.isnan(bb_range) and bb_range > 0:
-        bollinger_pct_b = float((preco_atual - float(bb_lower.iloc[-1])) / bb_range)
-    else:
-        bollinger_pct_b = 0.5
-
-    # --- Z-Score vs MA20 ---
-    z_score_20 = float((preco_atual - ma20) / (sigma_20 + 1e-9)) if sigma_20 > 0 else 0.0
 
     # --- Faixa 52 semanas (252 pregões) ---
     ultimos_252 = close.tail(252)
@@ -387,22 +369,17 @@ def get_market_indicators(ticker: str):
             return v if not math.isnan(v) else default
         return default
 
-    def _sma(series, window):
-        return float(series.rolling(window).mean().iloc[-1]) if len(series) >= window else float(series.mean())
-
-    ma20, ma50 = _sma(close, 20), _sma(close, 50)
-    ma200 = _sma(close, 200) if len(close) >= 200 else _sma(close, len(close))
+    # --- Médias móveis, volatilidade e Bollinger via helper ---
+    stats = compute_statistical_indicators(df)
+    ma20 = stats["ma20"]
+    ma50 = stats["ma50"]
+    ma200 = stats["ma200"]
+    sigma_20 = stats["sigma_20"]
+    bollinger_pct_b = stats["bb_pct_b"]
+    z_score_20 = stats["z_score_20"]
 
     hv_20 = _self.estimar_iv_historica(df, janela=20)
     hv_60 = _self.estimar_iv_historica(df, janela=60)
-    log_ret = np.log(close / close.shift(1)).dropna()
-    sigma_20 = float(log_ret.tail(20).std() * np.sqrt(252)) if len(log_ret) >= 20 else hv_20
-
-    bb_mid = close.rolling(20).mean(); bb_std = close.rolling(20).std()
-    bb_up = bb_mid + 2 * bb_std; bb_lo = bb_mid - 2 * bb_std
-    rng_bb = float((bb_up - bb_lo).iloc[-1])
-    bollinger_pct_b = float((preco_atual - float(bb_lo.iloc[-1])) / rng_bb) if rng_bb > 0 else 0.5
-    z_score_20 = float((preco_atual - ma20) / (sigma_20 + 1e-9)) if sigma_20 > 0 else 0.0
 
     vwap = _last("vwap", preco_atual)
     vwap_dist_pct = (preco_atual - vwap) / vwap * 100 if vwap else 0.0
