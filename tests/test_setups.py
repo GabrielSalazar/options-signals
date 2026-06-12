@@ -1,5 +1,6 @@
 import pandas as pd
 from backend.domain.setups import SetupResult, _tendencia_ema9, larry_91
+from backend.domain.setups import larry_92, larry_93
 
 
 def _df(rows):
@@ -39,3 +40,30 @@ class TestLarry91:
         df = _with_ema9(df, [9, 10, 11])
         r = larry_91(df)
         assert r.status == "inativo"
+
+
+class TestLarry92:
+    def test_armado_em_alta_com_pullback(self):
+        # ema9 up; último candle faz mínima menor que a anterior
+        df = _df([(10, 11, 9, 10), (11, 12, 10, 11), (10, 11, 8, 9)])
+        df = _with_ema9(df, [9, 10, 11])
+        r = larry_92(df)
+        assert r.status == "armado"
+        assert r.vies == "alta"
+
+    def test_disparado_em_alta(self):
+        # anterior foi pullback (low[-2] < low[-3]); atual rompe a máxima anterior
+        df = _df([(10, 12, 10, 11), (10, 11, 8, 9), (9, 13, 9, 12)])
+        df = _with_ema9(df, [9, 10, 11])
+        r = larry_92(df)
+        assert r.status == "ativo"
+        assert r.vies == "alta"
+
+
+class TestLarry93:
+    def test_armado_apos_duas_minimas_decrescentes_em_alta(self):
+        df = _df([(10, 12, 11, 11), (10, 11, 10, 10), (9, 10, 9, 9)])
+        df = _with_ema9(df, [9, 10, 11])
+        r = larry_93(df)
+        assert r.status == "armado"
+        assert r.vies == "alta"

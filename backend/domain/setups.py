@@ -50,3 +50,47 @@ def larry_91(df: pd.DataFrame) -> SetupResult:
         return SetupResult(nome, "ativo", "baixa",
                            "MME9 em baixa e rompimento da mínima anterior — continuação vendedora.")
     return SetupResult(nome, "inativo", "neutro", "Sem rompimento a favor da MME9.")
+
+
+def larry_92(df: pd.DataFrame) -> SetupResult:
+    """Pivô de retorno à média (1 candle de pullback)."""
+    nome = "Larry 9.2"
+    if len(df) < 3:
+        return SetupResult(nome, "inativo", "neutro", "Dados insuficientes.")
+    tend = _tendencia_ema9(df)
+    low = df["Low"]
+    high = df["High"]
+    if tend == "up":
+        disparou = float(low.iloc[-3]) > float(low.iloc[-2]) and float(high.iloc[-1]) > float(high.iloc[-2])
+        if disparou:
+            return SetupResult(nome, "ativo", "alta",
+                               "Rompimento da máxima após pullback — entrada compradora a favor da MME9.")
+        if float(low.iloc[-1]) < float(low.iloc[-2]):
+            return SetupResult(nome, "armado", "alta",
+                               f"Pullback em tendência de alta — aguardando rompimento de R$ {float(high.iloc[-1]):.2f}.")
+    if tend == "down":
+        disparou = float(high.iloc[-3]) < float(high.iloc[-2]) and float(low.iloc[-1]) < float(low.iloc[-2])
+        if disparou:
+            return SetupResult(nome, "ativo", "baixa",
+                               "Rompimento da mínima após repique — entrada vendedora a favor da MME9.")
+        if float(high.iloc[-1]) > float(high.iloc[-2]):
+            return SetupResult(nome, "armado", "baixa",
+                               f"Repique em tendência de baixa — aguardando perda de R$ {float(low.iloc[-1]):.2f}.")
+    return SetupResult(nome, "inativo", "neutro", "Sem pivô de retorno à média.")
+
+
+def larry_93(df: pd.DataFrame) -> SetupResult:
+    """Continuação após duas correções consecutivas contra a tendência."""
+    nome = "Larry 9.3"
+    if len(df) < 3:
+        return SetupResult(nome, "inativo", "neutro", "Dados insuficientes.")
+    tend = _tendencia_ema9(df)
+    low = df["Low"]
+    high = df["High"]
+    if tend == "up" and float(low.iloc[-1]) < float(low.iloc[-2]) < float(low.iloc[-3]):
+        return SetupResult(nome, "armado", "alta",
+                           "Duas mínimas decrescentes em tendência de alta — correção madura, aguardando retomada.")
+    if tend == "down" and float(high.iloc[-1]) > float(high.iloc[-2]) > float(high.iloc[-3]):
+        return SetupResult(nome, "armado", "baixa",
+                           "Duas máximas crescentes em tendência de baixa — repique maduro, aguardando retomada.")
+    return SetupResult(nome, "inativo", "neutro", "Sem padrão de continuação 9.3.")
