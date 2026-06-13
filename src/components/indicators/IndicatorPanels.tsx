@@ -2,7 +2,8 @@
 
 import React from 'react';
 import type { IndicatorsPayload } from '@/lib/types/indicators';
-import { ZoneGauge, StatRow, MaChip } from './Gauges';
+import { ZoneGauge, StatRow } from './Gauges';
+import { MaChip } from '@/components/shared/MaChip';
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--dw-bg-soft)', border: '1px solid var(--dw-rule-soft)',

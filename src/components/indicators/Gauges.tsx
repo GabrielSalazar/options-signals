@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { MaChip } from '@/components/shared/MaChip';
 
 const GREEN = 'var(--dw-green)';
 const RED = 'var(--dw-red)';
@@ -38,20 +39,6 @@ export function StatRow({ label, value, color }: { label: string; value: string;
       <span style={{ color: 'var(--dw-ink-muted)', fontSize: 12 }}>{label}</span>
       <span style={{ fontWeight: 700, color: color ?? 'var(--dw-ink)' }}>{value}</span>
     </div>
-  );
-}
-
-/** Chip colorido para MAs (% acima/abaixo). */
-export function MaChip({ label, pct }: { label: string; pct: number }) {
-  const positive = pct >= 0;
-  return (
-    <span style={{
-      padding: '2px 8px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-      background: positive ? '#FEE2E2' : '#D1FAE5',
-      color: positive ? '#991B1B' : '#065F46',
-    }}>
-      {label} {positive ? '+' : ''}{pct.toFixed(1)}%
-    </span>
   );
 }
 

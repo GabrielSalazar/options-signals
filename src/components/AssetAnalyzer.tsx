@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { scoreAsset } from '@/lib/asset-analysis';
 import type { AssetAnalysisPayload, AssetVerdict } from '@/lib/types/analytics';
+import { MaChip } from '@/components/shared/MaChip';
 
 interface Props {
   payload: AssetAnalysisPayload;
@@ -241,22 +242,6 @@ export function AssetAnalyzer({ payload, onVerdict }: Props) {
   const { preco_atual, ma20, ma50, ma200, faixa_52s_min, faixa_52s_max, rsi14, bollinger_pct_b, z_score_20, macd_diff, stoch_k, stoch_d, adx, preco_graham, preco_dcf } = payload;
   const preco_justo_mas = (ma20 + ma50 + ma200) / 3;
 
-  const maChip = (label: string, ma: number) => {
-    const pct = ((preco_atual - ma) / ma) * 100;
-    const positive = pct >= 0;
-    return (
-      <span
-        key={label}
-        style={{
-          padding: '2px 8px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-          background: positive ? '#FEE2E2' : '#D1FAE5',
-          color: positive ? '#991B1B' : '#065F46',
-        }}
-      >
-        {label} {positive ? '+' : ''}{pct.toFixed(1)}%
-      </span>
-    );
-  };
 
   const sectionStyle: React.CSSProperties = {
     background: 'var(--dw-bg-soft)',
@@ -328,9 +313,9 @@ export function AssetAnalyzer({ payload, onVerdict }: Props) {
           Médias móveis
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {maChip('MA20', ma20)}
-          {maChip('MA50', ma50)}
-          {maChip('MA200', ma200)}
+          <MaChip label="MA20" pct={((preco_atual - ma20) / ma20) * 100} />
+          <MaChip label="MA50" pct={((preco_atual - ma50) / ma50) * 100} />
+          <MaChip label="MA200" pct={((preco_atual - ma200) / ma200) * 100} />
         </div>
       </div>
 
