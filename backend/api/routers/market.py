@@ -7,12 +7,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from fastapi import APIRouter, HTTPException
 
 from backend.services.data_providers import fetch_brapi_historical, _fetch_chain
-from backend.domain.options_math import estimar_iv_historica
+from backend.domain.options_math import estimar_iv_historica, mes_vencimento_ideal
 from backend.domain.indicators import _rsi_manual, _stoch_manual, _adx_manual, calcular_indicadores
 from backend.domain.setups import detectar_setups
-from backend.domain.options_math import mes_vencimento_ideal
 from backend.domain.greeks import implied_volatility
 from backend.domain.analytics import compute_statistical_indicators
+from backend.domain.volatility import compute_log_returns
 
 logger = logging.getLogger("b3_api")
 router = APIRouter(prefix="/market", tags=["Market"])

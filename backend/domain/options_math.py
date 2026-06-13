@@ -5,6 +5,7 @@ import pandas as pd
 from datetime import datetime, timezone
 from scipy.stats import norm
 from backend.core.config import CONFIG
+from backend.domain.volatility import compute_log_returns
 
 MESES_CALL = {"A":1,"B":2,"C":3,"D":4,"E":5,"F":6,"G":7,"H":8,"I":9,"J":10,"K":11,"L":12}
 MESES_PUT  = {"M":1,"N":2,"O":3,"P":4,"Q":5,"R":6,"S":7,"T":8,"U":9,"V":10,"W":11,"X":12}
@@ -97,7 +98,7 @@ def mes_vencimento_ideal() -> tuple:
     return mes, ano, dte
 
 def estimar_iv_historica(df: pd.DataFrame, janela: int = 20, interval: str = "1d") -> float:
-    retornos = np.log(df["Close"] / df["Close"].shift(1)).dropna()
+    retornos = compute_log_returns(df["Close"])
     if len(retornos) < janela:
         return 0.40
     iv_periodo = retornos.tail(janela).std()

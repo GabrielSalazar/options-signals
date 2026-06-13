@@ -1,6 +1,7 @@
 """Shared statistical and analytical computations for market data."""
 import numpy as np
 import pandas as pd
+from backend.domain.volatility import compute_log_returns
 
 
 def compute_statistical_indicators(df: pd.DataFrame) -> dict:
@@ -44,7 +45,7 @@ def compute_statistical_indicators(df: pd.DataFrame) -> dict:
 
     # Log-returns and sigma_20 (annualized volatility)
     # Fallback to 0.4 matches estimar_iv_historica default when < 20 observations
-    log_ret = np.log(close / close.shift(1)).dropna()
+    log_ret = compute_log_returns(close)
     sigma_20 = float(log_ret.tail(20).std() * np.sqrt(252)) if len(log_ret) >= 20 else 0.4
 
     # Bollinger Bands %B (position within bands)
