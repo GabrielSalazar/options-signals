@@ -453,8 +453,14 @@ def _atm_iv_from_chain(chain: list, spot: float, dte: int):
     """IV ATM a partir da chain bruta da opcoes.net. Retorna None se não der.
 
     Estrutura por linha (op[:10]): ticker, _, tipo, _, _, strike, _, _, preco, negocios.
-    A data de vencimento não está nesse slice — sem ela, usamos dte (estimado, dias
-    úteis) e o strike mais próximo do spot. Se a inversão de IV falhar, retorna None.
+
+    LIMITATION: A data de vencimento NÃO está nesse slice — sem ela, usamos dte (estimado
+    em dias úteis) e o strike mais próximo do spot. Se a chain misturar vários vencimentos,
+    o strike escolhido pode pertencer a outro vencimento que não o dte usado na inversão
+    de IV → IV pode estar desviada.
+
+    MITIGATION: Se IV cair fora de 0.01–4.99 (guardrail), retorna None e a leitura de vol
+    degrada para "indisponivel" (HV-only). Isso previne propagação de IVs ruins.
     """
     if not chain:
         return None
@@ -473,10 +479,17 @@ def _atm_iv_from_chain(chain: list, spot: float, dte: int):
     if not melhores:
         return None
     melhores.sort(key=lambda x: x[0])
+    # Find nearest strike to spot
+    # NOTE: chain contains ALL expirations mixed; we have no maturity info for each strike.
+    # If strike is from a different expiration than dte_proximo_venc, IV inversion will be off.
+    # This is mitigated by IV range guard below: out-of-range IV returns None.
     _, tipo, strike, preco = melhores[0]
     try:
         T = max(dte, 1) / 252  # dte em dias úteis → anos
         iv = implied_volatility(spot, strike, T, preco, tipo.upper())
+        # IV range guard (0.01–4.99): prevents unrealistic IVs from propagating
+        # when strike is from a mismatched expiration (see LIMITATION above).
+        # Returns None → vol_read degrades to "indisponivel".
         return float(iv) if iv and 0.01 < iv < 4.99 else None
     except Exception:
         return None
