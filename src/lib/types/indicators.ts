@@ -26,6 +26,7 @@ export interface IndicatorsPayload {
   atr14: number;
   vwap: number;
   vwap_dist_pct: number;
+  vwap_available: boolean;  // true if VWAP was calculated, false if fallback to preco_atual
   hv_20: number; hv_60: number;
   sigma_20: number;
   expected_move: number;

@@ -230,12 +230,13 @@ def test_indicators_endpoint_payload(monkeypatch):
     assert r.status_code == 200
     data = r.json()
     for key in ["ticker", "preco_atual", "rsi14", "adx", "atr14", "vwap",
-                "vwap_dist_pct", "expected_move", "faixa_1sigma", "dte_proximo_venc",
+                "vwap_dist_pct", "vwap_available", "expected_move", "faixa_1sigma", "dte_proximo_venc",
                 "iv_atm", "vol_read", "setups", "faixa_52s_min", "faixa_52s_max"]:
         assert key in data, f"faltando {key}"
     assert isinstance(data["setups"], list) and len(data["setups"]) == 9
     assert data["iv_atm"] is None
     assert data["vol_read"] in ("premio_gordo", "premio_barato", "neutro", "indisponivel")
+    assert isinstance(data["vwap_available"], bool)
 
 
 def test_indicators_404_sem_dados(monkeypatch):

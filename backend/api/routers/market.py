@@ -381,7 +381,11 @@ def get_market_indicators(ticker: str):
     hv_20 = _self.estimar_iv_historica(df, janela=20)
     hv_60 = _self.estimar_iv_historica(df, janela=60)
 
-    vwap = _last("vwap", preco_atual)
+    # VWAP: track availability separately
+    vwap = _last("vwap")  # Returns 0.0 (default) if 'vwap' not in columns
+    vwap_available = "vwap" in ind.columns and not math.isnan(float(ind["vwap"].iloc[-1]))
+    if not vwap_available:
+        vwap = preco_atual  # Fallback for display purposes
     vwap_dist_pct = (preco_atual - vwap) / vwap * 100 if vwap else 0.0
 
     ult252 = close.tail(252)
@@ -434,6 +438,7 @@ def get_market_indicators(ticker: str):
         "atr14": round(_last("atr", 0.0), 4),
         "vwap": round(vwap, 2),
         "vwap_dist_pct": round(vwap_dist_pct, 2),
+        "vwap_available": vwap_available,
         "hv_20": round(hv_20, 4), "hv_60": round(hv_60, 4),
         "sigma_20": round(sigma_20, 4),
         "expected_move": round(em, 2),

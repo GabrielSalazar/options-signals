@@ -52,7 +52,7 @@ export function ReversaoPanel({ p }: { p: IndicatorsPayload }) {
       <ZoneGauge label="Bollinger %B" value={p.bollinger_pct_b * 100} display={`${(p.bollinger_pct_b * 100).toFixed(0)}%`} lowPct={20} highPct={80} />
       <StatRow label="Z-Score vs MA20" value={p.z_score_20.toFixed(2)} color={zColor} />
       <StatRow label="ATR 14" value={`R$ ${p.atr14.toFixed(2)} (${(p.atr14 / p.preco_atual * 100).toFixed(1)}%)`} />
-      <StatRow label="Distância do VWAP" value={`${p.vwap_dist_pct > 0 ? '+' : ''}${p.vwap_dist_pct.toFixed(1)}%`} color={p.vwap_dist_pct >= 0 ? 'var(--dw-green)' : 'var(--dw-red)'} />
+      <StatRow label="Distância do VWAP" value={p.vwap_available ? `${p.vwap_dist_pct > 0 ? '+' : ''}${p.vwap_dist_pct.toFixed(1)}%` : '—'} color={p.vwap_available && p.vwap_dist_pct >= 0 ? 'var(--dw-green)' : p.vwap_available ? 'var(--dw-red)' : undefined} />
     </div>
   );
 }
