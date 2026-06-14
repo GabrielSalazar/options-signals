@@ -88,6 +88,8 @@ def persist_signals(sinais: list[dict]):
             "tipo_sinal":    s["tipo_sinal"],
             "direcao":       s.get("direcao", ""),
             "score":         s["score"],
+            "score_tecnico": s.get("score_tecnico", s.get("score")),
+            "bonus_sessao":  s.get("bonus_sessao", 0),
             "preco_acao":    s.get("preco_acao"),
             "ticker_opcao":  s.get("ticker_opcao", "N/A"),
             "strike_ref":    s.get("strike_ref"),
