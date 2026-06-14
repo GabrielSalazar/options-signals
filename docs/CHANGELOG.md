@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Não lançado]
 
+### Fixed
+- **Look-ahead bias eliminado nos pivots locais (Camada 0.1):** `is_fundo_local`/
+  `is_topo_local` passam a usar janela simétrica confirmada (`pivots_confirmados`,
+  `CONFIG["pivot_ordem"]=1`) e os gatilhos de fundos/topos + zonas de demanda/oferta
+  consomem apenas pivots confirmados (excluindo as últimas `ordem` linhas). O backtest
+  deixa de enxergar o futuro. Backtest de referência (PETR4, 2025-06→2026-06):
+  win-rate PENDENTE (medição não concluída — yfinance retornou zero dados em
+  ambiente de execução; re-executar com BRAPI_TOKEN configurado), 0 sinais
+  (indisponibilidade de dados, não regressão do motor). Guarda permanente em
+  `tests/test_lookahead.py`.
+
 ### Added
 - **Rastreamento de desfecho de sinais** ([backend/domain/outcome.py](../backend/domain/outcome.py),
   [backend/services/outcome_service.py](../backend/services/outcome_service.py)): reprecifica
