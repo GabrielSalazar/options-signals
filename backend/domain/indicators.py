@@ -130,8 +130,9 @@ def calcular_indicadores(df: pd.DataFrame) -> pd.DataFrame:
     df["suporte_20"]      = l.rolling(20).min()
     df["resistencia_20"]  = h.rolling(20).max()
     df["var_pct"]         = c.pct_change()
-    df["is_fundo_local"]  = (l < l.shift(1)) & (l < l.shift(-1))
-    df["is_topo_local"]   = (h > h.shift(1)) & (h > h.shift(-1))
+    is_fundo, is_topo = pivots_confirmados(df, ordem=CONFIG["pivot_ordem"])
+    df["is_fundo_local"] = is_fundo
+    df["is_topo_local"]  = is_topo
     return df
 
 def _stoch_manual(high, low, close, k=14):
