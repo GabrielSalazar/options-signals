@@ -43,6 +43,12 @@ CONFIG = {
     # ── Reentrada ──────────────────────────────────────────────────────────
     "reentrada_min_dias": 3,
 
+    # ── Pivots locais (anti-look-ahead) ────────────────────────────────────
+    "pivot_ordem": 1,   # candles à esquerda E à direita p/ confirmar pivot.
+                        # 1 = preserva o comportamento de produção atual e elimina
+                        # o look-ahead no backtest. ↑ (3–5) = pivots mais robustos
+                        # (calibração da Camada 2/5).
+
     # ── Carregador de tickers (universo líquido) ───────────────────────────
     "min_volume_rs":         5_000_000,   # piso de volume financeiro diário (R$) p/ pré-filtro
     "ticker_top_n":          150,         # nº máx de tickers no universo líquido (None = sem limite)

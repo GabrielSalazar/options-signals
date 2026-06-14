@@ -73,6 +73,11 @@ class TestConfigDefaults:
     def test_dte_range_valid(self):
         assert 0 < CONFIG["dte_minimo"] < CONFIG["dte_maximo"]
 
+    def test_pivot_ordem_existe_e_valido(self):
+        assert "pivot_ordem" in CONFIG
+        assert isinstance(CONFIG["pivot_ordem"], int)
+        assert CONFIG["pivot_ordem"] >= 1
+
 
 class TestAtivosB3:
     """Verifica integridade da lista de ativos."""
