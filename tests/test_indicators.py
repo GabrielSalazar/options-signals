@@ -17,6 +17,7 @@ from backend.domain.indicators import (
     encontrar_zonas_demanda_oferta,
     detectar_canal_linear,
 )
+from backend.domain.indicators import pivots_confirmados, ultimos_pivots_confirmados
 
 
 def _make_ohlcv(n=100, base=100.0, seed=42):
@@ -199,3 +200,33 @@ class TestEncontrarZonas:
         df = _make_ohlcv(5)
         dem, ofe = encontrar_zonas_demanda_oferta(df)
         assert dem is False and ofe is False
+
+
+class TestPivotsConfirmados:
+    """pivots_confirmados: janela simétrica + invariância a dados futuros."""
+
+    def test_detecta_fundo_e_topo_simples(self):
+        low  = [10, 9, 8, 9, 10, 11, 12, 11, 10]
+        high = [11, 10, 9, 10, 11, 12, 13, 12, 11]
+        df = pd.DataFrame({"Low": low, "High": high})
+        is_fundo, is_topo = pivots_confirmados(df, ordem=1)
+        assert bool(is_fundo.iloc[2]) is True
+        assert bool(is_topo.iloc[6]) is True
+
+    def test_ultimas_ordem_linhas_nunca_confirmadas(self):
+        df = pd.DataFrame({"Low": list(range(10, 0, -1)), "High": list(range(11, 1, -1))})
+        is_fundo, is_topo = pivots_confirmados(df, ordem=2)
+        assert bool(is_fundo.iloc[-1]) is False
+        assert bool(is_fundo.iloc[-2]) is False
+
+    def test_invariante_a_dados_futuros(self):
+        rng = np.random.default_rng(7)
+        base = 50 + np.cumsum(rng.normal(0, 1.0, 120))
+        df = pd.DataFrame({"Low": base - 0.5, "High": base + 0.5})
+        ordem = 2
+        t = 90
+        f_trunc, t_trunc = pivots_confirmados(df.iloc[:t + 1], ordem)
+        f_full,  t_full  = pivots_confirmados(df.iloc[:t + 1 + 20], ordem)
+        lim = t - ordem
+        assert f_trunc.iloc[:lim + 1].equals(f_full.iloc[:lim + 1])
+        assert t_trunc.iloc[:lim + 1].equals(t_full.iloc[:lim + 1])

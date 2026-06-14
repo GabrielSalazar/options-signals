@@ -2,6 +2,43 @@ import numpy as np
 import pandas as pd
 from backend.core.config import CONFIG
 
+
+def pivots_confirmados(df: pd.DataFrame, ordem: int = 1) -> tuple[pd.Series, pd.Series]:
+    """Fundos/topos locais por janela simétrica de `ordem` candles de cada lado.
+
+    Um pivot no índice ``i`` só é marcado quando existem ``ordem`` candles à
+    esquerda E à direita (a janela ``rolling(center=True)`` retorna NaN nas
+    bordas). Por isso o valor de ``i`` é invariante à adição de candles após
+    ``i + ordem`` — base do teste anti-look-ahead. A marcação fica na data de
+    OCORRÊNCIA ``i``; o consumo deve ignorar as últimas ``ordem`` linhas do df
+    recebido (ver ``ultimos_pivots_confirmados``).
+    """
+    low, high = df["Low"], df["High"]
+    w = 2 * ordem + 1
+    min_roll = low.rolling(w, center=True).min()
+    max_roll = high.rolling(w, center=True).max()
+    is_fundo = (low == min_roll) & min_roll.notna()
+    is_topo  = (high == max_roll) & max_roll.notna()
+    return is_fundo, is_topo
+
+
+def ultimos_pivots_confirmados(df: pd.DataFrame, ordem: int = 1,
+                               n: int = 3) -> tuple:
+    """Últimos ``n`` valores de fundos (Low) e topos (High) locais CONFIRMADOS.
+
+    Exclui as últimas ``ordem`` linhas do df recebido: na decisão tomada na
+    última linha ``t``, um pivot em índice ``> t - ordem`` exigiria candles
+    futuros. Isso elimina o look-ahead mesmo quando ``is_fundo_local`` foi
+    pré-calculado sobre um df maior (caso do backtest).
+    """
+    if len(df) <= ordem:
+        return [], []
+    base = df.iloc[:len(df) - ordem]
+    fundos = base[base["is_fundo_local"]]["Low"].tail(n).values
+    topos  = base[base["is_topo_local"]]["High"].tail(n).values
+    return fundos, topos
+
+
 try:
     import ta
     TA_AVAILABLE = True
