@@ -290,7 +290,7 @@ def _montar_estrutura_opcao(ticker_base: str, preco: float, tipo_sinal: str,
 def _montar_sinal(ticker_base: str, nome: str, tipo_sinal: str, direcao_label: str,
                   emoji: str, score: int, gatilhos: list, preco: float, ultimo, penult,
                   stoch_k: float, rsi: float, vol_ratio: float, estrutura: dict,
-                  verbose: bool) -> dict | None:
+                  verbose: bool, bonus_sessao: int = 0) -> dict | None:
     """Calcula o score ponderado (shadow) e monta o dict final do sinal.
     Retorna None se o modo 'ponderado' reprovar."""
     try:
@@ -348,6 +348,8 @@ def _montar_sinal(ticker_base: str, nome: str, tipo_sinal: str, direcao_label: s
         "rr_alvo2":     estrutura["rr_alvo2"],
         "rr_final":     estrutura["rr_final"],
         "score":        score,
+        "score_tecnico": score,
+        "bonus_sessao":  bonus_sessao,
         "stoch_k":      stoch_k,
         "rsi":          rsi,
         "vol_ratio":    vol_ratio,
@@ -390,12 +392,10 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
         rsi          = gat["rsi"]
         vol_ratio    = gat["vol_ratio"]
 
-        # ── SCORE DE HORÁRIO integrado ───────────────────────
-        bonus_horario = score_horario()
-        score_alta  += bonus_horario
-        score_baixa += bonus_horario
+        # ── BÔNUS DE SESSÃO (informativo — NÃO entra na decisão de emissão) ──
+        bonus_sessao = score_horario()
 
-        # ── DECISÃO ──────────────────────────────────────────────────────
+        # ── DECISÃO (apenas score técnico/direcional) ─────────────────────
         MIN_SCORE = CONFIG["min_score"]
         if score_alta < MIN_SCORE and score_baixa < MIN_SCORE:
             return None
@@ -423,7 +423,7 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
 
         return _montar_sinal(ticker_base, nome, tipo_sinal, direcao_label, emoji, score,
                              gatilhos, preco, ultimo, penult, stoch_k, rsi, vol_ratio,
-                             estrutura, verbose)
+                             estrutura, verbose, bonus_sessao=bonus_sessao)
 
     except Exception as e:
         if verbose:

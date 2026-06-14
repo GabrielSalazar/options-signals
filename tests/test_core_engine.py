@@ -202,3 +202,25 @@ def test_montar_sinal_monta_dict(monkeypatch):
     assert s["dist_otm_pct"] == 8.0
     assert set(s["greeks"]) == {"delta", "gamma", "theta", "vega", "rho", "prob_profit"}
     assert "score_ponderado" in s and "ponderado_passou" in s
+
+
+def test_bonus_horario_nao_entra_no_threshold(monkeypatch):
+    """Um setup com score técnico < min_score NÃO emite, mesmo com bônus de horário
+    que somado cruzaria o limiar."""
+    _relax_and_mock(monkeypatch)
+    monkeypatch.setattr(core_engine, "score_horario", lambda *a, **k: 3)  # bônus alto
+    monkeypatch.setitem(core_engine.CONFIG, "min_score", 11)  # acima do score técnico do seed 0 (9)
+    df = _make_df(0)
+    s = core_engine.analisar_ativo("TESTE3", "Teste", df_provided=df, indicators_calculated=True)
+    assert s is None  # 9 técnico < 11; o +3 de bônus NÃO deve resgatar
+
+
+def test_sinal_carrega_score_tecnico_e_bonus_sessao(monkeypatch):
+    _relax_and_mock(monkeypatch)
+    monkeypatch.setattr(core_engine, "score_horario", lambda *a, **k: 2)
+    df = _make_df(0)
+    s = core_engine.analisar_ativo("TESTE3", "Teste", df_provided=df, indicators_calculated=True)
+    assert s is not None
+    assert s["score_tecnico"] == 9          # só gatilhos direcionais
+    assert s["bonus_sessao"] == 2           # informativo, fora da decisão
+    assert s["score"] == s["score_tecnico"] # `score` = técnico puro (compat)
