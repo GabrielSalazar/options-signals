@@ -10,7 +10,8 @@ from backend.domain.indicators import (
     calcular_indicadores,
     detectar_divergencia,
     encontrar_zonas_demanda_oferta,
-    detectar_canal_linear
+    detectar_canal_linear,
+    ultimos_pivots_confirmados,
 )
 from backend.domain.options_math import mes_vencimento_ideal, estimar_iv_historica, estimar_premio_otm
 from backend.services.data_providers import get_real_options_from_opcoes_net, fetch_brapi_historical
@@ -113,6 +114,9 @@ def _avaliar_gatilhos(df: pd.DataFrame, ultimo, penult, preco: float,
     vol_ratio    = volume / vol_med if vol_med > 0 else 1.0
     bb_lo        = float(ultimo.get("bb_lower",     0))
 
+    ordem = CONFIG["pivot_ordem"]
+    ultimos_fundos, ultimos_topos = ultimos_pivots_confirmados(df, ordem, n=3)
+
     # ── GATILHOS DE ALTA ─────────────────────────────────────────────
     if (stoch_k < CONFIG["stoch_oversold"] + 10 and stoch_k > stoch_d and stoch_k_prev <= stoch_d_prev):
         sinais_alta.append("📈 Estocástico: cruzamento altista em sobrevenda")
@@ -138,7 +142,6 @@ def _avaliar_gatilhos(df: pd.DataFrame, ultimo, penult, preco: float,
         sinais_alta.append("📈 MACD cruzou zero (momentum altista)")
         score_alta += 2
 
-    ultimos_fundos = df[df["is_fundo_local"]].tail(3)["Low"].values
     if (len(ultimos_fundos) >= 3 and all(ultimos_fundos[i] < ultimos_fundos[i+1] for i in range(2))):
         sinais_alta.append("📈 Fundos ascendentes (reversão)")
         score_alta += 2
@@ -179,7 +182,6 @@ def _avaliar_gatilhos(df: pd.DataFrame, ultimo, penult, preco: float,
         sinais_baixa.append("📉 EMA9 cruzou abaixo EMA21")
         score_baixa += 2
 
-    ultimos_topos = df[df["is_topo_local"]].tail(3)["High"].values
     if (len(ultimos_topos) >= 3 and all(ultimos_topos[i] > ultimos_topos[i+1] for i in range(2))):
         sinais_baixa.append("📉 Topos descendentes (tendência de baixa)")
         score_baixa += 2
