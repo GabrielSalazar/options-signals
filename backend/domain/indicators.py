@@ -178,15 +178,21 @@ def detectar_divergencia(df: pd.DataFrame, janela: int = 5) -> tuple:
     return div_alta, div_baixa
 
 def encontrar_zonas_demanda_oferta(df: pd.DataFrame, lookback: int = 60,
-                                   tolerancia_atr: float = 1.0) -> tuple:
+                                   tolerancia_atr: float = 1.0,
+                                   ordem: int | None = None) -> tuple:
     if len(df) < 10:
         return False, False
+
+    if ordem is None:
+        ordem = CONFIG["pivot_ordem"]
 
     preco  = float(df["Close"].iloc[-1])
     atr    = float(df["atr"].iloc[-1]) if "atr" in df.columns else preco * 0.02
 
-    fundos = df[df["is_fundo_local"]]["Low"].tail(lookback).values
-    topos  = df[df["is_topo_local"]]["High"].tail(lookback).values
+    # Só pivots confirmados (exclui as últimas `ordem` linhas — sem look-ahead).
+    base = df.iloc[:len(df) - ordem] if len(df) > ordem else df.iloc[0:0]
+    fundos = base[base["is_fundo_local"]]["Low"].tail(lookback).values
+    topos  = base[base["is_topo_local"]]["High"].tail(lookback).values
 
     zona_demanda = any(abs(preco - f) <= atr * tolerancia_atr for f in fundos)
     zona_oferta  = any(abs(preco - t) <= atr * tolerancia_atr for t in topos)
