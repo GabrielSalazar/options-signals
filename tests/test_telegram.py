@@ -50,3 +50,16 @@ def test_enviar_telegram_usa_quebras_reais(monkeypatch):
                         "mes_venc": 6, "ano_venc": 2026, "gatilhos": ["g1"]})
     assert "\\n" not in capt["text"]   # sem barra-n literal
     assert "\n" in capt["text"]         # quebras de linha reais
+
+
+def test_save_telegram_config_grava_no_supabase(monkeypatch):
+    import backend.services.telegram_service as tg
+    capturado = {}
+    class _Tbl:
+        def upsert(self, row): capturado.update(row); return self
+        def execute(self): return type("R", (), {})()
+    class _Sb:
+        def table(self, _): return _Tbl()
+    monkeypatch.setattr(tg, "get_supabase", lambda: _Sb())
+    tg.save_telegram_config("tok", "cid")
+    assert capturado.get("token") == "tok" and capturado.get("chat_id") == "cid"

@@ -11,6 +11,7 @@ import logging
 import requests
 
 from backend.core.config import CONFIG
+from backend.services.supabase_client import get_supabase
 
 logger = logging.getLogger("b3_api")
 
@@ -30,6 +31,22 @@ def load_telegram_config():
     if env_chat_id:
         CONFIG["telegram_chat_id"] = env_chat_id
 
+    supabase = get_supabase()
+    if supabase:
+        try:
+            res = (supabase.table("telegram_config")
+                   .select("token, chat_id").eq("id", 1).limit(1).execute())
+            if res.data:
+                row = res.data[0]
+                if row.get("token") and not env_token:
+                    CONFIG["telegram_token"] = row["token"]
+                if row.get("chat_id") and not env_chat_id:
+                    CONFIG["telegram_chat_id"] = row["chat_id"]
+                logger.info("Config Telegram carregada do Supabase")
+                return
+        except Exception as e:
+            logger.warning(f"Falha ao ler telegram_config do Supabase: {e}")
+
     try:
         with open(_TELEGRAM_CONFIG_FILE) as f:
             data = json.load(f)
@@ -45,7 +62,17 @@ def load_telegram_config():
 
 
 def save_telegram_config(token: str, chat_id: str):
-    """Persiste config do Telegram em arquivo JSON."""
+    """Persiste a config do Telegram no Supabase (tabela telegram_config, linha
+    única); cai para arquivo JSON quando o Supabase está indisponível."""
+    supabase = get_supabase()
+    if supabase:
+        try:
+            supabase.table("telegram_config").upsert(
+                {"id": 1, "token": token, "chat_id": chat_id}
+            ).execute()
+            return
+        except Exception as e:
+            logger.warning(f"Falha ao gravar telegram_config no Supabase: {e}")
     try:
         with open(_TELEGRAM_CONFIG_FILE, "w") as f:
             json.dump({"token": token, "chat_id": chat_id}, f)
