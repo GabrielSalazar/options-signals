@@ -42,6 +42,8 @@ CONFIG = {
 
     # ── Reentrada ──────────────────────────────────────────────────────────
     "reentrada_min_dias": 3,
+    "reentrada_mesma_direcao_dias": 3,         # bloqueio de mesma direção (ticker, tipo)
+    "reentrada_direcao_oposta_delta_score": 2, # reversão só se score >= vigente + delta
 
     # ── Pivots locais (anti-look-ahead) ────────────────────────────────────
     "pivot_ordem": 1,   # candles à esquerda E à direita p/ confirmar pivot.

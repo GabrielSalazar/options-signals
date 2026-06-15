@@ -78,6 +78,10 @@ class TestConfigDefaults:
         assert isinstance(CONFIG["pivot_ordem"], int)
         assert CONFIG["pivot_ordem"] >= 1
 
+    def test_reentrada_direcional_knobs(self):
+        assert CONFIG["reentrada_mesma_direcao_dias"] >= 1
+        assert CONFIG["reentrada_direcao_oposta_delta_score"] >= 0
+
 
 class TestAtivosB3:
     """Verifica integridade da lista de ativos."""
