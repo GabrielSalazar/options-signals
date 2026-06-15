@@ -134,6 +134,22 @@ class TestScoreHorario:
         """Formato inválido → score 0."""
         assert score_horario("abc") == 0
 
+    def test_usa_timezone_brt_nao_naive(self, monkeypatch):
+        """score_horario() sem argumento deve avaliar a hora em BRT, não no fuso
+        do servidor. Simulamos um servidor em UTC: 16:30 UTC = 13:30 BRT → bônus 3."""
+        import backend.core.config as cfg
+        from datetime import datetime as real_dt
+        from zoneinfo import ZoneInfo
+
+        class _FakeDateTime(real_dt):
+            @classmethod
+            def now(cls, tz=None):
+                base = real_dt(2026, 6, 15, 16, 30, tzinfo=ZoneInfo("UTC"))
+                return base.astimezone(tz) if tz else base.replace(tzinfo=None)
+
+        monkeypatch.setattr(cfg, "datetime", _FakeDateTime)
+        assert cfg.score_horario() == 3  # 13:30 BRT
+
 
 class TestReentrada:
     """Testes de reentrada de sinais."""

@@ -17,3 +17,4 @@ scipy
 tqdm
 slowapi
 prometheus-client
+tzdata

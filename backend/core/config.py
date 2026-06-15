@@ -1,5 +1,8 @@
 import os
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+_TZ_SP = ZoneInfo("America/Sao_Paulo")
 
 CONFIG = {
     # ── Indicadores ────────────────────────────────────────────────────────
@@ -200,7 +203,7 @@ def is_reentrada_valida(ticker: str, tipo_sinal: str | None = None, score: int =
 
 def score_horario(hora_str: str = None) -> int:
     if hora_str is None:
-        hora_str = datetime.now().strftime("%H:%M")
+        hora_str = datetime.now(_TZ_SP).strftime("%H:%M")
     try:
         h, m = map(int, hora_str.split(":"))
         minutos = h * 60 + m
@@ -212,7 +215,7 @@ def score_horario(hora_str: str = None) -> int:
         return 0
 
 def dentro_horario_pregao(margem_min: int = 30) -> bool:
-    now = datetime.now()
+    now = datetime.now(_TZ_SP)
     abert  = now.replace(hour=10, minute=0,  second=0, microsecond=0)
     fech   = now.replace(hour=16, minute=30, second=0, microsecond=0)
     margem = timedelta(minutes=margem_min)
