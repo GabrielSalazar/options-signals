@@ -14,6 +14,25 @@ All notable changes to this project will be documented in this file.
   ambiente de execução; re-executar com BRAPI_TOKEN configurado), 0 sinais
   (indisponibilidade de dados, não regressão do motor). Guarda permanente em
   `tests/test_lookahead.py`.
+- **Bônus de sessão fora do threshold de emissão (Camada 0.2):** a decisão de emitir
+  passa a usar **apenas** o score técnico/direcional. O bônus de horário deixa de ser
+  somado ao score antes do corte `min_score` e vira campo informativo `bonus_sessao`
+  (priorização, não filtro). Sinais carregam `score_tecnico` + `bonus_sessao`,
+  persistidos no Supabase (migração `002`) e exibidos separados no Telegram.
+- **Cooldown de reentrada por (ticker, direção) (Camada 0.3):** o bloqueio deixa de ser
+  cego à direção. Mesma direção dentro de `reentrada_mesma_direcao_dias` bloqueia; a
+  direção oposta ao sinal vigente só emite se `score >= score_vigente +
+  reentrada_direcao_oposta_delta_score`. `_historico_sinais` passa a guardar tipo+score;
+  `rebuild_historico_sinais` reconstrói a partir do Supabase.
+- **Higiene técnica (Camada 0.4):** `score_horario`/`dentro_horario_pregao` agora avaliam
+  o horário em `America/Sao_Paulo` (antes `datetime.now()` naive, fuso do servidor);
+  `tzdata` adicionado às dependências. A chave de cache de OHLCV inclui `period`
+  (`ohlcv:{ticker}:{interval}:{period}`), evitando contaminação entre janelas. Config do
+  Telegram persiste no Supabase (migração `003`) com fallback ao arquivo JSON.
+
+> **Pendências da Camada 0 (não-bloqueantes):** aplicar as migrações `002`/`003` no
+> Supabase (SQL Editor) e medir o delta de backtest pós-correção de look-ahead quando
+> houver dados de mercado (`BRAPI_TOKEN`).
 
 ### Added
 - **Rastreamento de desfecho de sinais** ([backend/domain/outcome.py](../backend/domain/outcome.py),
