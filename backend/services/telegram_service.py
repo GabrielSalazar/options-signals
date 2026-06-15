@@ -69,7 +69,8 @@ def enviar_telegram(sinal: dict):
         f"*Alvo 1:* R$ {sinal.get('alvo1', 0):.2f} (+{CONFIG.get('alvo1_pct', 0.25)*100:.0f}%) | R/R: {sinal.get('rr_alvo1', 0):.1f}×\n"
         f"*Alvo 2:* R$ {sinal.get('alvo2', 0):.2f} (+{CONFIG.get('alvo2_pct', 0.5)*100:.0f}%) | R/R: {sinal.get('rr_alvo2', 0):.1f}×\n"
         f"*Stop:* R$ {sinal.get('stop', 0):.2f} ({CONFIG.get('stop_pct', 0.5)*100:.0f}%)\n\n"
-        f"*Score:* {sinal.get('score')}/10\n"
+        f"*Score técnico:* {sinal.get('score_tecnico', sinal.get('score'))} (mín. {CONFIG.get('min_score', 5)})\n"
+        f"*Bônus sessão:* +{sinal.get('bonus_sessao', 0)} (prioridade, não entra no corte)\n"
         f"*Gatilhos:*\n• " + "\n• ".join(sinal.get("gatilhos", []))
     )
 
