@@ -150,10 +150,24 @@ class TestReentrada:
         assert is_reentrada_valida("VALE3") is False
 
     def test_old_entry_valid(self):
-        _historico_sinais["ITUB4"] = [
-            datetime.now() - timedelta(days=CONFIG["reentrada_min_dias"] + 1)
-        ]
-        assert is_reentrada_valida("ITUB4") is True
+        from backend.core.config import _historico_sinais
+        _historico_sinais["ITUB4"] = [{
+            "ts": datetime.now() - timedelta(days=CONFIG["reentrada_mesma_direcao_dias"] + 1),
+            "tipo": "CALL", "score": 8,
+        }]
+        assert is_reentrada_valida("ITUB4", "CALL", 8) is True
+
+    def test_mesma_direcao_recente_bloqueia(self):
+        registrar_sinal("PETR4", "CALL", 9)
+        assert is_reentrada_valida("PETR4", "CALL", 12) is False
+
+    def test_direcao_oposta_fraca_bloqueia(self):
+        registrar_sinal("PETR4", "CALL", 11)
+        assert is_reentrada_valida("PETR4", "PUT", 12) is False
+
+    def test_direcao_oposta_forte_emite(self):
+        registrar_sinal("PETR4", "CALL", 11)
+        assert is_reentrada_valida("PETR4", "PUT", 13) is True
 
     def test_different_tickers_independent(self):
         registrar_sinal("PETR4")

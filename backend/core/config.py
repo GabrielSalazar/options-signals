@@ -166,16 +166,37 @@ def validar_config(cfg: dict = None) -> None:
 validar_config()
 
 
+# _historico_sinais: ticker -> [{"ts": datetime, "tipo": str|None, "score": int}]
 _historico_sinais = {}
 
-def registrar_sinal(ticker: str):
-    _historico_sinais.setdefault(ticker, []).append(datetime.now())
+def registrar_sinal(ticker: str, tipo_sinal: str | None = None, score: int = 0):
+    _historico_sinais.setdefault(ticker, []).append(
+        {"ts": datetime.now(), "tipo": tipo_sinal, "score": int(score)}
+    )
 
-def is_reentrada_valida(ticker: str) -> bool:
-    if ticker not in _historico_sinais:
+def is_reentrada_valida(ticker: str, tipo_sinal: str | None = None, score: int = 0) -> bool:
+    """Cooldown por (ticker, direção):
+    - mesma direção dentro de `reentrada_mesma_direcao_dias` → bloqueia;
+    - direção oposta vigente → só emite se score >= score_vigente + delta.
+    """
+    registros = _historico_sinais.get(ticker)
+    if not registros:
         return True
-    ultima = _historico_sinais[ticker][-1]
-    return (datetime.now() - ultima).days >= CONFIG["reentrada_min_dias"]
+    agora = datetime.now()
+    dias = CONFIG["reentrada_mesma_direcao_dias"]
+    delta = CONFIG["reentrada_direcao_oposta_delta_score"]
+
+    mesmos = [r for r in registros if r.get("tipo") == tipo_sinal]
+    if mesmos and (agora - mesmos[-1]["ts"]).days < dias:
+        return False
+
+    opostos = [r for r in registros
+               if r.get("tipo") is not None and r.get("tipo") != tipo_sinal]
+    if opostos and (agora - opostos[-1]["ts"]).days < dias:
+        if score < opostos[-1].get("score", 0) + delta:
+            return False
+
+    return True
 
 def score_horario(hora_str: str = None) -> int:
     if hora_str is None:
