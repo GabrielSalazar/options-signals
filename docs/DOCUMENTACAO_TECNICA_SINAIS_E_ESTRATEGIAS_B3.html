@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Documentação Técnica — Sinais e Estratégias B3</title>
+<style>
+  :root{
+    --ink:#1a2433; --ink-mid:#3f4c5e; --muted:#6b7787; --rule:#dce3ec;
+    --blue:#1f5fbf; --blue-soft:#eaf1fb; --green:#137a4b; --green-soft:#e7f5ee;
+    --red:#b3261e; --red-soft:#fbecea; --amber:#9a6700; --amber-soft:#fdf3e0;
+    --bg-soft:#f6f8fb; --code-bg:#f3f5f9;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body{
+    font-family:"Segoe UI",-apple-system,Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink); font-size:10.5pt; line-height:1.5; margin:0;
+  }
+  @page{ size:A4; margin:18mm 16mm 16mm 16mm; }
+
+  h1,h2,h3,h4{ color:var(--ink); line-height:1.25; font-weight:700; }
+  h2{ font-size:17pt; margin:0 0 4px; padding-bottom:6px; border-bottom:2px solid var(--blue); }
+  h3{ font-size:12.5pt; margin:18px 0 6px; color:var(--blue); }
+  h4{ font-size:11pt; margin:14px 0 4px; color:var(--ink-mid); }
+  p{ margin:7px 0; }
+  small{ color:var(--muted); }
+  code{ font-family:"Cascadia Code","Consolas",monospace; font-size:9.2pt;
+        background:var(--code-bg); padding:1px 4px; border-radius:3px; color:#22364d; }
+  ul,ol{ margin:6px 0 6px 0; padding-left:20px; }
+  li{ margin:3px 0; }
+
+  .section{ page-break-before:always; padding-top:2px; }
+  .lead{ color:var(--ink-mid); }
+  .kicker{ text-transform:uppercase; letter-spacing:.14em; font-size:8pt; color:var(--blue); font-weight:700; }
+
+  table{ width:100%; border-collapse:collapse; margin:10px 0; font-size:9.3pt; }
+  th,td{ border:1px solid var(--rule); padding:5px 8px; text-align:left; vertical-align:top; }
+  th{ background:var(--blue-soft); color:var(--ink); font-weight:700; }
+  tbody tr:nth-child(even){ background:var(--bg-soft); }
+  table, tr, td, th{ page-break-inside:avoid; }
+  .num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .mono{ font-family:"Cascadia Code","Consolas",monospace; }
+
+  .formula{ background:var(--code-bg); border-left:3px solid var(--blue);
+            padding:8px 12px; margin:8px 0; font-family:"Cascadia Code","Consolas",monospace;
+            font-size:9.4pt; border-radius:0 4px 4px 0; page-break-inside:avoid; }
+  .callout{ border:1px solid var(--rule); border-left:4px solid var(--amber);
+            background:var(--amber-soft); padding:8px 12px; border-radius:0 4px 4px 0;
+            margin:10px 0; font-size:9.5pt; page-break-inside:avoid; }
+  .callout.info{ border-left-color:var(--blue); background:var(--blue-soft); }
+  .callout.ok{ border-left-color:var(--green); background:var(--green-soft); }
+
+  .pill{ display:inline-block; font-size:8pt; font-weight:700; padding:1px 7px;
+         border-radius:10px; }
+  .pill.green{ background:var(--green-soft); color:var(--green); }
+  .pill.red{ background:var(--red-soft); color:var(--red); }
+  .pill.blue{ background:var(--blue-soft); color:var(--blue); }
+  .pill.amber{ background:var(--amber-soft); color:var(--amber); }
+
+  /* Cover */
+  .cover{ height:255mm; display:flex; flex-direction:column; justify-content:center;
+          page-break-after:always; }
+  .cover .band{ border-top:4px solid var(--blue); border-bottom:1px solid var(--rule); padding:26px 0; }
+  .cover h1{ font-size:30pt; margin:0 0 6px; letter-spacing:-.5px; }
+  .cover .sub{ font-size:14pt; color:var(--ink-mid); margin:0; }
+  .cover .meta{ margin-top:40px; font-size:10pt; color:var(--muted); }
+  .cover .meta b{ color:var(--ink-mid); }
+  .cover .chips span{ display:inline-block; margin:3px 6px 3px 0; padding:3px 10px;
+        border:1px solid var(--rule); border-radius:14px; font-size:8.5pt; color:var(--ink-mid); background:var(--bg-soft); }
+
+  /* TOC */
+  .toc{ page-break-after:always; }
+  .toc ol{ list-style:none; padding:0; counter-reset:toc; }
+  .toc > ol > li{ counter-increment:toc; margin:7px 0; font-weight:600; }
+  .toc > ol > li::before{ content:counter(toc) ".  "; color:var(--blue); font-weight:700; }
+  .toc small{ display:block; font-weight:400; color:var(--muted); margin-left:18px; }
+
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .foot{ margin-top:26px; padding-top:8px; border-top:1px solid var(--rule); color:var(--muted); font-size:8.5pt; }
+</style>
+</head>
+<body>
+
+<!-- ════════════════ CAPA ════════════════ -->
+<div class="cover">
+  <div class="band">
+    <div class="kicker">Scanner de Opções B3 · v4.2</div>
+    <h1>Documentação Técnica</h1>
+    <p class="sub">Gatilhos, Alerta de Sinais, Indicadores e Estratégias de Opções</p>
+  </div>
+  <div class="meta">
+    <p>Este documento descreve, detalhe por detalhe, como o sistema gera sinais de
+    compra de CALL/PUT a partir de indicadores técnicos, como pontua e filtra cada
+    oportunidade, como dispara os alertas e quais estratégias de opções estão
+    disponíveis no simulador.</p>
+    <div class="chips">
+      <span>FastAPI · Python</span><span>Next.js · TypeScript</span>
+      <span>Supabase · Redis</span><span>Black-Scholes · Greeks</span>
+      <span>APScheduler · SSE · Telegram</span>
+    </div>
+    <p style="margin-top:26px;"><b>Versão:</b> 4.2.0 &nbsp;·&nbsp; <b>Data:</b> 03/06/2026
+    &nbsp;·&nbsp; <b>Base:</b> branch <span class="mono">main</span></p>
+    <p><b>Fonte de verdade:</b> código em <span class="mono">backend/</span> e
+    <span class="mono">src/</span>. Os valores numéricos citados refletem
+    <span class="mono">backend/core/config.py</span>.</p>
+  </div>
+</div>
+
+<!-- ════════════════ SUMÁRIO ════════════════ -->
+<div class="toc">
+  <h2>Sumário</h2>
+  <ol>
+    <li>Visão geral e arquitetura do pipeline<small>Da requisição ao sinal persistido — as 8 etapas</small></li>
+    <li>Indicadores técnicos utilizados<small>Estocástico, RSI, EMA, MACD, Bollinger, ATR, ADX, Williams %R, CCI, Keltner, VWAP</small></li>
+    <li>Geração de sinais — modo clássico<small>11 gatilhos de alta, 9 de baixa, bônus de horário e regra de decisão</small></li>
+    <li>Score ponderado 0–100<small>Os 12 componentes calibrados e o limiar de aprovação</small></li>
+    <li>Montagem do sinal<small>Strike OTM, vencimento/DTE, IV, prêmio, dados reais, Greeks, entradas/alvos/stop</small></li>
+    <li>Greeks e Black-Scholes<small>Delta, Gamma, Theta, Vega, Rho, POP e IV por Newton-Raphson</small></li>
+    <li>Disparo e alerta dos sinais<small>Scan agendado, scheduler, persistência, SSE e Telegram</small></li>
+    <li>Estratégias de opções<small>As 17 estruturas do simulador, por categoria e perfil</small></li>
+    <li>Parâmetros de configuração (CONFIG)<small>Referência completa dos valores calibrados</small></li>
+    <li>Universo de ativos e mapa de arquivos<small>Onde cada peça vive no código</small></li>
+  </ol>
+</div>
+
+<!-- ════════════════ 1. VISÃO GERAL ════════════════ -->
+<div class="section">
+  <h2>1 · Visão geral e arquitetura do pipeline</h2>
+  <p class="lead">O sistema analisa cada ativo de uma watchlist e decide se há uma
+  oportunidade de comprar uma opção <b>CALL</b> (aposta de alta) ou <b>PUT</b> (aposta de baixa).
+  O coração é a função <code>analisar_ativo()</code> em
+  <span class="mono">backend/services/core_engine.py</span>, que executa o pipeline abaixo.</p>
+
+  <h3>As 8 etapas, da entrada ao sinal</h3>
+  <table>
+    <thead><tr><th style="width:34px">#</th><th>Etapa</th><th>O que acontece</th><th>Onde</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td><b>Reentrada</b></td><td>Se o ticker já gerou sinal nos últimos <b>3 dias</b>, é pulado (evita repetição).</td><td class="mono">config.is_reentrada_valida</td></tr>
+      <tr><td class="num">2</td><td><b>Coleta de dados</b></td><td>Baixa 6 meses de OHLCV via <b>yfinance</b> (cache Redis 5 min, 3 tentativas com backoff). Fallback para <b>brapi</b>.</td><td class="mono">core_engine + cache</td></tr>
+      <tr><td class="num">3</td><td><b>Indicadores</b></td><td>Calcula ~20 indicadores técnicos sobre a série.</td><td class="mono">domain/indicators.py</td></tr>
+      <tr><td class="num">4</td><td><b>Motor de gatilhos</b></td><td>Avalia 11 gatilhos de alta e 9 de baixa; soma pontos em <code>score_alta</code> / <code>score_baixa</code>.</td><td class="mono">core_engine.py</td></tr>
+      <tr><td class="num">5</td><td><b>Decisão</b></td><td>Se nenhum lado atinge o <b>score mínimo (5)</b>, descarta. Senão escolhe CALL ou PUT pelo maior score.</td><td class="mono">core_engine.py</td></tr>
+      <tr><td class="num">6</td><td><b>Montagem</b></td><td>Define strike OTM, vencimento/DTE, IV, prêmio estimado e integra o preço real de tela (opcoes.net).</td><td class="mono">domain/options_math.py</td></tr>
+      <tr><td class="num">7</td><td><b>Greeks &amp; filtros</b></td><td>Calcula os Greeks; rejeita se <code>|Δ|</code> fora de 0,15–0,45 ou se R/R do Alvo 1 &lt; 0,8.</td><td class="mono">domain/greeks.py</td></tr>
+      <tr><td class="num">8</td><td><b>Saída</b></td><td>Retorna o dicionário do sinal (preço, strike, alvos, stop, Greeks, score). Registra reentrada e calcula o score ponderado (shadow).</td><td class="mono">core_engine.py</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout info">
+    <b>Dois motores de score em paralelo.</b> O <b>clássico</b> (aditivo, 0–~23 pts) é quem
+    <b>decide</b> por padrão (<code>scoring_mode = "classico"</code>). O <b>ponderado</b> (0–100)
+    roda em <i>shadow mode</i> e é persistido junto, mas só passa a decidir quando
+    <code>scoring_mode = "ponderado"</code>.
+  </div>
+</div>
+
+<!-- ════════════════ 2. INDICADORES ════════════════ -->
+<div class="section">
+  <h2>2 · Indicadores técnicos utilizados</h2>
+  <p class="lead">Todos calculados em <code>calcular_indicadores()</code>
+  (<span class="mono">backend/domain/indicators.py</span>). Quando a biblioteca <code>ta</code>
+  está disponível ela é usada; caso contrário há implementações manuais equivalentes
+  (RSI, ATR, ADX, Estocástico, CCI etc.).</p>
+
+  <table>
+    <thead><tr><th>Indicador</th><th>Parâmetro</th><th>Para que serve no sistema</th></tr></thead>
+    <tbody>
+      <tr><td><b>Estocástico</b> (K, D)</td><td class="mono">K=14, D=3</td><td>Sobrecompra/sobrevenda e cruzamentos K×D — gatilho de reversão.</td></tr>
+      <tr><td><b>RSI</b></td><td class="mono">14</td><td>Força relativa; sobrevenda &lt;35 (alta) / sobrecompra &gt;65 (baixa) e divergências.</td></tr>
+      <tr><td><b>EMA rápida / lenta</b></td><td class="mono">9 / 21</td><td>Cruzamento de médias = mudança de tendência de curto prazo.</td></tr>
+      <tr><td><b>EMA longa</b></td><td class="mono">200</td><td>Contexto de tendência primária (usada no score ponderado: <code>trend_up/down</code>).</td></tr>
+      <tr><td><b>MACD</b> (diff)</td><td class="mono">12/26/9</td><td>Momentum; cruzamento da linha zero (histograma) confirma direção.</td></tr>
+      <tr><td><b>Bollinger Bands</b></td><td class="mono">20, 2σ</td><td>Extremos de preço; <code>bb_pct</code> e <code>bb_width</code> (largura) para squeeze.</td></tr>
+      <tr><td><b>ATR</b></td><td class="mono">14</td><td>Volatilidade absoluta — tolerância para suporte/resistência e zonas.</td></tr>
+      <tr><td><b>ADX</b></td><td class="mono">14</td><td>Força da tendência (≥25 = tendência relevante) — usado no ponderado.</td></tr>
+      <tr><td><b>Williams %R</b></td><td class="mono">14</td><td>Oscilador complementar de sobrecompra/sobrevenda.</td></tr>
+      <tr><td><b>CCI</b></td><td class="mono">20</td><td>Desvio do preço típico em relação à média — extremos cíclicos.</td></tr>
+      <tr><td><b>Keltner Channels</b></td><td class="mono">20 / ATR 14</td><td>Combinado com Bollinger detecta <b>Volatility Squeeze</b> (ponderado).</td></tr>
+      <tr><td><b>VWAP</b></td><td class="mono">20</td><td>Preço médio ponderado por volume — viés comprador/vendedor (ponderado).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Derivados de estrutura de preço</h3>
+  <p>Além dos osciladores, o motor computa elementos de <i>price action</i> usados pelos gatilhos:</p>
+  <ul>
+    <li><code>suporte_20</code> / <code>resistencia_20</code> — mínima/máxima dos últimos 20 períodos.</li>
+    <li><code>is_fundo_local</code> / <code>is_topo_local</code> — pivôs locais (vale/topo) para detectar <b>fundos ascendentes</b> e <b>topos descendentes</b>.</li>
+    <li><b>Divergências</b> (<code>detectar_divergencia</code>) — preço e RSI andando em sentidos opostos numa janela de 5 barras.</li>
+    <li><b>Zonas de demanda/oferta</b> (<code>encontrar_zonas_demanda_oferta</code>) — proximidade (≤ 1×ATR) de fundos/topos históricos (lookback 60).</li>
+    <li><b>Canal linear</b> (<code>detectar_canal_linear</code>) — regressão (<code>polyfit</code>) sobre topos e fundos das últimas 20 barras; inclinação (slope) define canal de alta/baixa.</li>
+  </ul>
+</div>
+
+<!-- ════════════════ 3. GATILHOS CLÁSSICOS ════════════════ -->
+<div class="section">
+  <h2>3 · Geração de sinais — modo clássico</h2>
+  <p class="lead">O motor clássico é <b>aditivo</b>: cada condição verdadeira soma pontos.
+  São <b>11 gatilhos de alta</b> (pontuam para CALL) e <b>9 de baixa</b> (pontuam para PUT).
+  O peso de cada um reflete sua confiabilidade histórica.</p>
+
+  <h3>3.1 · Pré-condição de liquidez</h3>
+  <p>Antes de qualquer gatilho, o ativo precisa ter volume médio de 20 dias
+  <code>≥ 1.000.000</code> (<code>min_volume_diario</code>). Sem isso, o ativo é descartado.</p>
+
+  <h3>3.2 · Gatilhos de ALTA → CALL <span class="pill green">11 critérios</span></h3>
+  <table>
+    <thead><tr><th>#</th><th>Gatilho</th><th>Condição (resumida)</th><th class="num">Pts</th></tr></thead>
+    <tbody>
+      <tr><td>G1</td><td>Estocástico em sobrevenda</td><td>K &lt; 35, K &gt; D e cruzou para cima (K<sub>−1</sub> ≤ D<sub>−1</sub>)</td><td class="num">+3</td></tr>
+      <tr><td>G2</td><td>RSI sobrevendido</td><td>RSI &lt; 35</td><td class="num">+2</td></tr>
+      <tr><td>G3</td><td>Preço em suporte</td><td>Preço ≤ suporte<sub>20</sub> + ATR</td><td class="num">+2</td></tr>
+      <tr><td>G4</td><td>Cruzamento de EMAs</td><td>EMA9 cruza acima da EMA21</td><td class="num">+2</td></tr>
+      <tr><td>G5</td><td>Volume elevado</td><td>Volume ≥ 1,5× a média</td><td class="num">+1</td></tr>
+      <tr><td>G6</td><td>MACD vira positivo</td><td>Histograma cruza o zero para cima</td><td class="num">+2</td></tr>
+      <tr><td>G7</td><td>Fundos ascendentes</td><td>3 fundos locais consecutivos crescentes</td><td class="num">+2</td></tr>
+      <tr><td>G8</td><td>Bollinger inferior</td><td>Preço ≤ banda inferior × 1,01</td><td class="num">+1</td></tr>
+      <tr><td>G9</td><td>Divergência altista</td><td>Preço cai mas RSI sobe (janela 5)</td><td class="num">+3</td></tr>
+      <tr><td>G10</td><td>Zona de demanda</td><td>Preço a ≤ 1×ATR de um fundo histórico</td><td class="num">+3</td></tr>
+      <tr><td>G11</td><td>Canal altista</td><td>Inclinação de topos e fundos &gt; 0</td><td class="num">+2</td></tr>
+    </tbody>
+    <tfoot><tr><th colspan="3" style="text-align:right">Máximo teórico (sem horário)</th><th class="num">23</th></tr></tfoot>
+  </table>
+
+  <h3>3.3 · Gatilhos de BAIXA → PUT <span class="pill red">9 critérios</span></h3>
+  <table>
+    <thead><tr><th>#</th><th>Gatilho</th><th>Condição (resumida)</th><th class="num">Pts</th></tr></thead>
+    <tbody>
+      <tr><td>B1</td><td>Estocástico em sobrecompra</td><td>K &gt; 65, K &lt; D e cruzou para baixo</td><td class="num">+3</td></tr>
+      <tr><td>B2</td><td>RSI sobrecomprado</td><td>RSI &gt; 65</td><td class="num">+2</td></tr>
+      <tr><td>B3</td><td>Preço em resistência</td><td>Preço ≥ resistência<sub>20</sub> − ATR</td><td class="num">+2</td></tr>
+      <tr><td>B4</td><td>Cruzamento de EMAs</td><td>EMA9 cruza abaixo da EMA21</td><td class="num">+2</td></tr>
+      <tr><td>B5</td><td>Topos descendentes</td><td>3 topos locais consecutivos decrescentes</td><td class="num">+2</td></tr>
+      <tr><td>B6</td><td>MACD vira negativo</td><td>Histograma cruza o zero para baixo</td><td class="num">+2</td></tr>
+      <tr><td>B7</td><td>Divergência baixista</td><td>Preço sobe mas RSI cai (janela 5)</td><td class="num">+3</td></tr>
+      <tr><td>B8</td><td>Zona de oferta</td><td>Preço a ≤ 1×ATR de um topo histórico</td><td class="num">+3</td></tr>
+      <tr><td>B9</td><td>Canal baixista</td><td>Inclinação de topos e fundos &lt; 0</td><td class="num">+2</td></tr>
+    </tbody>
+    <tfoot><tr><th colspan="3" style="text-align:right">Máximo teórico (sem horário)</th><th class="num">21</th></tr></tfoot>
+  </table>
+
+  <h3>3.4 · Bônus de horário</h3>
+  <p>Adicionado aos <b>dois</b> lados (<code>score_horario()</code> em
+  <span class="mono">config.py</span>), premia janelas de maior liquidez do pregão:</p>
+  <table>
+    <thead><tr><th>Janela (horário de Brasília)</th><th class="num">Bônus</th></tr></thead>
+    <tbody>
+      <tr><td>13:00 – 15:00 (núcleo de liquidez)</td><td class="num">+3</td></tr>
+      <tr><td>10:00 – 11:30 (abertura)</td><td class="num">+2</td></tr>
+      <tr><td>15:00 – 16:30 (fechamento)</td><td class="num">+1</td></tr>
+      <tr><td>Demais horários</td><td class="num">0</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3.5 · Regra de decisão</h3>
+  <div class="formula">
+    se max(score_alta, score_baixa) &lt; <b>min_score (5)</b> → <b>sem sinal</b><br>
+    senão: tipo = <b>CALL</b> se score_alta ≥ score_baixa, caso contrário <b>PUT</b>
+  </div>
+  <p>O <code>score</code> reportado no sinal é o do lado vencedor, e os <code>gatilhos</code>
+  listados são exatamente as condições que dispararam aquele lado.</p>
+</div>
+
+<!-- ════════════════ 4. SCORE PONDERADO ════════════════ -->
+<div class="section">
+  <h2>4 · Score ponderado 0–100</h2>
+  <p class="lead">Modelo alternativo (<span class="mono">backend/domain/scoring.py</span>),
+  calibrado sobre 31 sinais reais. Atribui pesos por importância e produz um número
+  de 0 a 100, mais um conjunto de "razões" legíveis. Aprovado quando
+  <code>score ≥ min_score_ponderado (60)</code>.</p>
+
+  <table>
+    <thead><tr><th>#</th><th>Componente</th><th>Regra (resumida)</th><th class="num">Peso máx.</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Preço da opção na faixa</td><td>R$ 0,10 ≤ prêmio ≤ R$ 3,00</td><td class="num">12</td></tr>
+      <tr><td>2</td><td>DTE ideal</td><td>10 ≤ DTE ≤ 60 dias</td><td class="num">8</td></tr>
+      <tr><td>3</td><td>Delta OTM ideal</td><td>0,15 ≤ |Δ| ≤ 0,45 (parcial fora)</td><td class="num">10</td></tr>
+      <tr><td>4</td><td>Tendência</td><td>0/8/16/20 conforme alinhamento com EMA9/21/200</td><td class="num">20</td></tr>
+      <tr><td>5</td><td>MACD</td><td>Cruzamento (18) &gt; a favor e acelerando (12) &gt; a favor (7)</td><td class="num">18</td></tr>
+      <tr><td>6</td><td>RSI na zona da direção</td><td>Faixas específicas por CALL/PUT</td><td class="num">14</td></tr>
+      <tr><td>7</td><td>Estocástico</td><td>Sobrevenda/sobrecompra ou cruzamento a favor</td><td class="num">9</td></tr>
+      <tr><td>8</td><td>ADX forte</td><td>ADX ≥ 25</td><td class="num">5</td></tr>
+      <tr><td>9</td><td>Volume relativo</td><td>≥ 1,5× (8) ou ≥ 1,0× (4)</td><td class="num">8</td></tr>
+      <tr><td>10</td><td>Bônus Bollinger</td><td>Perto da banda a favor da direção</td><td class="num">4</td></tr>
+      <tr><td>11</td><td>Bônus VWAP</td><td>Preço do lado certo do VWAP</td><td class="num">5</td></tr>
+      <tr><td>12</td><td>Bônus Volatility Squeeze</td><td>Bandas de Bollinger dentro do canal de Keltner</td><td class="num">5</td></tr>
+    </tbody>
+    <tfoot><tr><th colspan="3" style="text-align:right">Teto (limitado a 100)</th><th class="num">100</th></tr></tfoot>
+  </table>
+
+  <div class="callout info"><b>Concordância.</b> Como ambos os scores são persistidos
+  (<code>score</code> e <code>score_ponderado</code>) junto de <code>ponderado_passou</code>,
+  o endpoint <code>/signals/performance</code> mede a concordância entre os dois métodos por ticker.</div>
+</div>
+
+<!-- ════════════════ 5. MONTAGEM DO SINAL ════════════════ -->
+<div class="section">
+  <h2>5 · Montagem do sinal</h2>
+  <p class="lead">Decidido o tipo (CALL/PUT), o motor constrói a recomendação operável:
+  qual opção, qual vencimento, faixa de entrada, alvos, stop e risco/retorno.</p>
+
+  <h3>5.1 · Seleção do strike OTM</h3>
+  <p>A distância OTM é específica por ativo (<code>OTM_POR_ATIVO</code>); fora da lista usa
+  <code>OTM_DEFAULT = 8%</code>. Ativos mais voláteis recebem distâncias maiores.</p>
+  <div class="formula">
+    CALL: strike = preço × (1 + dist_otm)<br>
+    PUT&nbsp;: strike = preço × (1 − dist_otm)
+  </div>
+  <table>
+    <thead><tr><th>Faixa OTM</th><th>Exemplos de ativos</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">12%</td><td>MGLU3, BEEF3</td></tr>
+      <tr><td class="mono">9–10%</td><td>BRKM5, USIM5, ASAI3, MRVE3, CSNA3, HAPV3, NTCO3, PCAR3, MRFG3, YDUQ3, COGN3</td></tr>
+      <tr><td class="mono">7–8%</td><td>VALE3, LREN3, RADL3, GGBR4, GOAU4, KLBN11, EMBR3, PRIO3, RAIL3, ENEV3, CSAN3, HYPE3, CYRE3, VBBR3, MULT3</td></tr>
+      <tr><td class="mono">5–6%</td><td>PETR4, PETR3, ITUB4, BBDC4, ABEV3, BBAS3, BBSE3, B3SA3, BPAC11, WEGE3, EGIE3, RENT3, EQTL3, RDOR3, CPLE6, TIMS3, VIVT3</td></tr>
+      <tr><td class="mono">4%</td><td>BOVA11 (ETF)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>5.2 · Vencimento e DTE</h3>
+  <p><code>mes_vencimento_ideal()</code> procura, entre o mês atual e os 3 seguintes, o primeiro
+  cujo <b>DTE</b> caia na faixa <code>10–45 dias úteis</code>. O vencimento B3 é a
+  <b>3ª sexta-feira</b> do mês; o DTE em dias úteis é aproximado por:</p>
+  <div class="formula">DTE ≈ dias_corridos_até_a_3ª_sexta × 5 ÷ 7</div>
+
+  <h3>5.3 · Volatilidade implícita histórica (HV)</h3>
+  <p><code>estimar_iv_historica()</code> usa o desvio-padrão dos log-retornos de 20 períodos,
+  anualizado. Fallback de 40% se a série for curta.</p>
+  <div class="formula">
+    HV = desvio_padrão( ln(Pₜ / Pₜ₋₁) )<sub>20</sub> × √252<br>
+    <small>(timeframe 1h usa √(252×7))</small>
+  </div>
+
+  <h3>5.4 · Prêmio estimado (Black-Scholes)</h3>
+  <p><code>estimar_premio_otm()</code> precifica a opção por Black-Scholes simplificado
+  (taxa nula nesta estimativa), usado quando não há preço real de mercado:</p>
+  <div class="formula">
+    d₁ = [ ln(S/K) + ½·σ²·T ] / (σ·√T)&nbsp;&nbsp;;&nbsp;&nbsp;d₂ = d₁ − σ·√T&nbsp;&nbsp;(T = DTE/252)<br>
+    CALL = S·N(d₁) − K·N(d₂)&nbsp;&nbsp;;&nbsp;&nbsp;PUT = K·N(−d₂) − S·N(−d₁)&nbsp;&nbsp;(mín. R$ 0,10)
+  </div>
+
+  <h3>5.5 · Integração com dados reais (opcoes.net.br)</h3>
+  <p>Se houver uma opção líquida real para o strike (<code>get_real_options_from_opcoes_net</code>),
+  o sistema substitui o strike teórico pelo <b>strike real</b>, captura o <b>preço de tela</b>
+  e o <b>ticker da opção</b>. Esse preço de tela vira a base de cálculo das entradas/alvos.
+  Sem liquidez, o ticker fica como <code>N/A (S/ Liquidez)</code> e usa-se o prêmio estimado.</p>
+
+  <h3>5.6 · Entradas, alvos, stop e risco/retorno</h3>
+  <p>Sobre a base (<code>preço de tela</code> ou <code>prêmio estimado</code>):</p>
+  <table>
+    <thead><tr><th>Campo</th><th>Fórmula</th><th>Valor (calibração atual)</th></tr></thead>
+    <tbody>
+      <tr><td>Faixa de entrada</td><td>base × (1 ∓ 0,035)</td><td>±3,5%</td></tr>
+      <tr><td>Alvo 1</td><td>base × (1 + 0,25)</td><td>+25%</td></tr>
+      <tr><td>Alvo 2</td><td>base × (1 + 2,50)</td><td>+250%</td></tr>
+      <tr><td>Alvo final</td><td>base × (1 + 7,00)</td><td>+700%</td></tr>
+      <tr><td>Stop</td><td>base × (1 − 0,43)</td><td>−43%</td></tr>
+      <tr><td>Risco</td><td>base − stop</td><td>43% da base</td></tr>
+      <tr><td>R/R Alvo&nbsp;n</td><td>(alvo<sub>n</sub> − base) ÷ risco</td><td>—</td></tr>
+    </tbody>
+  </table>
+
+  <h3>5.7 · Filtros de rejeição</h3>
+  <ul>
+    <li><b>Delta:</b> rejeita se <code>|Δ|</code> fora de <code>0,15–0,45</code> (evita opções deep-OTM sem liquidez ou já no dinheiro).</li>
+    <li><b>Risco/Retorno:</b> rejeita se <code>R/R Alvo 1 &lt; 0,8</code> (<code>rr_minimo</code>).</li>
+    <li><b>Modo ponderado:</b> se ativo, rejeita quando o score ponderado &lt; 60.</li>
+  </ul>
+  <div class="callout"><b>Nota técnica.</b> O R/R do Alvo 1 é invariante de escala:
+  <code>R/R₁ = alvo1_pct ÷ |stop_pct| = 0,25 ÷ 0,43 ≈ 0,58</code>. Com a calibração atual esse
+  valor fica <b>abaixo</b> de <code>rr_minimo = 0,8</code> — ou seja, o filtro do Alvo 1 é
+  bastante restritivo e, na prática, a tese de retorno se apoia nos Alvos 2 (+250%) e final (+700%).
+  É um ponto a revisar caso se deseje afrouxar a geração de sinais no modo clássico.</div>
+</div>
+
+<!-- ════════════════ 6. GREEKS ════════════════ -->
+<div class="section">
+  <h2>6 · Greeks e Black-Scholes</h2>
+  <p class="lead">Em <span class="mono">backend/domain/greeks.py</span>, cada sinal recebe os
+  Greeks completos, usados como filtro de qualidade e exibidos no card do frontend.
+  Taxa livre de risco padrão: <code>r = 13,5% a.a.</code> (Selic).</p>
+
+  <div class="formula">
+    d₁ = [ ln(S/K) + (r + ½σ²)·T ] / (σ·√T)&nbsp;&nbsp;;&nbsp;&nbsp;d₂ = d₁ − σ·√T
+  </div>
+
+  <table>
+    <thead><tr><th>Grega</th><th>O que mede</th><th>Fórmula (CALL)</th></tr></thead>
+    <tbody>
+      <tr><td><b>Delta (Δ)</b></td><td>Sensibilidade ao preço do ativo</td><td>N(d₁)</td></tr>
+      <tr><td><b>Gamma (Γ)</b></td><td>Variação do Delta</td><td>φ(d₁) / (S·σ·√T)</td></tr>
+      <tr><td><b>Theta (Θ)</b></td><td>Decaimento por dia (÷365)</td><td>[ −S·φ(d₁)·σ/(2√T) − r·K·e<sup>−rT</sup>·N(d₂) ] / 365</td></tr>
+      <tr><td><b>Vega</b></td><td>Sensibilidade à IV (por 1%)</td><td>S·φ(d₁)·√T / 100</td></tr>
+      <tr><td><b>Rho</b></td><td>Sensibilidade aos juros (por 1%)</td><td>K·T·e<sup>−rT</sup>·N(d₂) / 100</td></tr>
+      <tr><td><b>POP</b></td><td>Prob. neutra de exercício</td><td>N(d₂) — CALL / N(−d₂) — PUT</td></tr>
+    </tbody>
+  </table>
+  <p>Para PUT, o Delta é <code>N(d₁) − 1</code> e o sinal de Theta/Rho se ajusta conforme as fórmulas do código.</p>
+
+  <h3>6.1 · IV de mercado (Newton-Raphson)</h3>
+  <p>Quando há preço de tela real, <code>implied_volatility()</code> resolve a IV implícita
+  iterativamente (até 100 iterações, tolerância 1e-6) e, se ficar entre 5% e 300%, os Greeks
+  são recalculados com a IV de mercado — não a histórica:</p>
+  <div class="formula">σ<sub>n+1</sub> = σ<sub>n</sub> − [ BS(σ<sub>n</sub>) − preço_mercado ] / Vega(σ<sub>n</sub>)</div>
+</div>
+
+<!-- ════════════════ 7. ALERTA DOS SINAIS ════════════════ -->
+<div class="section">
+  <h2>7 · Disparo e alerta dos sinais</h2>
+  <p class="lead">A produção e distribuição dos sinais vive em
+  <span class="mono">backend/services/signal_service.py</span> e
+  <span class="mono">scheduler.py</span>, expostos pelos routers de
+  <span class="mono">scan</span>.</p>
+
+  <h3>7.1 · Varredura (scan)</h3>
+  <ul>
+    <li><b>Agendado</b> (<code>run_scan</code>): percorre a watchlist com <b>10 workers</b> em paralelo;
+        para cada sinal, envia Telegram, faz broadcast SSE e persiste.</li>
+    <li><b>Sob demanda</b>: <code>POST /signals/scan/{ticker}</code> (1 ativo),
+        <code>POST /signals/scan</code> (lista), <code>POST /signals/scan/all</code> (watchlist curada)
+        e <code>/all-b3</code> (universo completo via brapi).</li>
+    <li><b>Streaming</b>: <code>GET /signals/scan/stream</code> (SSE) emite progresso ativo a ativo
+        para a tela do Scanner.</li>
+  </ul>
+
+  <h3>7.2 · Agendador (APScheduler)</h3>
+  <table>
+    <thead><tr><th>Job</th><th>Gatilho (America/Sao_Paulo)</th><th>Ação</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">scan_job</td><td>Seg–Sex, 10h–16h, a cada 30 min</td><td>Varre a watchlist e gera/persiste sinais</td></tr>
+      <tr><td class="mono">cleanup_job</td><td>Diário às 02:00</td><td>Remove sinais com mais de 30 dias</td></tr>
+    </tbody>
+  </table>
+
+  <h3>7.3 · Persistência e distribuição</h3>
+  <ul>
+    <li><b>Supabase</b> (<code>persist_signals</code>): grava ~30 campos por sinal na tabela <code>signals</code>
+        (preço, strike, alvos, stop, Greeks, score clássico e ponderado, IV de mercado, gatilhos).</li>
+    <li><b>Tempo real</b>: <code>GET /signals/alerts/stream</code> (SSE) entrega novos sinais ao
+        <i>LiveFeed</i>; a página <code>/signals</code> também usa o Realtime do Supabase.</li>
+    <li><b>Telegram</b> (<code>telegram_service.enviar_telegram</code>): envia uma mensagem formatada
+        com ticker, tipo, vencimento, strike, IV, DTE, faixa de entrada, alvos, stop e gatilhos.</li>
+  </ul>
+
+  <h3>7.4 · Controle de reentrada</h3>
+  <p>Ao gerar um sinal, <code>registrar_sinal()</code> grava o timestamp. Um novo sinal do mesmo
+  ticker só é aceito após <code>reentrada_min_dias = 3</code>. Após reinício do processo, o histórico
+  é reconstruído do Supabase (<code>rebuild_historico_sinais</code>) para preservar a regra.</p>
+</div>
+
+<!-- ════════════════ 8. ESTRATÉGIAS ════════════════ -->
+<div class="section">
+  <h2>8 · Estratégias de opções (simulador)</h2>
+  <p class="lead">Independentes do scanner, as <b>17 estruturas</b> do simulador
+  (<span class="mono">src/lib/strategies.ts</span>, página <code>/estrategias</code>) calculam
+  payoff, custo, lucro/prejuízo máximo, breakevens e Greeks da posição via Black-Scholes no
+  frontend (<span class="mono">src/lib/black-scholes.ts</span>).</p>
+
+  <h3>8.1 · Posições puras <span class="pill blue">1 perna</span></h3>
+  <table>
+    <thead><tr><th>Estratégia</th><th>Perfil</th><th>Descrição</th></tr></thead>
+    <tbody>
+      <tr><td><b>Compra de Call</b> (Long Call)</td><td><span class="pill green">alta</span></td><td>Alta especulativa — risco limitado ao prêmio, ganho ilimitado.</td></tr>
+      <tr><td><b>Venda de Call</b> (Short Call)</td><td><span class="pill amber">neutro</span></td><td>Renda em queda/lateralidade — <b>risco ilimitado</b> em alta forte.</td></tr>
+      <tr><td><b>Compra de Put</b> (Long Put)</td><td><span class="pill red">baixa</span></td><td>Baixa especulativa — risco limitado ao prêmio pago.</td></tr>
+      <tr><td><b>Venda de Put</b> (Short Put)</td><td><span class="pill green">alta</span></td><td>Renda aguardando entrada mais barata na ação.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.2 · Com ação-objeto <span class="pill blue">2 pernas</span></h3>
+  <table>
+    <thead><tr><th>Estratégia</th><th>Perfil</th><th>Descrição</th></tr></thead>
+    <tbody>
+      <tr><td><b>Venda Coberta</b> (Covered Call)</td><td><span class="pill amber">renda</span></td><td>Rentabiliza carteira de ações vendendo calls — a mais usada no Brasil.</td></tr>
+      <tr><td><b>Put Protetora</b> (Protective Put)</td><td><span class="pill blue">hedge</span></td><td>Seguro contra quedas em posição comprada em ações.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.3 · Spreads (travas) <span class="pill blue">2 pernas</span></h3>
+  <table>
+    <thead><tr><th>Estratégia</th><th>Perfil</th><th>Descrição</th></tr></thead>
+    <tbody>
+      <tr><td><b>Trava de Alta com Call</b> (Bull Call)</td><td><span class="pill green">alta</span></td><td>Aposta de alta com custo e risco reduzidos (débito).</td></tr>
+      <tr><td><b>Trava de Baixa com Put</b> (Bear Put)</td><td><span class="pill red">baixa</span></td><td>Aposta de baixa com custo e risco reduzidos (débito).</td></tr>
+      <tr><td><b>Trava de Alta com Put</b> (Bull Put)</td><td><span class="pill amber">renda</span></td><td>Crédito recebido apostando que o ativo fica acima do strike.</td></tr>
+      <tr><td><b>Trava de Baixa com Call</b> (Bear Call)</td><td><span class="pill amber">renda</span></td><td>Crédito recebido apostando que o ativo fica abaixo do strike.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.4 · Volatilidade <span class="pill blue">2–3 pernas</span></h3>
+  <table>
+    <thead><tr><th>Estratégia</th><th>Perfil</th><th>Descrição</th></tr></thead>
+    <tbody>
+      <tr><td><b>Straddle Comprado</b></td><td><span class="pill amber">neutro</span></td><td>Lucra com movimentos fortes em qualquer direção.</td></tr>
+      <tr><td><b>Strangle Comprado</b></td><td><span class="pill amber">neutro</span></td><td>Como o Straddle, mais barato — exige movimento maior.</td></tr>
+      <tr><td><b>Straddle Vendido</b></td><td><span class="pill amber">renda</span></td><td>Lucra com mercado parado — <b>risco ilimitado</b> nos dois lados.</td></tr>
+      <tr><td><b>Strangle Vendido</b></td><td><span class="pill amber">renda</span></td><td>Range mais amplo que o Straddle vendido — <b>risco ilimitado</b>.</td></tr>
+      <tr><td><b>Borboleta</b> (Butterfly)</td><td><span class="pill amber">neutro</span></td><td>Máximo lucro se fechar exatamente no strike central (3 pernas).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.5 · Complexas <span class="pill blue">4 pernas</span></h3>
+  <table>
+    <thead><tr><th>Estratégia</th><th>Perfil</th><th>Descrição</th></tr></thead>
+    <tbody>
+      <tr><td><b>Iron Condor</b></td><td><span class="pill amber">renda</span></td><td>Renda com o mercado dentro de um range amplo — 4 pernas.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ════════════════ 9. CONFIG ════════════════ -->
+<div class="section">
+  <h2>9 · Parâmetros de configuração</h2>
+  <p class="lead">Referência dos valores em <span class="mono">backend/core/config.py</span>
+  (<code>CONFIG</code>) que governam todo o comportamento descrito acima.</p>
+
+  <div class="grid2">
+    <table>
+      <thead><tr><th>Indicadores</th><th class="num">Valor</th></tr></thead>
+      <tbody>
+        <tr><td>stoch_k_period / d</td><td class="num">14 / 3</td></tr>
+        <tr><td>stoch_oversold / overbought</td><td class="num">25 / 75</td></tr>
+        <tr><td>rsi_period</td><td class="num">14</td></tr>
+        <tr><td>rsi_oversold / overbought</td><td class="num">35 / 65</td></tr>
+        <tr><td>ema_fast / slow</td><td class="num">9 / 21</td></tr>
+        <tr><td>volume_mult</td><td class="num">1,5×</td></tr>
+      </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Gestão de risco</th><th class="num">Valor</th></tr></thead>
+      <tbody>
+        <tr><td>stop_pct</td><td class="num">−43%</td></tr>
+        <tr><td>alvo1 / alvo2 / final</td><td class="num">+25 / +250 / +700%</td></tr>
+        <tr><td>rr_minimo</td><td class="num">0,8</td></tr>
+        <tr><td>buy_band_pct</td><td class="num">±3,5%</td></tr>
+        <tr><td>book_days</td><td class="num">7</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="grid2">
+    <table>
+      <thead><tr><th>Filtros</th><th class="num">Valor</th></tr></thead>
+      <tbody>
+        <tr><td>min_volume_diario</td><td class="num">1.000.000</td></tr>
+        <tr><td>min_score (clássico)</td><td class="num">5</td></tr>
+        <tr><td>min_score_ponderado</td><td class="num">60</td></tr>
+        <tr><td>delta_min / max</td><td class="num">0,15 / 0,45</td></tr>
+        <tr><td>option_price_min / max</td><td class="num">R$ 0,10 / 3,00</td></tr>
+        <tr><td>min_negocios_opcao</td><td class="num">10</td></tr>
+      </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Vencimento / reentrada</th><th class="num">Valor</th></tr></thead>
+      <tbody>
+        <tr><td>dte_minimo / maximo</td><td class="num">10 / 45</td></tr>
+        <tr><td>reentrada_min_dias</td><td class="num">3</td></tr>
+        <tr><td>scoring_mode</td><td class="num">classico</td></tr>
+        <tr><td>OTM_DEFAULT</td><td class="num">8%</td></tr>
+        <tr><td>taxa livre de risco (r)</td><td class="num">13,5%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ════════════════ 10. UNIVERSO E MAPA ════════════════ -->
+<div class="section">
+  <h2>10 · Universo de ativos e mapa de arquivos</h2>
+
+  <h3>10.1 · Watchlist curada (53 ativos)</h3>
+  <p>Definida em <code>ATIVOS_B3</code>. O scan completo pode ainda expandir para todo o
+  universo da B3 via brapi (<code>get_all_b3_assets</code>).</p>
+  <p class="mono" style="font-size:8.8pt; line-height:1.7;">
+  ITUB4 · BBDC4 · BBAS3 · SANB11 · B3SA3 · BPAC11 · BBSE3 · VALE3 · PETR4 · PETR3 · SUZB3 ·
+  KLBN11 · GGBR4 · CSNA3 · USIM5 · BRKM5 · GOAU4 · MGLU3 · LREN3 · RADL3 · ABEV3 · ASAI3 ·
+  WEGE3 · EGIE3 · BRAV3 · BEEF3 · MRVE3 · BOVA11 · RANI3 · COGN3 · EMBR3 · RENT3 · PRIO3 ·
+  RAIL3 · ENEV3 · EQTL3 · CSAN3 · HAPV3 · HYPE3 · RDOR3 · NTCO3 · CPLE6 · CYRE3 · TIMS3 ·
+  VBBR3 · VIVT3 · YDUQ3 · MULT3 · PCAR3 · MRFG3 · BBDC3 · ITUB3
+  </p>
+
+  <h3>10.2 · Onde cada peça vive</h3>
+  <table>
+    <thead><tr><th>Tema</th><th>Arquivo</th></tr></thead>
+    <tbody>
+      <tr><td>Pipeline / gatilhos clássicos / decisão</td><td class="mono">backend/services/core_engine.py</td></tr>
+      <tr><td>Cálculo dos indicadores e price action</td><td class="mono">backend/domain/indicators.py</td></tr>
+      <tr><td>Score ponderado 0–100</td><td class="mono">backend/domain/scoring.py</td></tr>
+      <tr><td>Strike, DTE, IV, prêmio, decodificação B3</td><td class="mono">backend/domain/options_math.py</td></tr>
+      <tr><td>Greeks e IV implícita</td><td class="mono">backend/domain/greeks.py</td></tr>
+      <tr><td>Parâmetros, watchlist, OTM, reentrada, horário</td><td class="mono">backend/core/config.py</td></tr>
+      <tr><td>Scan, persistência, fila de alertas</td><td class="mono">backend/services/signal_service.py</td></tr>
+      <tr><td>Agendador (jobs)</td><td class="mono">backend/services/scheduler.py</td></tr>
+      <tr><td>Mensagem do Telegram</td><td class="mono">backend/services/telegram_service.py</td></tr>
+      <tr><td>Endpoints de scan / sinais</td><td class="mono">backend/api/routers/{scan,signals}.py</td></tr>
+      <tr><td>17 estratégias de opções (motor + UI)</td><td class="mono">src/lib/strategies.ts · src/app/estrategias</td></tr>
+      <tr><td>Black-Scholes / Greeks no frontend</td><td class="mono">src/lib/black-scholes.ts</td></tr>
+    </tbody>
+  </table>
+
+  <div class="foot">
+    Documentação técnica gerada a partir do código-fonte do projeto Scanner de Opções B3 (v4.2.0).
+    Os números refletem a calibração vigente em <code>config.py</code> na data de emissão (03/06/2026)
+    e podem mudar com recalibrações futuras. Documentos complementares:
+    <span class="mono">docs/MONTAGEM_DE_SINAL_B3.md</span>,
+    <span class="mono">docs/ESTRATEGIAS_OPCOES_B3.md</span>,
+    <span class="mono">docs/SCORING_PONDERADO.md</span>,
+    <span class="mono">docs/GREEKS_E_BLACK_SCHOLES.md</span>.
+  </div>
+</div>
+
+</body>
+</html>

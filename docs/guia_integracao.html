@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>b3_ticker_loader — Guia de Integração</title>
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=jet-brains-mono@400,500&display=swap" rel="stylesheet">
+<style>
+:root,[data-theme="light"]{--bg:#f7f6f2;--surface:#f9f8f5;--surface-2:#edeae5;--border:#d4d1ca;--text:#28251d;--muted:#7a7974;--faint:#bab9b4;--primary:#01696f;--primary-h:#0c4e54;--success:#437a22;--warning:#964219;--error:#a12c7b;--code-bg:#f0efea;--code-text:#0c4e54;--badge-call:#d4edd8;--badge-call-t:#2e5c10;--badge-put:#fde8e0;--badge-put-t:#713417}
+[data-theme="dark"]{--bg:#171614;--surface:#1c1b19;--surface-2:#22211f;--border:#393836;--text:#cdccca;--muted:#797876;--faint:#5a5957;--primary:#4f98a3;--primary-h:#227f8b;--success:#6daa45;--warning:#bb653b;--error:#d163a7;--code-bg:#1e1d1b;--code-text:#4f98a3;--badge-call:#1e2e1a;--badge-call-t:#6daa45;--badge-put:#2a1c14;--badge-put-t:#bb653b}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
+body{font-family:'Satoshi',sans-serif;font-size:1rem;line-height:1.6;color:var(--text);background:var(--bg);min-height:100dvh}
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100dvh}
+/* SIDEBAR */
+.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:1.5rem 1rem;position:sticky;top:0;height:100dvh;overflow-y:auto;display:flex;flex-direction:column;gap:0.25rem}
+.sidebar-logo{display:flex;align-items:center;gap:0.625rem;padding:0.5rem 0.5rem 1rem;margin-bottom:0.5rem;border-bottom:1px solid var(--border)}
+.sidebar-logo svg{color:var(--primary);flex-shrink:0}
+.sidebar-logo-text{font-size:0.875rem;font-weight:700;color:var(--text);letter-spacing:-0.01em}
+.sidebar-logo-sub{font-size:0.75rem;color:var(--muted);display:block}
+.nav-section{font-size:0.7rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--faint);padding:0.75rem 0.5rem 0.25rem}
+.nav-item{display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.5rem;border-radius:6px;font-size:0.8125rem;color:var(--muted);cursor:pointer;text-decoration:none;transition:all 150ms}
+.nav-item:hover,.nav-item.active{background:var(--surface-2);color:var(--text)}
+.nav-item.active{color:var(--primary)}
+.nav-dot{width:6px;height:6px;border-radius:50%;background:var(--border);flex-shrink:0}
+.nav-item.active .nav-dot{background:var(--primary)}
+/* MAIN */
+.main{padding:2.5rem 3rem;max-width:900px}
+h1{font-size:clamp(1.5rem,2vw,2rem);font-weight:700;color:var(--text);letter-spacing:-0.02em;margin-bottom:0.375rem}
+.page-sub{font-size:0.9375rem;color:var(--muted);margin-bottom:2rem}
+h2{font-size:1.125rem;font-weight:700;color:var(--text);margin:2.5rem 0 0.875rem;padding-top:2.5rem;border-top:1px solid var(--border)}
+h2:first-of-type{margin-top:0;padding-top:0;border-top:none}
+h3{font-size:0.9375rem;font-weight:600;color:var(--text);margin:1.25rem 0 0.5rem}
+p{font-size:0.9375rem;color:var(--muted);margin-bottom:0.75rem;max-width:68ch}
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:0.25rem;padding:0.125rem 0.5rem;border-radius:999px;font-size:0.7rem;font-weight:700;letter-spacing:0.04em;text-transform:uppercase}
+.badge-green{background:var(--badge-call);color:var(--badge-call-t)}
+.badge-orange{background:var(--badge-put);color:var(--badge-put-t)}
+.badge-blue{background:color-mix(in oklch,var(--primary) 15%,var(--surface));color:var(--primary)}
+/* STEP CARDS */
+.steps{display:flex;flex-direction:column;gap:1px;margin:1.25rem 0}
+.step{display:grid;grid-template-columns:40px 1fr;gap:1rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.125rem 1.25rem;position:relative}
+.step+.step{margin-top:0.5rem}
+.step-num{width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;font-size:0.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:0.125rem}
+.step-title{font-size:0.9375rem;font-weight:600;color:var(--text);margin-bottom:0.25rem}
+.step-desc{font-size:0.875rem;color:var(--muted);line-height:1.5}
+.step-file{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:0.75rem;background:var(--code-bg);color:var(--code-text);padding:0.1rem 0.4rem;border-radius:4px;margin-top:0.375rem}
+/* CODE BLOCKS */
+.code-wrap{margin:1rem 0;border-radius:10px;overflow:hidden;border:1px solid var(--border)}
+.code-header{background:var(--surface-2);padding:0.5rem 1rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.code-lang{font-size:0.7rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted)}
+.code-file{font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--primary)}
+pre{background:var(--code-bg);padding:1.25rem 1.5rem;overflow-x:auto}
+code{font-family:'JetBrains Mono',monospace;font-size:0.8125rem;line-height:1.75;color:var(--text)}
+.hl-comment{color:var(--muted)}
+.hl-kw{color:var(--primary)}
+.hl-str{color:var(--success)}
+.hl-num{color:var(--warning)}
+.hl-fn{color:var(--error)}
+/* PARAMS TABLE */
+.params-table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:0.875rem}
+.params-table th{text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--faint);padding:0.5rem 0.75rem;border-bottom:1px solid var(--border)}
+.params-table td{padding:0.625rem 0.75rem;border-bottom:1px solid var(--border);color:var(--muted);vertical-align:top}
+.params-table td:first-child{font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--primary);white-space:nowrap}
+.params-table td:nth-child(2){color:var(--text);font-size:0.8125rem}
+.params-table tr:last-child td{border-bottom:none}
+/* FLOW DIAGRAM */
+.flow{display:flex;flex-direction:column;gap:0;margin:1.25rem 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.flow-item{display:grid;grid-template-columns:32px 1fr auto;align-items:center;gap:0.75rem;padding:0.75rem 1rem;border-bottom:1px solid var(--border)}
+.flow-item:last-child{border-bottom:none}
+.flow-arrow{color:var(--faint);font-size:0.875rem;text-align:center}
+.flow-label{font-size:0.875rem;color:var(--text);font-weight:500}
+.flow-sub{font-size:0.75rem;color:var(--muted)}
+/* CALLOUT */
+.callout{display:flex;gap:0.75rem;padding:1rem 1.25rem;border-radius:8px;margin:1.25rem 0;font-size:0.875rem}
+.callout-info{background:color-mix(in oklch,var(--primary) 10%,var(--surface));border-left:3px solid var(--primary)}
+.callout-warn{background:color-mix(in oklch,var(--warning) 10%,var(--surface));border-left:3px solid var(--warning)}
+.callout-icon{font-size:1rem;flex-shrink:0;margin-top:0.125rem}
+.callout-body{color:var(--muted);line-height:1.5}
+.callout-body strong{color:var(--text)}
+/* THEME TOGGLE */
+.theme-toggle{position:fixed;top:1rem;right:1rem;width:36px;height:36px;border-radius:8px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);transition:all 150ms;z-index:100}
+.theme-toggle:hover{color:var(--text);background:var(--surface-2)}
+@media(max-width:768px){.layout{grid-template-columns:1fr}.sidebar{display:none}.main{padding:1.5rem 1.25rem}}
+</style>
+</head>
+<body>
+<button class="theme-toggle" data-theme-toggle aria-label="Toggle theme">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+</button>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="currentColor" opacity="0.12"/><path d="M7 21L14 7l7 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.5 16.5h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <div><span class="sidebar-logo-text">B3 Ticker Loader</span><span class="sidebar-logo-sub">Scanner de Opções v3.0+</span></div>
+    </div>
+    <span class="nav-section">Guia</span>
+    <a class="nav-item active" href="#overview"><span class="nav-dot"></span>Visão Geral</a>
+    <a class="nav-item" href="#onde-inserir"><span class="nav-dot"></span>Onde Inserir</a>
+    <a class="nav-item" href="#parametros"><span class="nav-dot"></span>Parâmetros</a>
+    <a class="nav-item" href="#fluxo"><span class="nav-dot"></span>Fluxo de Execução</a>
+    <a class="nav-item" href="#codigo"><span class="nav-dot"></span>Código de Integração</a>
+    <a class="nav-item" href="#fontes"><span class="nav-dot"></span>Fontes de Dados</a>
+    <a class="nav-item" href="#fallback"><span class="nav-dot"></span>Fallback & Erros</a>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <h1>b3_ticker_loader.py</h1>
+    <p class="page-sub">Módulo de varredura dinâmica — substitui a lista estática de ~20 ativos por toda a B3 filtrada por liquidez.</p>
+
+    <!-- VISÃO GERAL -->
+    <h2 id="overview">Visão Geral</h2>
+    <p>O scanner atual itera sobre uma lista hardcoded de ~20 tickers em <code>config.py</code>. Este módulo expande isso para <strong>toda a B3 (~400+ ativos)</strong>, aplicando um filtro de volume antes de passar os tickers para o <code>analisar_ativo()</code>.</p>
+
+    <div class="callout callout-info">
+      <span class="callout-icon">💡</span>
+      <div class="callout-body"><strong>Na prática:</strong> de ~400 ativos listados, ~80–120 passam no filtro de 1M de volume diário. O pipeline do seu <code>core_engine.py</code> já rejeita ativos com volume insuficiente na Etapa 3 — este módulo faz o pré-filtro para economizar tempo e chamadas de API.</div>
+    </div>
+
+    <div class="flow">
+      <div class="flow-item"><span class="flow-arrow">①</span><div><div class="flow-label">API Oficial da B3</div><div class="flow-sub">sistemaswebb3-listados.b3.com.br — lista completa</div></div><span class="badge badge-green">Fonte primária</span></div>
+      <div class="flow-item"><span class="flow-arrow">②</span><div><div class="flow-label">Lista Curada (fallback)</div><div class="flow-sub">60+ tickers hardcoded por setor</div></div><span class="badge badge-blue">Complemento</span></div>
+      <div class="flow-item"><span class="flow-arrow">③</span><div><div class="flow-label">Filtro de Volume (yfinance)</div><div class="flow-sub">Volume médio ≥ 1M em 10 dias — batch de 20</div></div><span class="badge badge-orange">Liquidez</span></div>
+      <div class="flow-item"><span class="flow-arrow">④</span><div><div class="flow-label">Top N (opcional)</div><div class="flow-sub">Prioriza lista curada + limita ao top_n</div></div><span class="badge badge-blue">Opcional</span></div>
+    </div>
+
+    <!-- ONDE INSERIR -->
+    <h2 id="onde-inserir">Onde Inserir no Projeto</h2>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>
+          <div class="step-title">Salvar o arquivo</div>
+          <div class="step-desc">Copie <code>b3_ticker_loader.py</code> para a mesma pasta do seu scanner principal.</div>
+          <span class="step-file">projeto/ ├── scanner_opcoes_b3_v3.py ├── core_engine.py ├── b3_ticker_loader.py  ← aqui └── config.py</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-title">Substituir a lista estática no scanner_opcoes_b3_v3.py</div>
+          <div class="step-desc">No topo do arquivo, substitua a definição de <code>TICKERS</code> pelo import + chamada dinâmica.</div>
+          <span class="step-file">scanner_opcoes_b3_v3.py — topo do arquivo, antes do main()</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-title">Ajustar o loop de análise (se necessário)</div>
+          <div class="step-desc">O <code>carregar_tickers_b3()</code> retorna lista sem <code>.SA</code> — adicione o sufixo ao passar para o <code>analisar_ativo()</code>.</div>
+          <span class="step-file">analisar_ativo(ticker + ".SA", interval="1d")</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CÓDIGO DE INTEGRAÇÃO -->
+    <h2 id="codigo">Código de Integração</h2>
+    <h3>ANTES — lista estática</h3>
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-lang">Python</span><span class="code-file">scanner_opcoes_b3_v3.py (antes)</span></div>
+      <pre><code><span class="hl-comment"># ❌ Lista hardcoded — apenas ~20 ativos, nunca atualiza</span>
+TICKERS = [
+    <span class="hl-str">"PETR4.SA"</span>, <span class="hl-str">"VALE3.SA"</span>, <span class="hl-str">"MGLU3.SA"</span>,
+    <span class="hl-str">"ITUB4.SA"</span>, <span class="hl-str">"ABEV3.SA"</span>, <span class="hl-str">"BBDC4.SA"</span>, <span class="hl-comment"># ...</span>
+]
+
+<span class="hl-kw">def</span> <span class="hl-fn">main</span>():
+    sinais = []
+    <span class="hl-kw">for</span> ticker <span class="hl-kw">in</span> TICKERS:
+        sinal = analisar_ativo(ticker)
+        <span class="hl-kw">if</span> sinal:
+            sinais.append(sinal)</code></pre>
+    </div>
+
+    <h3>DEPOIS — dinâmico, toda a B3</h3>
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-lang">Python</span><span class="code-file">scanner_opcoes_b3_v3.py (depois)</span></div>
+      <pre><code><span class="hl-comment"># ✅ Import no topo do arquivo (junto com os outros imports)</span>
+<span class="hl-kw">from</span> b3_ticker_loader <span class="hl-kw">import</span> carregar_tickers_b3
+
+<span class="hl-kw">def</span> <span class="hl-fn">main</span>():
+    <span class="hl-comment"># ── Etapa 0: Carregar tickers dinamicamente ────────────────</span>
+    logger.info(<span class="hl-str">"Carregando tickers da B3..."</span>)
+    tickers_base = carregar_tickers_b3(
+        min_volume=<span class="hl-num">1_000_000</span>,   <span class="hl-comment"># mesmo filtro do core_engine Etapa 3</span>
+        top_n=<span class="hl-num">150</span>,             <span class="hl-comment"># top 150 mais líquidos (None = sem limite)</span>
+        usar_api_b3=<span class="hl-kw">True</span>,       <span class="hl-comment"># tenta API oficial primeiro</span>
+        usar_lista_curada=<span class="hl-kw">True</span>,  <span class="hl-comment"># complementa com lista curada</span>
+    )
+    TICKERS = [<span class="hl-str">f"</span>{t}<span class="hl-str">.SA"</span> <span class="hl-kw">for</span> t <span class="hl-kw">in</span> tickers_base]
+    logger.info(<span class="hl-str">f"✅ </span>{<span class="hl-fn">len</span>(TICKERS)}<span class="hl-str"> ativos para scan"</span>)
+
+    <span class="hl-comment"># ── Loop de análise (igual ao atual) ──────────────────────</span>
+    sinais = []
+    <span class="hl-kw">for</span> ticker <span class="hl-kw">in</span> TICKERS:
+        <span class="hl-kw">try</span>:
+            sinal = analisar_ativo(ticker, interval=<span class="hl-str">"1d"</span>)
+            <span class="hl-kw">if</span> sinal:
+                sinais.append(sinal)
+                enviar_telegram(sinal)
+        <span class="hl-kw">except</span> Exception <span class="hl-kw">as</span> e:
+            logger.error(<span class="hl-str">f"Erro em </span>{ticker}<span class="hl-str">: </span>{e}<span class="hl-str">"</span>)</code></pre>
+    </div>
+
+    <!-- PARÂMETROS -->
+    <h2 id="parametros">Parâmetros da Função Principal</h2>
+    <table class="params-table">
+      <thead><tr><th>Parâmetro</th><th>Tipo</th><th>Default</th><th>Descrição</th></tr></thead>
+      <tbody>
+        <tr><td>min_volume</td><td>int</td><td>1_000_000</td><td>Volume mínimo diário em R$. Mesmo critério da Etapa 3 do core_engine.</td></tr>
+        <tr><td>top_n</td><td>int | None</td><td>None</td><td>Limitar ao N ativos mais líquidos. None = sem limite. Recomendado: 100–150.</td></tr>
+        <tr><td>usar_api_b3</td><td>bool</td><td>True</td><td>Buscar lista completa na API oficial da B3. False usa só lista curada.</td></tr>
+        <tr><td>usar_lista_curada</td><td>bool</td><td>True</td><td>Complementar com os 60+ tickers hardcoded. Sempre True como fallback.</td></tr>
+        <tr><td>filtrar_volume</td><td>bool</td><td>True</td><td>Aplicar filtro de volume via yfinance. False pula o filtro (mais rápido).</td></tr>
+        <tr><td>cache_segundos</td><td>int</td><td>3600</td><td>Reaproveitamento de lista em execuções repetidas (ex: scan a cada 15min).</td></tr>
+      </tbody>
+    </table>
+
+    <!-- FLUXO -->
+    <h2 id="fluxo">Fluxo de Execução Detalhado</h2>
+    <div class="flow">
+      <div class="flow-item"><span class="flow-arrow">A</span><div><div class="flow-label">listar_todas_empresas_b3()</div><div class="flow-sub">Itera páginas da API B3 com rate limit de 0.3s/req</div></div><span class="badge badge-blue">~400 tickers</span></div>
+      <div class="flow-item"><span class="flow-arrow">+</span><div><div class="flow-label">TICKERS_CURADOS</div><div class="flow-sub">60+ tickers setorizados como complemento/fallback</div></div><span class="badge badge-blue">~60 tickers</span></div>
+      <div class="flow-item"><span class="flow-arrow">B</span><div><div class="flow-label">Deduplica & normaliza</div><div class="flow-sub">Uppercase, strip, mantém ordem de precedência</div></div><span class="badge badge-blue">~420 únicos</span></div>
+      <div class="flow-item"><span class="flow-arrow">C</span><div><div class="flow-label">filtrar_por_volume() — batch de 20</div><div class="flow-sub">yf.download em lotes, média 10 dias, 1s entre batches</div></div><span class="badge badge-orange">~80–120 passam</span></div>
+      <div class="flow-item"><span class="flow-arrow">D</span><div><div class="flow-label">Prioriza curados + aplica top_n</div><div class="flow-sub">Lista curada tem precedência nos top N</div></div><span class="badge badge-green">Lista final ✅</span></div>
+    </div>
+
+    <!-- FONTES -->
+    <h2 id="fontes">Fontes de Dados</h2>
+    <table class="params-table">
+      <thead><tr><th>Fonte</th><th>URL</th><th>Uso</th><th>Limite</th></tr></thead>
+      <tbody>
+        <tr><td>API B3 (primária)</td><td>sistemaswebb3-listados.b3.com.br</td><td>Lista completa de empresas</td><td>Sem auth — rate limit gentil</td></tr>
+        <tr><td>yfinance</td><td>finance.yahoo.com</td><td>Volume histórico dos últimos 10 dias</td><td>Batch de 20, 1s delay</td></tr>
+        <tr><td>Lista curada</td><td>hardcoded em b3_ticker_loader.py</td><td>Fallback + complemento setorizado</td><td>Sem limite</td></tr>
+      </tbody>
+    </table>
+
+    <!-- FALLBACK -->
+    <h2 id="fallback">Fallback & Tratamento de Erros</h2>
+
+    <div class="callout callout-warn">
+      <span class="callout-icon">⚠️</span>
+      <div class="callout-body"><strong>API B3 fora do ar?</strong> O módulo captura a exceção, loga um warning e cai automaticamente para a lista curada de 60+ tickers. O scanner continua rodando sem interrupção.</div>
+    </div>
+
+    <div class="callout callout-info">
+      <span class="callout-icon">⏱️</span>
+      <div class="callout-body"><strong>Tempo estimado de execução:</strong> Com top_n=150 e filtro de volume ativo, o carregamento leva ~45–90 segundos (batch de 20 tickers × delay de 1s). Execute <strong>uma vez por sessão</strong> e reuse a lista no loop de scan.</div>
+    </div>
+
+    <h3>Modo Produção vs Modo Rápido</h3>
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-lang">Python</span><span class="code-file">Configurações recomendadas</span></div>
+      <pre><code><span class="hl-comment"># Modo Produção — máxima cobertura (roda 1x/dia)</span>
+tickers = carregar_tickers_b3(
+    min_volume=<span class="hl-num">1_000_000</span>,
+    top_n=<span class="hl-kw">None</span>,          <span class="hl-comment"># sem limite — todos os líquidos</span>
+    usar_api_b3=<span class="hl-kw">True</span>,
+)
+
+<span class="hl-comment"># Modo Rápido — scan intraday (a cada 15 min)</span>
+tickers = carregar_tickers_b3(
+    min_volume=<span class="hl-num">2_000_000</span>,  <span class="hl-comment"># mais restrito = mais rápido</span>
+    top_n=<span class="hl-num">80</span>,
+    usar_api_b3=<span class="hl-kw">False</span>,    <span class="hl-comment"># só lista curada, sem HTTP extra</span>
+    filtrar_volume=<span class="hl-kw">False</span>, <span class="hl-comment"># pula yfinance — confiar na lista curada</span>
+)</code></pre>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  const t=document.querySelector('[data-theme-toggle]'),r=document.documentElement;
+  let d=r.getAttribute('data-theme')||'dark';
+  const updateIcon=()=>{t.innerHTML=d==='dark'?'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>':'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>'};
+  updateIcon();
+  t&&t.addEventListener('click',()=>{d=d==='dark'?'light':'dark';r.setAttribute('data-theme',d);updateIcon()});
+  // Nav active state
+  const items=document.querySelectorAll('.nav-item');
+  const observer=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{if(e.isIntersecting){const id=e.target.id;items.forEach(i=>{i.classList.toggle('active',i.getAttribute('href')==='#'+id)})}});
+  },{threshold:0.5});
+  document.querySelectorAll('h2[id]').forEach(h=>observer.observe(h));
+})();
+</script>
+</body>
+</html>
