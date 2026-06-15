@@ -67,7 +67,7 @@ def _carregar_ohlcv(ticker: str, interval: str, df_provided: pd.DataFrame | None
         df = df_provided.copy()
     else:
         period = "6mo" if interval == "1d" else "730d"
-        cache_key = f"ohlcv:{ticker}:{interval}"
+        cache_key = f"ohlcv:{ticker}:{interval}:{period}"
         df = cache_get_df(cache_key)
 
         if df is None:

@@ -234,3 +234,14 @@ def test_reentrada_oposta_forte_emite_apos_call(monkeypatch):
     config.registrar_sinal("PETR4", "CALL", 8)
     assert config.is_reentrada_valida("PETR4", "PUT", 8 + config.CONFIG["reentrada_direcao_oposta_delta_score"]) is True
     config._historico_sinais.clear()
+
+
+def test_cache_key_inclui_period(monkeypatch):
+    """A cache key de OHLCV deve conter ticker, interval E period."""
+    capturadas = []
+    monkeypatch.setattr(core_engine, "cache_get_df",
+                        lambda key: capturadas.append(key) or None)
+    monkeypatch.setattr(core_engine, "cache_set_df", lambda *a, **k: None)
+    monkeypatch.setattr(core_engine, "_baixar_ohlcv", lambda *a, **k: None)
+    core_engine._carregar_ohlcv("PETR4.SA", "1d", None, False, False)
+    assert any(k.startswith("ohlcv:PETR4.SA:1d:") and k.count(":") == 3 for k in capturadas)
