@@ -364,10 +364,6 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
     """
     try:
         ticker_base = ticker.replace(".SA", "")
-        if df_provided is None and not is_reentrada_valida(ticker_base):
-            if verbose:
-                logger.info(f"↩ {ticker_base}: sinal recente (<{CONFIG['reentrada_min_dias']}d), pulando")
-            return None
 
         df = _carregar_ohlcv(ticker, interval, df_provided, indicators_calculated, verbose)
         if df is None:
@@ -413,13 +409,19 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
             direcao_label = "COMPRA DE PUT"
             emoji         = "🔴"
 
+        # ── REENTRADA por (ticker, direção, score) — só em produção ──────
+        if df_provided is None and not is_reentrada_valida(ticker_base, tipo_sinal, score):
+            if verbose:
+                logger.info(f"↩ {ticker_base}: reentrada bloqueada ({tipo_sinal}, score {score})")
+            return None
+
         # ── ESTRUTURA DA OPÇÃO ────────────────────────────────────────────
         estrutura = _montar_estrutura_opcao(ticker_base, preco, tipo_sinal, df, interval, verbose)
         if estrutura is None:
             return None
 
         if df_provided is None:
-            registrar_sinal(ticker_base)
+            registrar_sinal(ticker_base, tipo_sinal, score)
 
         return _montar_sinal(ticker_base, nome, tipo_sinal, direcao_label, emoji, score,
                              gatilhos, preco, ultimo, penult, stoch_k, rsi, vol_ratio,

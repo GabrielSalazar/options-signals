@@ -224,3 +224,13 @@ def test_sinal_carrega_score_tecnico_e_bonus_sessao(monkeypatch):
     assert s["score_tecnico"] == 9          # só gatilhos direcionais
     assert s["bonus_sessao"] == 2           # informativo, fora da decisão
     assert s["score"] == s["score_tecnico"] # `score` = técnico puro (compat)
+
+
+def test_reentrada_oposta_forte_emite_apos_call(monkeypatch):
+    """CALL registrado; um PUT forte o suficiente ainda emite (não é bloqueado pelo
+    cooldown cego à direção)."""
+    from backend.core import config
+    config._historico_sinais.clear()
+    config.registrar_sinal("PETR4", "CALL", 8)
+    assert config.is_reentrada_valida("PETR4", "PUT", 8 + config.CONFIG["reentrada_direcao_oposta_delta_score"]) is True
+    config._historico_sinais.clear()
