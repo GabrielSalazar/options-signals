@@ -151,7 +151,7 @@ def rebuild_historico_sinais():
     try:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=CONFIG.get("reentrada_min_dias", 3) + 1)).isoformat()
         res = (supabase.table("signals")
-               .select("ticker, timestamp")
+               .select("ticker, timestamp, tipo_sinal, score_tecnico, score")
                .gte("timestamp", cutoff)
                .order("timestamp")
                .execute())
@@ -162,7 +162,12 @@ def rebuild_historico_sinais():
                 continue
             try:
                 ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00")).replace(tzinfo=None)
-                _historico_sinais.setdefault(ticker, []).append(ts)
+                score = row.get("score_tecnico")
+                if score is None:
+                    score = row.get("score", 0)
+                _historico_sinais.setdefault(ticker, []).append(
+                    {"ts": ts, "tipo": row.get("tipo_sinal"), "score": int(score or 0)}
+                )
             except Exception:
                 pass
         logger.info(f"historico_sinais reconstituído: {len(_historico_sinais)} tickers com sinal recente")
