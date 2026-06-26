@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from scipy.stats import norm
 from backend.core.config import CONFIG
 from backend.domain.volatility import compute_log_returns
+from backend.domain.greeks import implied_volatility
 
 MESES_CALL = {"A":1,"B":2,"C":3,"D":4,"E":5,"F":6,"G":7,"H":8,"I":9,"J":10,"K":11,"L":12}
 MESES_PUT  = {"M":1,"N":2,"O":3,"P":4,"Q":5,"R":6,"S":7,"T":8,"U":9,"V":10,"W":11,"X":12}
@@ -129,3 +130,31 @@ def estimar_premio_otm(preco: float, strike: float, dte_du: int,
     except Exception:
         fator_otm = abs(preco - strike) / preco
         return max(0.10, round(preco * iv * math.sqrt(t) * max(0.1, 1 - fator_otm * 5), 2))
+
+def resolver_iv(preco_tela: float | None, S: float, K: float, T: float, tipo: str,
+                 hv_20d: float, ivs_strikes_vizinhos: list[float] | None = None) -> tuple[float, str]:
+    """
+    Fallback chain de IV implícita (Camada 1.1):
+      1. tela            — IV implícita do prêmio real, validada contra no-arbitrage.
+      2. strikes_vizinhos — mediana da IV implícita dos strikes líquidos vizinhos.
+      3. hv_proxy         — HV 20d × 1.1 (prêmio de risco típico).
+      4. default          — 0.40 (último recurso).
+    Retorna (iv, fonte).
+    """
+    ivs_strikes_vizinhos = ivs_strikes_vizinhos or []
+
+    if preco_tela and T > 0:
+        intrinsico = max(S - K, 0.0) if tipo.upper() == "CALL" else max(K - S, 0.0)
+        if preco_tela > intrinsico:
+            iv = implied_volatility(S, K, T, preco_tela, tipo, sigma_init=hv_20d or 0.5)
+            if 0.05 <= iv <= 3.0:
+                return iv, "tela"
+
+    validos = [v for v in ivs_strikes_vizinhos if v and 0.05 <= v <= 3.0]
+    if validos:
+        return float(np.median(validos)), "strikes_vizinhos"
+
+    if hv_20d and hv_20d > 0:
+        return float(hv_20d * 1.1), "hv_proxy"
+
+    return 0.40, "default"
