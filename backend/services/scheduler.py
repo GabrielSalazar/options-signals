@@ -9,6 +9,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from backend.services.signal_service import run_scan, cleanup_old_signals
+from backend.services.iv_history_service import coletar_iv_diaria
 
 logger = logging.getLogger("b3_api")
 
@@ -30,6 +31,14 @@ def start():
         trigger=CronTrigger(hour=2, minute=0, timezone="America/Sao_Paulo"),
         id="cleanup_job",
         name="Cleanup old signals",
+        replace_existing=True,
+        max_instances=1,
+    )
+    scheduler.add_job(
+        coletar_iv_diaria,
+        trigger=CronTrigger(day_of_week="mon-fri", hour=18, minute=0, timezone="America/Sao_Paulo"),
+        id="iv_history_job",
+        name="Coleta diaria de IV ATM (pos-fechamento)",
         replace_existing=True,
         max_instances=1,
     )
