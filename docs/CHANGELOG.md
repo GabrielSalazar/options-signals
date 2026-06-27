@@ -34,6 +34,36 @@ All notable changes to this project will be documented in this file.
 > Supabase (SQL Editor) e medir o delta de backtest pós-correção de look-ahead quando
 > houver dados de mercado (`BRAPI_TOKEN`).
 
+### Fixed (Camada 1 — Volatilidade Implícita)
+- **Rótulo de IV corrigido**: o campo que era exibido como "IV" na verdade era
+  volatilidade histórica de 20 dias. Renomeado para `hv_20d` em todo o backend
+  (`signal_service`, `outcome_service`, `outcome.py`, `telegram_service`) e no frontend
+  (`SignalCard`, `VolatilitySkew`, `alerts`/`analytics`/`scanner`/`signals` pages).
+
+### Added (Camada 1 — Volatilidade Implícita)
+- **Fallback chain de IV implícita real** (`resolver_iv`,
+  [backend/domain/options_math.py](../backend/domain/options_math.py)): deriva a IV do
+  prêmio real de tela quando disponível e válido (no-arbitrage), cai para a mediana da
+  IV dos strikes líquidos vizinhos, depois para HV 20d × 1.1, e por último para um
+  default de 0.40. Os Greeks do sinal (`iv_impl`, `iv_source`) agora usam essa cadeia em
+  vez da HV histórica.
+- **Histórico diário de IV e IV Rank** ([backend/services/iv_history_service.py](../backend/services/iv_history_service.py),
+  migração `005`): job agendado pós-fechamento (18h BRT, dias úteis) persiste a IV ATM
+  diária por ticker líquido em `iv_history`. `iv_rank()` calcula o percentil de 252 dias
+  quando há ≥60 dias úteis de histórico (`confiavel=True`); caso contrário usa o proxy
+  `iv_premium` (IV ATM / HV 20d).
+- **Filtro de volatilidade na emissão de sinais** (`avaliar_filtro_iv`,
+  [backend/domain/scoring.py](../backend/domain/scoring.py)): bloqueia ou exige score
+  técnico ≥7 quando a IV Rank/premium indica opção "cara". Roda em **modo shadow** por
+  padrão (`CONFIG["iv_filter_mode"]="shadow"` — loga a decisão sem filtrar); modo
+  `"ativo"` filtra de fato. Sinais carregam `iv_rank`/`iv_premium`/`iv_filter_decisao`,
+  persistidos no Supabase (migração `004`).
+
+> **Pendências da Camada 1 (não-bloqueantes):** aplicar as migrações `004`/`005` no
+> Supabase (SQL Editor) antes do deploy; manter `iv_filter_mode="shadow"` em produção
+> até `iv_history` acumular ≥60 dias úteis de cobertura para a maioria do universo
+> líquido (acompanhar via `iv_rank(...)["confiavel"]`).
+
 ### Added
 - **Rastreamento de desfecho de sinais** ([backend/domain/outcome.py](../backend/domain/outcome.py),
   [backend/services/outcome_service.py](../backend/services/outcome_service.py)): reprecifica
