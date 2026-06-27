@@ -27,7 +27,7 @@ def test_formatter_separa_score_tecnico_e_bonus(monkeypatch):
     tg.enviar_telegram({
         "ticker": "PETR4", "nome": "Petrobras", "tipo_sinal": "CALL",
         "mes_venc": 6, "ano_venc": 2026, "strike_ref": 40.0, "dist_otm_pct": 6.0,
-        "iv_hist": 35.0, "dte": 30, "entrada_min": 0.5, "entrada_max": 0.6,
+        "hv_20d": 35.0, "dte": 30, "entrada_min": 0.5, "entrada_max": 0.6,
         "alvo1": 0.7, "alvo2": 1.0, "alvo_final": 2.0, "stop": 0.3,
         "rr_alvo1": 0.5, "rr_alvo2": 1.0, "rr_final": 2.0,
         "score_tecnico": 9, "bonus_sessao": 3, "score": 9, "gatilhos": ["x"],

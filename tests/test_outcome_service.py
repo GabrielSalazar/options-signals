@@ -35,7 +35,7 @@ def _row(**over):
         "ticker": "TESTE3", "tipo_sinal": "CALL", "strike_ref": 110.0,
         "premio_est": 1.0, "preco_tela": None,
         "alvo1": 1.25, "alvo2": 3.50, "alvo_final": 8.0, "stop": 0.57,
-        "iv_hist": 40.0, "iv_mercado": None, "dte": 20, "preco_acao": 100.0,
+        "hv_20d": 40.0, "iv_mercado": None, "dte": 20, "preco_acao": 100.0,
         "score": 9, "score_ponderado": 72, "ponderado_passou": True,
         "timestamp": "2026-05-20T13:00:00+00:00",
     }

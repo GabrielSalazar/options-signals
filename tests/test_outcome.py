@@ -12,7 +12,7 @@ def _sinal(**over):
         "tipo_sinal": "CALL", "strike_ref": 110.0,
         "premio_est": 1.0, "preco_tela": None,
         "alvo1": 1.25, "alvo2": 3.50, "alvo_final": 8.0, "stop": 0.57,
-        "iv_hist": 40.0, "iv_mercado": None, "dte": 20, "preco_acao": 100.0,
+        "hv_20d": 40.0, "iv_mercado": None, "dte": 20, "preco_acao": 100.0,
     }
     s.update(over)
     return s

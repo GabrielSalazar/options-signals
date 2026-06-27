@@ -18,7 +18,7 @@ from backend.domain.outcome import avaliar_desfecho, comparar_por_desfecho
 logger = logging.getLogger("b3_api")
 
 _CAMPOS = ("ticker, tipo_sinal, strike_ref, premio_est, preco_tela, alvo1, alvo2, "
-           "alvo_final, stop, iv_hist, iv_mercado, dte, preco_acao, score, "
+           "alvo_final, stop, hv_20d, iv_mercado, dte, preco_acao, score, "
            "score_ponderado, ponderado_passou, timestamp")
 
 

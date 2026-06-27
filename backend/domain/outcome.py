@@ -30,7 +30,7 @@ def avaliar_desfecho(sinal: dict, precos_acao: list) -> dict:
     tipo = (sinal.get("tipo_sinal") or "CALL").upper()
     K = float(sinal["strike_ref"])
     base = float(sinal.get("preco_tela") or sinal["premio_est"])  # prêmio de entrada
-    iv_pct = sinal.get("iv_mercado") or sinal.get("iv_hist") or 40.0
+    iv_pct = sinal.get("iv_mercado") or sinal.get("hv_20d") or 40.0
     sigma = float(iv_pct) / 100.0
     dte0 = int(sinal["dte"])
     alvo1, alvo2 = float(sinal["alvo1"]), float(sinal["alvo2"])
