@@ -52,7 +52,7 @@ def rodar_backtest(ticker: str, nome: str, data_inicio: str, data_fim: str, inte
             sinal["max_return"] = 0.0
             
             premio_entrada = sinal["premio_est"]
-            iv = sinal["iv_hist"] / 100.0
+            iv = sinal["hv_20d"] / 100.0
             
             for j in range(horizonte):
                 future_row = df_full.iloc[i + j]

@@ -13,8 +13,8 @@ from backend.domain.indicators import (
     detectar_canal_linear,
     ultimos_pivots_confirmados,
 )
-from backend.domain.options_math import mes_vencimento_ideal, estimar_iv_historica, estimar_premio_otm
-from backend.services.data_providers import get_real_options_from_opcoes_net, fetch_brapi_historical
+from backend.domain.options_math import mes_vencimento_ideal, estimar_iv_historica, estimar_premio_otm, resolver_iv
+from backend.services.data_providers import get_real_options_from_opcoes_net, fetch_brapi_historical, obter_opcoes_vizinhas
 from backend.domain.greeks import calculate_greeks, implied_volatility
 from backend.domain.scoring import score_ponderado
 
@@ -223,8 +223,8 @@ def _montar_estrutura_opcao(ticker_base: str, preco: float, tipo_sinal: str,
     )
 
     mes_v, ano_v, dte = mes_vencimento_ideal()
-    iv           = estimar_iv_historica(df, interval=interval)
-    premio_est   = estimar_premio_otm(preco, strike_ref, dte, iv, tipo_sinal)
+    hv_20d       = estimar_iv_historica(df, interval=interval)
+    premio_est   = estimar_premio_otm(preco, strike_ref, dte, hv_20d, tipo_sinal)
 
     # --- INTEGRAÇÃO COM DADOS REAIS (opcoes.net.br) ---
     opcao_real = get_real_options_from_opcoes_net(ticker_base, tipo_sinal, strike_ref)
@@ -236,20 +236,26 @@ def _montar_estrutura_opcao(ticker_base: str, preco: float, tipo_sinal: str,
         preco_tela = None
         ticker_opcao = "N/A (S/ Liquidez)"
 
-    # Greeks: se há preço REAL de tela, derivamos IV de mercado e usamos no BS
     T = max(dte, 1) / 252
-    iv_mercado = None
-    sigma_para_greeks = iv
+
+    # Fallback chain de IV implícita (Camada 1.1): tela -> strikes vizinhos -> HV proxy -> default
+    ivs_vizinhos = []
     if preco_tela:
-        try:
-            iv_mercado = implied_volatility(
-                preco, strike_ref, T, preco_tela, tipo_sinal, sigma_init=iv,
-            )
-            if 0.05 <= iv_mercado <= 3.0:
-                sigma_para_greeks = iv_mercado
-        except Exception:
-            iv_mercado = None
-    greeks = calculate_greeks(preco, strike_ref, T, sigma_para_greeks, tipo_sinal)
+        for vizinho in obter_opcoes_vizinhas(ticker_base, tipo_sinal, strike_ref, mes_v, ano_v, strike_ref):
+            intrinsico = (max(preco - vizinho["strike_real"], 0.0) if tipo_sinal == "CALL"
+                         else max(vizinho["strike_real"] - preco, 0.0))
+            if vizinho["preco_tela"] > intrinsico:
+                try:
+                    ivs_vizinhos.append(implied_volatility(
+                        preco, vizinho["strike_real"], T, vizinho["preco_tela"],
+                        tipo_sinal, sigma_init=hv_20d,
+                    ))
+                except Exception:
+                    pass
+
+    iv_impl, iv_source = resolver_iv(preco_tela, preco, strike_ref, T, tipo_sinal, hv_20d, ivs_vizinhos)
+    iv_mercado = iv_impl if iv_source == "tela" else None
+    greeks = calculate_greeks(preco, strike_ref, T, iv_impl, tipo_sinal)
 
     delta_abs = abs(greeks["delta"])
     if delta_abs and not (CONFIG.get("delta_min", 0.0) <= delta_abs <= CONFIG.get("delta_max", 1.0)):
@@ -276,7 +282,8 @@ def _montar_estrutura_opcao(ticker_base: str, preco: float, tipo_sinal: str,
     rr_final     = round((alvo_final - preco_base_calculo) / risco, 2) if risco > 0 else 0
 
     return {
-        "dist_otm": dist_otm, "strike_ref": strike_ref, "iv": iv, "iv_mercado": iv_mercado,
+        "dist_otm": dist_otm, "strike_ref": strike_ref, "hv_20d": hv_20d,
+        "iv_impl": iv_impl, "iv_source": iv_source, "iv_mercado": iv_mercado,
         "dte": dte, "mes_v": mes_v, "ano_v": ano_v, "premio_est": premio_est,
         "preco_tela": preco_tela, "ticker_opcao": ticker_opcao,
         "entrada_min": entrada_min, "entrada_max": entrada_max,
@@ -314,7 +321,7 @@ def _montar_sinal(ticker_base: str, nome: str, tipo_sinal: str, direcao_label: s
                 logger.info(f"⚠ {ticker_base}: score ponderado {shadow_score} abaixo do limiar")
             return None
 
-    iv = estrutura["iv"]
+    hv_20d = estrutura["hv_20d"]
     iv_mercado = estrutura["iv_mercado"]
     return {
         "emoji":        emoji,
@@ -326,8 +333,10 @@ def _montar_sinal(ticker_base: str, nome: str, tipo_sinal: str, direcao_label: s
         "ticker_opcao": estrutura["ticker_opcao"],
         "strike_ref":   estrutura["strike_ref"],
         "dist_otm_pct": estrutura["dist_otm"] * 100,
-        "iv_hist":      round(iv * 100, 1),
+        "hv_20d":       round(hv_20d * 100, 1),
         "iv_mercado":   round(iv_mercado * 100, 1) if iv_mercado else None,
+        "iv_impl":      round(estrutura["iv_impl"] * 100, 1),
+        "iv_source":    estrutura["iv_source"],
         "dte":          estrutura["dte"],
         "mes_venc":     estrutura["mes_v"],
         "ano_venc":     estrutura["ano_v"],

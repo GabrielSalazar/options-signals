@@ -64,7 +64,9 @@ def test_analisar_ativo_sinal_call_caracterizacao(monkeypatch):
     assert (s["rr_alvo1"], s["rr_alvo2"], s["rr_final"]) == (0.5, 6.25, 17.5)
     assert len(s["gatilhos"]) == 4
     assert set(s["greeks"]) == {"delta", "gamma", "theta", "vega", "rho", "prob_profit"}
-    assert s["greeks"]["delta"] == pytest.approx(0.0095, abs=1e-3)
+    # Valor recalibrado: sem preço de tela, resolver_iv usa o fallback hv_proxy
+    # (hv_20d * 1.1), não hv_20d puro como antes da Camada 1.1 (Task 3).
+    assert s["greeks"]["delta"] == pytest.approx(0.0166, abs=1e-3)
 
 
 def test_analisar_ativo_volume_baixo_retorna_none():
@@ -245,3 +247,48 @@ def test_cache_key_inclui_period(monkeypatch):
     monkeypatch.setattr(core_engine, "_baixar_ohlcv", lambda *a, **k: None)
     core_engine._carregar_ohlcv("PETR4.SA", "1d", None, False, False)
     assert any(k.startswith("ohlcv:PETR4.SA:1d:") and k.count(":") == 3 for k in capturadas)
+
+
+def test_montar_estrutura_opcao_expoe_hv_20d_iv_impl_e_fonte(monkeypatch):
+    import pandas as pd
+    from backend.services import core_engine as ce
+
+    monkeypatch.setattr(ce, "get_real_options_from_opcoes_net", lambda *a, **k: None)
+    monkeypatch.setattr(ce, "obter_opcoes_vizinhas", lambda *a, **k: [])
+
+    # Preços com leve variação: Close constante geraria log-retornos == 0 e,
+    # portanto, hv_20d == 0.0 (resolver_iv cairia em "default" em vez de
+    # "hv_proxy"). Uma pequena oscilação garante hv_20d > 0, exercitando o
+    # fallback hv_proxy pretendido pelo teste.
+    closes = [100.0 + (i % 3 - 1) * 0.01 for i in range(25)]
+    df = pd.DataFrame({"Close": closes})
+    estrutura = ce._montar_estrutura_opcao("PETR4", 100.0, "CALL", df, "1d", verbose=False)
+
+    assert estrutura is not None
+    assert "hv_20d" in estrutura
+    assert "iv" not in estrutura          # chave antiga não deve mais existir
+    assert estrutura["iv_source"] == "hv_proxy"   # sem preço de tela nem vizinhos
+    assert estrutura["iv_impl"] == pytest.approx(estrutura["hv_20d"] * 1.1)
+
+
+def test_montar_estrutura_opcao_usa_iv_de_tela_quando_disponivel(monkeypatch):
+    import pandas as pd
+    from backend.services import core_engine as ce
+    from backend.domain.greeks import bs_call_price
+
+    preco, strike, dte = 100.0, 105.0, 20
+    T = dte / 252
+    preco_tela_real = bs_call_price(preco, strike, T, sigma=0.35)
+
+    monkeypatch.setattr(ce, "mes_vencimento_ideal", lambda: (6, 2026, dte))
+    monkeypatch.setattr(ce, "get_real_options_from_opcoes_net",
+                        lambda *a, **k: {"strike_real": strike, "preco_tela": preco_tela_real,
+                                         "ticker_opcao": "PETRC405"})
+    monkeypatch.setattr(ce, "obter_opcoes_vizinhas", lambda *a, **k: [])
+
+    df = pd.DataFrame({"Close": [100.0] * 25})
+    estrutura = ce._montar_estrutura_opcao("PETR4", preco, "CALL", df, "1d", verbose=False)
+
+    assert estrutura["iv_source"] == "tela"
+    assert estrutura["iv_impl"] == pytest.approx(0.35, abs=0.01)
+    assert estrutura["iv_mercado"] == pytest.approx(0.35, abs=0.01)
