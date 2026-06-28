@@ -133,8 +133,8 @@ export default function SignalCard({ signal }: { signal: Signal }) {
                             <p className="font-mono font-bold text-dw-ink-mid">{(signal.greeks.prob_profit * 100)?.toFixed(0)}%</p>
                         </div>
                         <div>
-                            <p className="label">IV Hist</p>
-                            <p className="font-mono font-bold text-dw-ink-mid">{signal.iv_hist?.toFixed(1)}%</p>
+                            <p className="label">HV 20d</p>
+                            <p className="font-mono font-bold text-dw-ink-mid">{signal.hv_20d?.toFixed(1)}%</p>
                         </div>
                     </div>
                     {signal.score_ponderado != null && (

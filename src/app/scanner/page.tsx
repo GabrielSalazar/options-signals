@@ -17,7 +17,7 @@ const HEALTH_RETRY_INTERVAL_S = 6;
 const DEMO_SIGNALS: Signal[] = [
     {
         ticker: 'PETR4', nome: 'Petrobras PN', tipo_sinal: 'CALL', direcao: 'COMPRA DE CALL',
-        preco_acao: 37.50, ticker_opcao: 'PETRF380', strike_ref: 39.38, dist_otm_pct: 5, iv_hist: 32.5, dte: 21,
+        preco_acao: 37.50, ticker_opcao: 'PETRF380', strike_ref: 39.38, dist_otm_pct: 5, hv_20d: 32.5, dte: 21,
         mes_venc: 6, ano_venc: 2026, premio_est: 0.45, preco_tela: 0.43, entrada_min: 0.40, entrada_max: 0.50,
         alvo1: 0.56, alvo2: 1.13, alvo_final: 2.25, stop: 0.26, rr_alvo1: 0.8, rr_alvo2: 1.51,
         rr_final: 3.96, score: 8, stoch_k: 22.5, rsi: 32.1, vol_ratio: 1.8,
@@ -25,7 +25,7 @@ const DEMO_SIGNALS: Signal[] = [
     },
     {
         ticker: 'VALE3', nome: 'Vale', tipo_sinal: 'PUT', direcao: 'COMPRA DE PUT',
-        preco_acao: 68.20, ticker_opcao: 'VALEP645', strike_ref: 64.59, dist_otm_pct: 5, iv_hist: 28.2, dte: 21,
+        preco_acao: 68.20, ticker_opcao: 'VALEP645', strike_ref: 64.59, dist_otm_pct: 5, hv_20d: 28.2, dte: 21,
         mes_venc: 6, ano_venc: 2026, premio_est: 0.38, preco_tela: 0.36, entrada_min: 0.34, entrada_max: 0.42,
         alvo1: 0.47, alvo2: 0.95, alvo_final: 1.90, stop: 0.22, rr_alvo1: 0.68, rr_alvo2: 1.92,
         rr_final: 3.93, score: 7, stoch_k: 78.5, rsi: 68.3, vol_ratio: 1.6,
@@ -33,7 +33,7 @@ const DEMO_SIGNALS: Signal[] = [
     },
     {
         ticker: 'MGLU3', nome: 'Magazine Luiza', tipo_sinal: 'CALL', direcao: 'COMPRA DE CALL',
-        preco_acao: 9.85, ticker_opcao: 'MGLUF109', strike_ref: 10.95, dist_otm_pct: 11, iv_hist: 42.1, dte: 21,
+        preco_acao: 9.85, ticker_opcao: 'MGLUF109', strike_ref: 10.95, dist_otm_pct: 11, hv_20d: 42.1, dte: 21,
         mes_venc: 6, ano_venc: 2026, premio_est: 0.32, preco_tela: 0.31, entrada_min: 0.29, entrada_max: 0.35,
         alvo1: 0.40, alvo2: 0.80, alvo_final: 1.60, stop: 0.19, rr_alvo1: 0.91, rr_alvo2: 2.27,
         rr_final: 4.82, score: 9, stoch_k: 18.2, rsi: 28.9, vol_ratio: 2.1,

@@ -28,7 +28,7 @@ export default function VolatilitySkew({ signals, ticker }: Props) {
       if (!byDate.has(dateStr)) byDate.set(dateStr, { iv: [], count: 0 });
       
       const obj = byDate.get(dateStr)!;
-      obj.iv.push(s.iv_hist);
+      obj.iv.push(s.hv_20d);
       obj.count++;
     });
     

@@ -50,7 +50,7 @@ function exportCSV(signals: Signal[]) {
     s.preco_acao?.toFixed(2) ?? '',
     s.strike_ref?.toFixed(2) ?? '',
     s.dte ?? '',
-    s.iv_hist?.toFixed(1) ?? '',
+    s.hv_20d?.toFixed(1) ?? '',
     s.rr_alvo1?.toFixed(2) ?? '',
     s.premio_est?.toFixed(2) ?? '',
   ].join(','));
@@ -455,7 +455,7 @@ export default function AlertsPage() {
                       {s.dte ?? '—'}d
                     </td>
                     <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--dw-ink-mid)' }}>
-                      {s.iv_hist?.toFixed(1) ?? '—'}%
+                      {s.hv_20d?.toFixed(1) ?? '—'}%
                     </td>
                     <td className="px-4 py-3 font-mono text-xs font-semibold" style={{ color: 'var(--dw-green)' }}>
                       {s.rr_alvo1?.toFixed(2) ?? '—'}x

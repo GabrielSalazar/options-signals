@@ -8,7 +8,7 @@ export interface Signal {
   ticker_opcao: string
   strike_ref: number
   dist_otm_pct: number
-  iv_hist: number
+  hv_20d: number
   dte: number
   mes_venc: number
   ano_venc: number

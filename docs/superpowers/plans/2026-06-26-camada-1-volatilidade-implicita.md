@@ -677,8 +677,10 @@ git commit -m "chore(db): adiciona migration 004 (rename iv_hist + colunas de IV
 
 ### Task 6: Frontend — rename `iv_hist`→`hv_20d`
 
+> **Escopo corrigido (descoberto durante a execução):** uma busca por `iv_hist` em `src/` no momento de executar esta tarefa encontrou 7 arquivos, não os 2 listados originalmente. Os 5 adicionais (`alerts/page.tsx`, `analytics/page.tsx`, `scanner/page.tsx`, `signals/page.tsx`, `VolatilitySkew.tsx`) também precisam do rename — a maioria são apenas leituras de campo ou dados mock de fixture, não há lógica nova a desenhar, mas todos devem ser corrigidos para o build não quebrar e para não haver `undefined` silencioso em produção.
+
 **Files:**
-- Modify: `src/types/signals.ts:11`, `src/components/SignalCard.tsx:137`
+- Modify: `src/types/signals.ts:11`, `src/components/SignalCard.tsx:137`, `src/app/alerts/page.tsx:53,458`, `src/app/analytics/page.tsx:104-105,122,315`, `src/app/scanner/page.tsx:20,28,36`, `src/app/signals/page.tsx:22,30,38,46,54,62,70,78`, `src/components/VolatilitySkew.tsx:31`
 
 - [ ] **Step 1: Atualizar o tipo**
 
@@ -694,20 +696,35 @@ por:
   hv_20d: number
 ```
 
-- [ ] **Step 2: Atualizar o componente**
+- [ ] **Step 2: Atualizar o componente SignalCard**
 
 Em `src/components/SignalCard.tsx:137`, localizar o bloco que renderiza o label (contexto: procurar por `iv_hist` no arquivo) e trocar a referência `signal.iv_hist` por `signal.hv_20d`, e o texto do label de "IV Hist" (ou equivalente) para "HV 20d".
 
-- [ ] **Step 3: Verificar tipos e build do frontend**
+- [ ] **Step 3: Atualizar os demais consumidores do campo**
+
+Em cada um dos arquivos abaixo, trocar toda ocorrência de `iv_hist` por `hv_20d` (campo lido de um objeto de sinal/mock, sem mudança de lógica — é uma renomeação mecânica de identificador):
+
+- `src/app/alerts/page.tsx:53` (`s.iv_hist?.toFixed(1) ?? ''` → `s.hv_20d?.toFixed(1) ?? ''`) e `:458` (`{s.iv_hist?.toFixed(1) ?? '—'}%` → `{s.hv_20d?.toFixed(1) ?? '—'}%`)
+- `src/app/analytics/page.tsx:104-105` (`bucket.calls.push(s.iv_hist)` / `bucket.puts.push(s.iv_hist)` → `s.hv_20d`), `:122` (`iv: s.iv_hist` → `iv: s.hv_20d`), `:315` (`sigma: signals[0].iv_hist` → `sigma: signals[0].hv_20d`)
+- `src/app/scanner/page.tsx:20,28,36` — três objetos mock com `iv_hist: <valor>` → `hv_20d: <valor>` (mesmo valor numérico, só o nome do campo muda)
+- `src/app/signals/page.tsx:22,30,38,46,54,62,70,78` — oito objetos mock, mesma troca (`iv_hist: <valor>` → `hv_20d: <valor>`)
+- `src/components/VolatilitySkew.tsx:31` (`obj.iv.push(s.iv_hist)` → `obj.iv.push(s.hv_20d)`)
+
+- [ ] **Step 4: Confirmar que não resta nenhuma referência**
+
+Run: `grep -rn "iv_hist" src/`
+Expected: nenhum resultado
+
+- [ ] **Step 5: Verificar tipos e build do frontend**
 
 Run: `npm run build` (ou `npx tsc --noEmit`, conforme o script disponível no `package.json`)
 Expected: sem erros de tipo relacionados a `iv_hist`/`hv_20d`
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/types/signals.ts src/components/SignalCard.tsx
-git commit -m "refactor(frontend): renomeia iv_hist para hv_20d no SignalCard"
+git add src/types/signals.ts src/components/SignalCard.tsx src/components/VolatilitySkew.tsx src/app/alerts/page.tsx src/app/analytics/page.tsx src/app/scanner/page.tsx src/app/signals/page.tsx
+git commit -m "refactor(frontend): renomeia iv_hist para hv_20d em todos os consumidores"
 ```
 
 ---

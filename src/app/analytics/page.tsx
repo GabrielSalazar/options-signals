@@ -101,8 +101,8 @@ export default function AnalyticsPage() {
       const key = Math.round(s.strike_ref * 10) / 10;
       if (!byStrike.has(key)) byStrike.set(key, { calls: [], puts: [] });
       const bucket = byStrike.get(key)!;
-      if (s.tipo_sinal === 'CALL') bucket.calls.push(s.iv_hist);
-      else bucket.puts.push(s.iv_hist);
+      if (s.tipo_sinal === 'CALL') bucket.calls.push(s.hv_20d);
+      else bucket.puts.push(s.hv_20d);
     });
     const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
     return Array.from(byStrike.entries())
@@ -119,7 +119,7 @@ export default function AnalyticsPage() {
     signals.map((s) => ({
       strike: s.strike_ref,
       expiry: `${String(s.mes_venc).padStart(2, '0')}/${s.ano_venc}`,
-      iv: s.iv_hist,
+      iv: s.hv_20d,
       tipo: s.tipo_sinal as 'CALL' | 'PUT',
     })),
     [signals],
@@ -312,7 +312,7 @@ export default function AnalyticsPage() {
               S: signals[0].preco_acao,
               K: signals[0].strike_ref,
               T: signals[0].dte,
-              sigma: signals[0].iv_hist,
+              sigma: signals[0].hv_20d,
               optType: signals[0].tipo_sinal.toLowerCase() as 'call' | 'put'
            } : undefined}
         />

@@ -19,7 +19,7 @@ const TICKER_SETOR: Record<string, string> = Object.fromEntries(
 const DEMO_SIGNALS: Signal[] = [
     {
         ticker: 'PETR4', nome: 'Petrobras PN', tipo_sinal: 'CALL', direcao: 'COMPRA DE CALL',
-        preco_acao: 37.50, ticker_opcao: 'PETRF380', strike_ref: 39.38, dist_otm_pct: 5, iv_hist: 32.5, dte: 21,
+        preco_acao: 37.50, ticker_opcao: 'PETRF380', strike_ref: 39.38, dist_otm_pct: 5, hv_20d: 32.5, dte: 21,
         mes_venc: 6, ano_venc: 2026, premio_est: 0.45, preco_tela: 0.43, entrada_min: 0.40, entrada_max: 0.50,
         alvo1: 0.56, alvo2: 1.13, alvo_final: 2.25, stop: 0.26, rr_alvo1: 0.8, rr_alvo2: 1.51,
         rr_final: 3.96, score: 8, stoch_k: 22.5, rsi: 32.1, vol_ratio: 1.8,
@@ -27,7 +27,7 @@ const DEMO_SIGNALS: Signal[] = [
     },
     {
         ticker: 'VALE3', nome: 'Vale', tipo_sinal: 'PUT', direcao: 'COMPRA DE PUT',
-        preco_acao: 68.20, ticker_opcao: 'VALEP645', strike_ref: 64.59, dist_otm_pct: 5, iv_hist: 28.2, dte: 21,
+        preco_acao: 68.20, ticker_opcao: 'VALEP645', strike_ref: 64.59, dist_otm_pct: 5, hv_20d: 28.2, dte: 21,
         mes_venc: 6, ano_venc: 2026, premio_est: 0.38, preco_tela: null, entrada_min: 0.34, entrada_max: 0.42,
         alvo1: 0.47, alvo2: 0.95, alvo_final: 1.90, stop: 0.22, rr_alvo1: 0.68, rr_alvo2: 1.92,
         rr_final: 3.93, score: 7, stoch_k: 78.5, rsi: 68.3, vol_ratio: 1.6,
@@ -35,7 +35,7 @@ const DEMO_SIGNALS: Signal[] = [
     },
     {
         ticker: 'MGLU3', nome: 'Magazine Luiza', tipo_sinal: 'CALL', direcao: 'COMPRA DE CALL',
-        preco_acao: 9.85, ticker_opcao: 'MGLUF109', strike_ref: 10.95, dist_otm_pct: 11, iv_hist: 42.1, dte: 21,
+        preco_acao: 9.85, ticker_opcao: 'MGLUF109', strike_ref: 10.95, dist_otm_pct: 11, hv_20d: 42.1, dte: 21,
         mes_venc: 6, ano_venc: 2026, premio_est: 0.32, preco_tela: null, entrada_min: 0.29, entrada_max: 0.35,
         alvo1: 0.40, alvo2: 0.80, alvo_final: 1.60, stop: 0.19, rr_alvo1: 0.91, rr_alvo2: 2.27,
         rr_final: 4.82, score: 9, stoch_k: 18.2, rsi: 28.9, vol_ratio: 2.1,
@@ -43,7 +43,7 @@ const DEMO_SIGNALS: Signal[] = [
     },
     {
         ticker: 'ITUB4', nome: 'Itaú Unibanco PN', tipo_sinal: 'CALL', direcao: 'COMPRA DE CALL',
-        preco_acao: 33.45, ticker_opcao: 'ITUBF350', strike_ref: 35.10, dist_otm_pct: 5, iv_hist: 22.8, dte: 28,
+        preco_acao: 33.45, ticker_opcao: 'ITUBF350', strike_ref: 35.10, dist_otm_pct: 5, hv_20d: 22.8, dte: 28,
         mes_venc: 6, ano_venc: 2026, premio_est: 0.38, preco_tela: null, entrada_min: 0.34, entrada_max: 0.42,
         alvo1: 0.48, alvo2: 0.95, alvo_final: 1.90, stop: 0.22, rr_alvo1: 0.71, rr_alvo2: 1.68,
         rr_final: 4.18, score: 7, stoch_k: 25.4, rsi: 34.2, vol_ratio: 1.5,
@@ -51,7 +51,7 @@ const DEMO_SIGNALS: Signal[] = [
     },
     {
         ticker: 'WEGE3', nome: 'Weg', tipo_sinal: 'PUT', direcao: 'COMPRA DE PUT',
-        preco_acao: 52.70, ticker_opcao: 'WEGEP499', strike_ref: 49.90, dist_otm_pct: 5, iv_hist: 19.4, dte: 21,
+        preco_acao: 52.70, ticker_opcao: 'WEGEP499', strike_ref: 49.90, dist_otm_pct: 5, hv_20d: 19.4, dte: 21,
         mes_venc: 6, ano_venc: 2026, premio_est: 0.55, preco_tela: null, entrada_min: 0.50, entrada_max: 0.60,
         alvo1: 0.69, alvo2: 1.38, alvo_final: 2.75, stop: 0.32, rr_alvo1: 0.76, rr_alvo2: 1.53,
         rr_final: 3.84, score: 6, stoch_k: 72.1, rsi: 66.8, vol_ratio: 1.4,
@@ -59,7 +59,7 @@ const DEMO_SIGNALS: Signal[] = [
     },
     {
         ticker: 'ABEV3', nome: 'Ambev', tipo_sinal: 'CALL', direcao: 'COMPRA DE CALL',
-        preco_acao: 11.94, ticker_opcao: 'ABEVF125', strike_ref: 12.53, dist_otm_pct: 5, iv_hist: 24.6, dte: 14,
+        preco_acao: 11.94, ticker_opcao: 'ABEVF125', strike_ref: 12.53, dist_otm_pct: 5, hv_20d: 24.6, dte: 14,
         mes_venc: 6, ano_venc: 2026, premio_est: 0.18, preco_tela: null, entrada_min: 0.16, entrada_max: 0.20,
         alvo1: 0.22, alvo2: 0.45, alvo_final: 0.90, stop: 0.10, rr_alvo1: 0.75, rr_alvo2: 1.81,
         rr_final: 4.50, score: 8, stoch_k: 19.3, rsi: 30.5, vol_ratio: 1.9,
@@ -67,7 +67,7 @@ const DEMO_SIGNALS: Signal[] = [
     },
     {
         ticker: 'BBAS3', nome: 'Banco do Brasil', tipo_sinal: 'CALL', direcao: 'COMPRA DE CALL',
-        preco_acao: 28.72, ticker_opcao: 'BBASF301', strike_ref: 30.15, dist_otm_pct: 5, iv_hist: 26.3, dte: 21,
+        preco_acao: 28.72, ticker_opcao: 'BBASF301', strike_ref: 30.15, dist_otm_pct: 5, hv_20d: 26.3, dte: 21,
         mes_venc: 6, ano_venc: 2026, premio_est: 0.29, preco_tela: null, entrada_min: 0.26, entrada_max: 0.32,
         alvo1: 0.36, alvo2: 0.72, alvo_final: 1.45, stop: 0.17, rr_alvo1: 0.67, rr_alvo2: 1.53,
         rr_final: 3.94, score: 7, stoch_k: 28.1, rsi: 35.7, vol_ratio: 1.7,
@@ -75,7 +75,7 @@ const DEMO_SIGNALS: Signal[] = [
     },
     {
         ticker: 'EGIE3', nome: 'Engie Brasil', tipo_sinal: 'PUT', direcao: 'COMPRA DE PUT',
-        preco_acao: 47.20, ticker_opcao: 'EGIEP448', strike_ref: 44.80, dist_otm_pct: 5, iv_hist: 16.2, dte: 28,
+        preco_acao: 47.20, ticker_opcao: 'EGIEP448', strike_ref: 44.80, dist_otm_pct: 5, hv_20d: 16.2, dte: 28,
         mes_venc: 6, ano_venc: 2026, premio_est: 0.42, preco_tela: null, entrada_min: 0.38, entrada_max: 0.46,
         alvo1: 0.52, alvo2: 1.05, alvo_final: 2.10, stop: 0.25, rr_alvo1: 0.71, rr_alvo2: 1.68,
         rr_final: 4.20, score: 6, stoch_k: 75.8, rsi: 70.2, vol_ratio: 1.3,
