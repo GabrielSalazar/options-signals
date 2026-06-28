@@ -33,6 +33,7 @@ CONFIG = {
     "min_score":            5,
     "scoring_mode":        "classico",  # "classico" | "ponderado"
     "min_score_ponderado": 60,           # limiar para modo ponderado (0-100)
+    "iv_filter_mode":       "shadow",   # "shadow" (loga decisao sem filtrar) | "ativo" (filtra de fato) — Camada 1.3
     "delta_min":           0.15,         # filtro de qualidade |delta| mínimo
     "delta_max":           0.45,         # filtro de qualidade |delta| máximo
     "option_price_min":    0.10,         # preço mínimo da opção (R$)

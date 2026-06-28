@@ -10,7 +10,7 @@ Cobre:
 """
 import pytest
 from unittest.mock import patch
-from backend.domain.scoring import score_ponderado
+from backend.domain.scoring import score_ponderado, avaliar_filtro_iv
 
 
 def _make_row(**overrides):
@@ -226,3 +226,58 @@ class TestScoreSignalThreshold:
         prev = _make_row(macd_diff=-0.3)
         result = score_ponderado(last, prev, 10.00, 90, {"delta": 0.05}, "CALL")
         assert result["signal"] is False, f"Score={result['score']} não deveria passar"
+
+
+def test_avaliar_filtro_iv_normal_com_rank_baixo():
+    r = avaliar_filtro_iv(iv_rank=30, iv_premium=None, iv_rank_confiavel=True, score_tecnico=5)
+    assert r["decisao"] == "normal"
+
+
+def test_avaliar_filtro_iv_exige_score_alto_na_faixa_media():
+    r = avaliar_filtro_iv(iv_rank=60, iv_premium=None, iv_rank_confiavel=True, score_tecnico=5)
+    assert r["decisao"] == "exige_score_7"
+
+
+def test_avaliar_filtro_iv_normal_na_faixa_media_se_score_compensa():
+    r = avaliar_filtro_iv(iv_rank=60, iv_premium=None, iv_rank_confiavel=True, score_tecnico=8)
+    assert r["decisao"] == "normal"
+
+
+def test_avaliar_filtro_iv_bloqueia_rank_alto():
+    r = avaliar_filtro_iv(iv_rank=80, iv_premium=None, iv_rank_confiavel=True, score_tecnico=9)
+    assert r["decisao"] == "bloquear"
+
+
+def test_avaliar_filtro_iv_usa_proxy_premium_sem_rank_confiavel():
+    r = avaliar_filtro_iv(iv_rank=None, iv_premium=1.6, iv_rank_confiavel=False, score_tecnico=9)
+    assert r["decisao"] == "bloquear"
+
+
+def test_avaliar_filtro_iv_normal_sem_nenhum_dado():
+    r = avaliar_filtro_iv(iv_rank=None, iv_premium=None, iv_rank_confiavel=False, score_tecnico=5)
+    assert r["decisao"] == "normal"
+
+
+def test_avaliar_filtro_iv_rank_exatamente_50_e_normal():
+    r = avaliar_filtro_iv(iv_rank=50, iv_premium=None, iv_rank_confiavel=True, score_tecnico=5)
+    assert r["decisao"] == "normal"
+
+
+def test_avaliar_filtro_iv_rank_exatamente_75_exige_score_7():
+    r = avaliar_filtro_iv(iv_rank=75, iv_premium=None, iv_rank_confiavel=True, score_tecnico=5)
+    assert r["decisao"] == "exige_score_7"
+
+
+def test_avaliar_filtro_iv_premium_exatamente_1_2_e_normal():
+    r = avaliar_filtro_iv(iv_rank=None, iv_premium=1.2, iv_rank_confiavel=False, score_tecnico=5)
+    assert r["decisao"] == "normal"
+
+
+def test_avaliar_filtro_iv_premium_exatamente_1_5_exige_score_7():
+    r = avaliar_filtro_iv(iv_rank=None, iv_premium=1.5, iv_rank_confiavel=False, score_tecnico=5)
+    assert r["decisao"] == "exige_score_7"
+
+
+def test_avaliar_filtro_iv_score_tecnico_exatamente_7_compensa_faixa_media():
+    r = avaliar_filtro_iv(iv_rank=60, iv_premium=None, iv_rank_confiavel=True, score_tecnico=7)
+    assert r["decisao"] == "normal"

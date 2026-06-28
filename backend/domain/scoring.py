@@ -171,3 +171,30 @@ def score_ponderado(last, prev, option_price: float, dte: int,
         "signal": score >= CONFIG.get("min_score_ponderado", 60),
         "reasons": reasons,
     }
+
+
+def avaliar_filtro_iv(iv_rank: float | None, iv_premium: float | None,
+                       iv_rank_confiavel: bool, score_tecnico: int) -> dict:
+    """
+    Decide o filtro de volatilidade da Camada 1.3. Os limites usam comparação
+    estrita (>), então o valor exato do limite cai sempre na faixa "abaixo":
+      IV Rank <= 50 (ou premium <= 1.2)            -> normal
+      IV Rank > 50 e <= 75 (ou premium > 1.2 e <= 1.5) -> exige score_tecnico >= 7
+      IV Rank > 75 (ou premium > 1.5)               -> bloquear
+    Usa iv_rank quando confiável (>=60 du de histórico); senão cai no proxy iv_premium.
+    Retorna {"decisao": str, "motivo": str}.
+    """
+    if iv_rank_confiavel and iv_rank is not None:
+        cara, media = iv_rank > 75, iv_rank > 50
+    elif iv_premium is not None:
+        cara, media = iv_premium > 1.5, iv_premium > 1.2
+    else:
+        return {"decisao": "normal", "motivo": "sem dado de IV — filtro inerte"}
+
+    if cara:
+        return {"decisao": "bloquear", "motivo": "IV cara — compra a seco bloqueada"}
+    if media:
+        if score_tecnico >= 7:
+            return {"decisao": "normal", "motivo": "IV moderada, mas score tecnico compensa"}
+        return {"decisao": "exige_score_7", "motivo": "IV moderada — exige score tecnico >= 7"}
+    return {"decisao": "normal", "motivo": "IV normal"}
