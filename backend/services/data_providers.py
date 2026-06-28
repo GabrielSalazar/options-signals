@@ -7,6 +7,7 @@ import logging
 import yfinance as yf
 from typing import Dict, List, Optional
 from backend.core.cache import cache_get, cache_set
+from backend.domain.options_math import decodificar_opcao_b3
 
 logger = logging.getLogger("b3_scanner")
 
@@ -256,6 +257,85 @@ def get_real_options_from_opcoes_net(ticker: str, tipo_alvo: str, strike_alvo: f
 
     cache_set(cache_key, result if result else {}, ttl=180)
     return result
+
+
+def obter_opcoes_vizinhas(ticker: str, tipo_alvo: str, strike_alvo: float,
+                           mes_v: int, ano_v: int, excluir_strike: float,
+                           n: int = 4) -> List[Dict]:
+    """
+    Busca até `n` opções líquidas do mesmo tipo e vencimento, mais próximas de
+    strike_alvo (excluindo o próprio strike). Usado no fallback chain de IV
+    (Camada 1.1) quando não há prêmio de tela para o strike de referência.
+    """
+    from backend.core.config import CONFIG
+    min_neg = CONFIG.get("min_negocios_opcao", 0)
+
+    chain = _fetch_chain(ticker)
+    candidatos = []
+
+    for op in chain:
+        if len(op) < 10:
+            continue
+        op_ticker, _, op_tipo, _, _, op_strike, _, _, op_preco, op_negocios = op[:10]
+
+        if op_tipo != tipo_alvo:
+            continue
+        if op_negocios is None or op_preco is None or op_preco <= 0.01:
+            continue
+        if op_negocios < min_neg:
+            continue
+        if abs(op_strike - excluir_strike) < 0.001:
+            continue
+
+        decoded = decodificar_opcao_b3(op_ticker)
+        if not decoded or decoded.get("mes_venc") != mes_v or decoded.get("ano_venc") != ano_v:
+            continue
+
+        candidatos.append({
+            "ticker_opcao": op_ticker,
+            "strike_real":  op_strike,
+            "preco_tela":   op_preco,
+        })
+
+    candidatos.sort(key=lambda c: abs(c["strike_real"] - strike_alvo))
+    return candidatos[:n]
+
+
+def obter_opcao_atm(ticker: str, preco_spot: float, mes_v: int, ano_v: int,
+                     tipo_alvo: str = "CALL") -> Optional[Dict]:
+    """
+    Busca a opção líquida mais próxima do spot (ATM) do tipo/vencimento dados.
+    Usado pelo job diário de histórico de IV (Camada 1.2).
+    """
+    from backend.core.config import CONFIG
+    min_neg = CONFIG.get("min_negocios_opcao", 0)
+
+    chain = _fetch_chain(ticker)
+    melhor = None
+    menor_distancia = float("inf")
+
+    for op in chain:
+        if len(op) < 10:
+            continue
+        op_ticker, _, op_tipo, _, _, op_strike, _, _, op_preco, op_negocios = op[:10]
+
+        if op_tipo != tipo_alvo:
+            continue
+        if op_negocios is None or op_preco is None or op_preco <= 0.01:
+            continue
+        if op_negocios < min_neg:
+            continue
+
+        decoded = decodificar_opcao_b3(op_ticker)
+        if not decoded or decoded.get("mes_venc") != mes_v or decoded.get("ano_venc") != ano_v:
+            continue
+
+        distancia = abs(op_strike - preco_spot)
+        if distancia < menor_distancia:
+            menor_distancia = distancia
+            melhor = {"ticker_opcao": op_ticker, "strike_real": op_strike, "preco_tela": op_preco}
+
+    return melhor
 
 
 def get_liquid_options_for_ticker(ticker: str, limit: int = 2) -> List[Dict]:

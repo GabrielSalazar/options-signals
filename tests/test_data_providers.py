@@ -73,3 +73,55 @@ def test_filtrar_por_volume_ignora_sem_dados(monkeypatch):
 
 def test_filtrar_por_volume_lista_vazia():
     assert dp.filtrar_por_volume([], min_volume_rs=1) == {}
+
+
+def _op(ticker_opcao, tipo, strike, preco, negocios=50):
+    # Layout da chain bruta: [ticker, _, tipo, _, _, strike, _, _, preco, negocios]
+    return [ticker_opcao, None, tipo, None, None, strike, None, None, preco, negocios]
+
+
+def test_obter_opcoes_vizinhas_filtra_tipo_vencimento_e_exclui_strike(monkeypatch):
+    chain = [
+        _op("PETRC405", "CALL", 40.5, 1.20),   # mesmo venc, vizinho
+        _op("PETRC410", "CALL", 41.0, 1.00),   # strike excluído
+        _op("PETRC395", "CALL", 39.5, 1.50),   # mesmo venc, vizinho
+        _op("PETRP405", "PUT",  40.5, 0.80),   # tipo errado
+        _op("PETRC505", "CALL", 50.5, 0.10),   # outro vencimento
+    ]
+    venc_por_ticker = {
+        "PETRC405": (6, 2026), "PETRC410": (6, 2026), "PETRC395": (6, 2026),
+        "PETRP405": (6, 2026), "PETRC505": (7, 2026),
+    }
+    monkeypatch.setattr(dp, "_fetch_chain", lambda t: chain)
+    monkeypatch.setattr(dp, "decodificar_opcao_b3",
+                        lambda t: dict(zip(("mes_venc", "ano_venc"), venc_por_ticker.get(t, (0, 0)))))
+    vizinhos = dp.obter_opcoes_vizinhas("PETR4", "CALL", strike_alvo=41.0,
+                                        mes_v=6, ano_v=2026, excluir_strike=41.0)
+    strikes = sorted(v["strike_real"] for v in vizinhos)
+    assert strikes == [39.5, 40.5]
+
+
+def test_obter_opcoes_vizinhas_respeita_limite_n(monkeypatch):
+    chain = [_op(f"PETRC{400+i}", "CALL", 40.0 + i, 1.0) for i in range(10)]
+    monkeypatch.setattr(dp, "_fetch_chain", lambda t: chain)
+    monkeypatch.setattr(dp, "decodificar_opcao_b3", lambda t: {"mes_venc": 6, "ano_venc": 2026})
+    vizinhos = dp.obter_opcoes_vizinhas("PETR4", "CALL", strike_alvo=45.0,
+                                        mes_v=6, ano_v=2026, excluir_strike=999.0, n=3)
+    assert len(vizinhos) == 3
+
+
+def test_obter_opcao_atm_acha_strike_mais_proximo_do_spot(monkeypatch):
+    chain = [
+        _op("PETRC400", "CALL", 40.0, 2.00),
+        _op("PETRC410", "CALL", 41.0, 1.50),
+        _op("PETRC420", "CALL", 42.0, 1.00),
+    ]
+    monkeypatch.setattr(dp, "_fetch_chain", lambda t: chain)
+    monkeypatch.setattr(dp, "decodificar_opcao_b3", lambda t: {"mes_venc": 6, "ano_venc": 2026})
+    atm = dp.obter_opcao_atm("PETR4", preco_spot=41.2, mes_v=6, ano_v=2026, tipo_alvo="CALL")
+    assert atm["strike_real"] == 41.0
+
+
+def test_obter_opcao_atm_retorna_none_sem_chain(monkeypatch):
+    monkeypatch.setattr(dp, "_fetch_chain", lambda t: [])
+    assert dp.obter_opcao_atm("PETR4", preco_spot=41.2, mes_v=6, ano_v=2026) is None
