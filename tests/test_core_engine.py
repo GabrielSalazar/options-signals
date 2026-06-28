@@ -69,6 +69,55 @@ def test_analisar_ativo_sinal_call_caracterizacao(monkeypatch):
     assert s["greeks"]["delta"] == pytest.approx(0.0166, abs=1e-3)
 
 
+def test_analisar_ativo_shadow_mode_nao_bloqueia_mesmo_com_filtro_indicando_bloqueio(monkeypatch):
+    _relax_and_mock(monkeypatch)
+    monkeypatch.setitem(core_engine.CONFIG, "iv_filter_mode", "shadow")
+    monkeypatch.setattr(core_engine, "obter_iv_rank",
+                        lambda ticker_base: {"iv_rank": 90, "iv_premium": None, "confiavel": True})
+    df = _make_df(0)
+
+    s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=df, indicators_calculated=True)
+
+    assert s is not None
+    assert s["iv_filter_decisao"] == "bloquear"
+
+
+def test_analisar_ativo_modo_ativo_bloqueia_quando_filtro_indica_bloqueio(monkeypatch):
+    _relax_and_mock(monkeypatch)
+    monkeypatch.setitem(core_engine.CONFIG, "iv_filter_mode", "ativo")
+    monkeypatch.setattr(core_engine, "obter_iv_rank",
+                        lambda ticker_base: {"iv_rank": 90, "iv_premium": None, "confiavel": True})
+    df = _make_df(0)
+
+    s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=df, indicators_calculated=True)
+
+    assert s is None
+
+
+def test_analisar_ativo_modo_ativo_bloqueia_no_ramo_exige_score_7_quando_score_baixo(monkeypatch):
+    _relax_and_mock(monkeypatch)
+    monkeypatch.setitem(core_engine.CONFIG, "iv_filter_mode", "ativo")
+    monkeypatch.setattr(core_engine, "obter_iv_rank",
+                        lambda ticker_base: {"iv_rank": 60, "iv_premium": None, "confiavel": True})
+    monkeypatch.setattr(core_engine, "avaliar_filtro_iv",
+                        lambda *a, **k: {"decisao": "exige_score_7", "motivo": "teste"})
+    # Score técnico real do df padrão é 9 (>=7), o que faria o filtro liberar
+    # mesmo na decisão "exige_score_7" (score compensa). Para exercitar de fato
+    # o branch `decisao == "exige_score_7" and score < 7`, força-se um score
+    # abaixo de 7 (mas ainda >= min_score=5, para não ser cortado antes) via
+    # mock de _avaliar_gatilhos — isola o teste do tunning fino dos gatilhos.
+    monkeypatch.setattr(core_engine, "_avaliar_gatilhos", lambda *a, **k: {
+        "sinais_alta": ["gatilho fake"], "sinais_baixa": [],
+        "score_alta": 5, "score_baixa": 0,
+        "stoch_k": 50.0, "rsi": 50.0, "vol_ratio": 1.0,
+    })
+    df = _make_df(0)
+
+    s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=df, indicators_calculated=True)
+
+    assert s is None
+
+
 def test_analisar_ativo_volume_baixo_retorna_none():
     df = _make_df(0)
     df["vol_media_20"] = 100  # abaixo de min_volume_acoes (1M) → rejeita no gate de volume

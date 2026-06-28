@@ -16,7 +16,8 @@ from backend.domain.indicators import (
 from backend.domain.options_math import mes_vencimento_ideal, estimar_iv_historica, estimar_premio_otm, resolver_iv
 from backend.services.data_providers import get_real_options_from_opcoes_net, fetch_brapi_historical, obter_opcoes_vizinhas
 from backend.domain.greeks import calculate_greeks, implied_volatility
-from backend.domain.scoring import score_ponderado
+from backend.domain.scoring import score_ponderado, avaliar_filtro_iv
+from backend.services.iv_history_service import iv_rank as obter_iv_rank
 
 logger = logging.getLogger("b3_scanner")
 
@@ -337,6 +338,9 @@ def _montar_sinal(ticker_base: str, nome: str, tipo_sinal: str, direcao_label: s
         "iv_mercado":   round(iv_mercado * 100, 1) if iv_mercado else None,
         "iv_impl":      round(estrutura["iv_impl"] * 100, 1),
         "iv_source":    estrutura["iv_source"],
+        "iv_rank":      estrutura.get("iv_rank"),
+        "iv_premium":   estrutura.get("iv_premium"),
+        "iv_filter_decisao": estrutura.get("iv_filter_decisao"),
         "dte":          estrutura["dte"],
         "mes_venc":     estrutura["mes_v"],
         "ano_venc":     estrutura["ano_v"],
@@ -428,6 +432,26 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
         estrutura = _montar_estrutura_opcao(ticker_base, preco, tipo_sinal, df, interval, verbose)
         if estrutura is None:
             return None
+
+        # ── FILTRO DE VOLATILIDADE (Camada 1.3 — shadow mode por padrão) ──
+        rank_info = obter_iv_rank(ticker_base)
+        filtro = avaliar_filtro_iv(rank_info["iv_rank"], rank_info["iv_premium"],
+                                   rank_info["confiavel"], score)
+        estrutura["iv_rank"] = rank_info["iv_rank"]
+        estrutura["iv_premium"] = rank_info["iv_premium"]
+        estrutura["iv_filter_decisao"] = filtro["decisao"]
+
+        if CONFIG.get("iv_filter_mode") == "ativo":
+            if filtro["decisao"] == "bloquear":
+                if verbose:
+                    logger.info(f"🚫 {ticker_base}: filtro IV bloqueou emissão ({filtro['motivo']})")
+                return None
+            if filtro["decisao"] == "exige_score_7" and score < 7:
+                if verbose:
+                    logger.info(f"🚫 {ticker_base}: filtro IV exige score>=7, atual={score} ({filtro['motivo']})")
+                return None
+        elif filtro["decisao"] != "normal" and verbose:
+            logger.info(f"ℹ {ticker_base}: filtro IV (shadow) indicaria '{filtro['decisao']}' — {filtro['motivo']}")
 
         if df_provided is None:
             registrar_sinal(ticker_base, tipo_sinal, score)
