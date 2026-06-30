@@ -13,7 +13,7 @@
 -- SELECT DISTINCT consenso_decisao FROM signals WHERE consenso_decisao IS NOT NULL AND consenso_decisao NOT IN ('passaria', 'bloquearia');
 -- SELECT DISTINCT setup FROM signals WHERE setup IS NOT NULL AND setup NOT IN ('REVERSAO', 'CONTINUACAO', 'HIBRIDO');
 -- SELECT DISTINCT resultado_final FROM trigger_outcomes WHERE resultado_final NOT IN ('alvo1', 'alvo2', 'alvo_final', 'stop', 'expirou', 'aberto', 'indeterminado');
--- SELECT to.signal_id FROM trigger_outcomes to LEFT JOIN signals s ON s.id = to.signal_id WHERE s.id IS NULL;
+-- SELECT tro.signal_id FROM trigger_outcomes tro LEFT JOIN signals s ON s.id = tro.signal_id WHERE s.id IS NULL;
 -- Se qualquer uma retornar linhas, NÃO aplicar esta migração sem antes
 -- corrigir/limpar os dados divergentes.
 -- ============================================================
