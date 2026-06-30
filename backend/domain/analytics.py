@@ -1,6 +1,7 @@
 """Shared statistical and analytical computations for market data."""
 import numpy as np
 import pandas as pd
+
 from backend.domain.volatility import compute_log_returns
 
 

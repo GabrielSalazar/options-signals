@@ -1,0 +1,17 @@
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+# Débito conhecido (baseline registrado na Task 15 do plano de melhorias
+# arquiteturais): estas categorias de estilo apareceram em volume alto
+# (~103 ocorrências) espalhadas por ~30 arquivos pré-existentes ao lint.
+# Corrigi-las exigiria reescrever lógica condensada em uma linha só em
+# vários módulos (fora do escopo desta task). F (bugs reais: imports não
+# usados, variáveis não usadas, etc.) permanece estrito.
+#   E501 (line-too-long, 42x)            — linhas longas pré-existentes
+#   E702 (multiple-statements-semicolon, 44x) — `a; b` em uma linha
+#   E701 (multiple-statements-colon, 6x)      — `if x: y` em uma linha
+#   E741 (ambiguous-variable-name, 11x)       — nomes curtos tipo `l`/`I`
+ignore = ["E501", "E701", "E702", "E741"]

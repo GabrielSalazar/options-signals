@@ -3,8 +3,8 @@
 Camada fina e isolada para que routers e serviços compartilhem a mesma forma
 de obter o cliente, sem duplicar a leitura de variáveis de ambiente.
 """
-import os
 import logging
+import os
 
 logger = logging.getLogger("b3_api")
 

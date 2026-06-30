@@ -8,10 +8,10 @@ Funções públicas:
   cache_get_df / cache_set_df — DataFrames pandas
   redis_status               — dict com estado da conexão (para /health)
 """
-import os
-import time
 import json
 import logging
+import os
+import time
 
 logger = logging.getLogger("b3_cache")
 
@@ -93,8 +93,9 @@ def cache_get_df(key: str):
         df = _mem_get(key)
         return df.copy() if df is not None else None
     try:
-        import pandas as pd
         from io import StringIO
+
+        import pandas as pd
         raw = r.get(key)
         return pd.read_json(StringIO(raw)) if raw else None
     except Exception:

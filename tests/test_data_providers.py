@@ -1,6 +1,8 @@
 """Testes de data_providers — fetch B3 oficial e filtro de volume (sem rede)."""
 from unittest.mock import MagicMock
+
 import pandas as pd
+
 from backend.services import data_providers as dp
 
 

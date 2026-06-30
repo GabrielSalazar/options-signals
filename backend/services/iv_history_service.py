@@ -2,10 +2,10 @@
 import logging
 from datetime import datetime, timezone
 
-from backend.domain.options_math import mes_vencimento_ideal, estimar_iv_historica, resolver_iv
+from backend.domain.options_math import estimar_iv_historica, mes_vencimento_ideal, resolver_iv
 from backend.services.data_providers import fetch_brapi_historical, obter_opcao_atm
-from backend.services.ticker_loader import carregar_tickers_b3
 from backend.services.supabase_client import get_supabase
+from backend.services.ticker_loader import carregar_tickers_b3
 
 logger = logging.getLogger("b3_api")
 

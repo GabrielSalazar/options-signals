@@ -1,10 +1,12 @@
+import base64
+import json
+import logging
 import os
 import time
-import json
-import base64
-import logging
-import yfinance as yf
 from typing import Dict, List, Optional
+
+import yfinance as yf
+
 from backend.core.cache import cache_get, cache_set
 from backend.domain.options_math import decodificar_opcao_b3
 from backend.services.http_client import get_with_retry

@@ -4,11 +4,11 @@ Ordem das rotas importa: os caminhos literais (`/stream`, `/all`, `/all-b3`)
 são declarados ANTES da rota paramétrica `/{ticker}`, senão esta última os
 captura (o segmento de path casa com `{ticker}` antes da validação do padrão).
 """
-import json
 import asyncio
+import json
 import logging
 
-from fastapi import APIRouter, Query, Path
+from fastapi import APIRouter, Path, Query
 from fastapi.responses import StreamingResponse
 
 from backend.core.config import ATIVOS_B3

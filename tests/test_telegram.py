@@ -229,8 +229,9 @@ def test_load_telegram_config_arquivo_corrompido_loga_warning(monkeypatch, tmp_p
 # ── save_telegram_config: fallback para arquivo ─────────────────────────────────
 
 def test_save_telegram_config_sem_supabase_grava_arquivo(monkeypatch, tmp_path):
-    import backend.services.telegram_service as tg
     import json
+
+    import backend.services.telegram_service as tg
     monkeypatch.setattr(tg, "get_supabase", lambda: None)
 
     config_file = tmp_path / "telegram_config.json"
@@ -243,8 +244,9 @@ def test_save_telegram_config_sem_supabase_grava_arquivo(monkeypatch, tmp_path):
 
 
 def test_save_telegram_config_supabase_excecao_cai_para_arquivo(monkeypatch, tmp_path, caplog):
-    import backend.services.telegram_service as tg
     import json
+
+    import backend.services.telegram_service as tg
 
     class _FakeTable:
         def upsert(self, row):

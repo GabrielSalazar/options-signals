@@ -31,8 +31,9 @@ def backtest_strategies():
 
 @router.post("/backtest/run")
 def backtest_run(params: BacktestParams):
-    from backend.services.backtest import rodar_backtest
     import numpy as np
+
+    from backend.services.backtest import rodar_backtest
     ticker_raw = params.ticker
     ticker = ticker_raw + ".SA"
     nome = ATIVOS_B3.get(ticker, ticker_raw)

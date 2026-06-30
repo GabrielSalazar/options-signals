@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from backend.domain.greeks import bs_call_price
 from backend.domain.options_math import (
     decodificar_opcao_b3,
     estimar_iv_historica,
@@ -12,7 +13,6 @@ from backend.domain.options_math import (
     mes_vencimento_ideal,
     resolver_iv,
 )
-from backend.domain.greeks import bs_call_price
 
 S, K, T, R, SIGMA = 100.0, 105.0, 30 / 365, 0.135, 0.30
 

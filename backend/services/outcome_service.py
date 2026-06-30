@@ -7,14 +7,14 @@ clássico (que decide hoje) com o ponderado (shadow), respondendo: dos sinais qu
 deram certo/errado, quantos o ponderado teria aprovado.
 """
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
-from backend.services.supabase_client import get_supabase
-from backend.services.core_engine import _baixar_ohlcv
 from backend.domain.outcome import avaliar_desfecho, comparar_por_desfecho, retorno_pct_do_desfecho
 from backend.domain.scoring import GATILHOS
+from backend.services.core_engine import _baixar_ohlcv
+from backend.services.supabase_client import get_supabase
 
 logger = logging.getLogger("b3_api")
 

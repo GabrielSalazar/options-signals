@@ -11,11 +11,14 @@ Cobre:
 import inspect
 import re
 
-import pytest
-from unittest.mock import patch
-from backend.domain.scoring import score_ponderado, avaliar_filtro_iv
-from backend.domain.scoring import GATILHOS, calcular_familias
-from backend.domain.scoring import classificar_setup, parametros_setup_shadow
+from backend.domain.scoring import (
+    GATILHOS,
+    avaliar_filtro_iv,
+    calcular_familias,
+    classificar_setup,
+    parametros_setup_shadow,
+    score_ponderado,
+)
 from backend.services import core_engine
 
 

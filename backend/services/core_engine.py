@@ -1,24 +1,45 @@
+import logging
 import os
 import time
-import yfinance as yf
-import pandas as pd
-import logging
 from datetime import datetime, timedelta
-from backend.core.config import CONFIG, OTM_POR_ATIVO, OTM_DEFAULT, is_reentrada_valida, registrar_sinal, score_horario
+
+import pandas as pd
+import yfinance as yf
+
 from backend.core.cache import cache_get_df, cache_set_df
+from backend.core.config import (
+    CONFIG,
+    OTM_DEFAULT,
+    OTM_POR_ATIVO,
+    is_reentrada_valida,
+    registrar_sinal,
+    score_horario,
+)
+from backend.domain.greeks import calculate_greeks, implied_volatility
 from backend.domain.indicators import (
     calcular_indicadores,
+    detectar_canal_linear,
     detectar_divergencia,
     encontrar_zonas_demanda_oferta,
-    detectar_canal_linear,
     ultimos_pivots_confirmados,
 )
-from backend.domain.options_math import mes_vencimento_ideal, estimar_iv_historica, estimar_premio_otm, resolver_iv
-from backend.services.data_providers import get_real_options_from_opcoes_net, fetch_brapi_historical, obter_opcoes_vizinhas
-from backend.domain.greeks import calculate_greeks, implied_volatility
+from backend.domain.options_math import (
+    estimar_iv_historica,
+    estimar_premio_otm,
+    mes_vencimento_ideal,
+    resolver_iv,
+)
 from backend.domain.scoring import (
-    score_ponderado, avaliar_filtro_iv, calcular_familias, classificar_setup,
+    avaliar_filtro_iv,
+    calcular_familias,
+    classificar_setup,
     parametros_setup_shadow,
+    score_ponderado,
+)
+from backend.services.data_providers import (
+    fetch_brapi_historical,
+    get_real_options_from_opcoes_net,
+    obter_opcoes_vizinhas,
 )
 from backend.services.iv_history_service import iv_rank as obter_iv_rank
 

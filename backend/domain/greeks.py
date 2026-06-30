@@ -9,7 +9,7 @@ Nota: como o preço da opção neste projeto é frequentemente ESTIMADO via Blac
 A função implied_volatility() está pronta para quando houver preço de mercado REAL.
 """
 import math
-import numpy as np
+
 from scipy.stats import norm
 
 RISK_FREE_RATE_DEFAULT = 0.135  # Selic ~13,5% a.a.

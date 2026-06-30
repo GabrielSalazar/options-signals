@@ -9,12 +9,20 @@ Cobre:
   - dentro_horario_pregao
 """
 import copy
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
+
 from backend.core.config import (
-    CONFIG, ATIVOS_B3, OTM_POR_ATIVO, OTM_DEFAULT,
-    score_horario, is_reentrada_valida, registrar_sinal,
-    validar_config, _historico_sinais,
+    ATIVOS_B3,
+    CONFIG,
+    OTM_DEFAULT,
+    OTM_POR_ATIVO,
+    _historico_sinais,
+    is_reentrada_valida,
+    registrar_sinal,
+    score_horario,
+    validar_config,
 )
 
 
@@ -137,9 +145,10 @@ class TestScoreHorario:
     def test_usa_timezone_brt_nao_naive(self, monkeypatch):
         """score_horario() sem argumento deve avaliar a hora em BRT, não no fuso
         do servidor. Simulamos um servidor em UTC: 16:30 UTC = 13:30 BRT → bônus 3."""
-        import backend.core.config as cfg
         from datetime import datetime as real_dt
         from zoneinfo import ZoneInfo
+
+        import backend.core.config as cfg
 
         class _FakeDateTime(real_dt):
             @classmethod

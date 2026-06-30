@@ -1,6 +1,7 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytest
+
 from backend.domain.analytics import compute_statistical_indicators
 
 
@@ -53,7 +54,7 @@ def test_exactly_21_periods_computes_sigma():
     result = compute_statistical_indicators(df)
 
     # Should compute sigma, not use fallback
-    assert result['sigma_20'] != 0.4, f"Expected computed sigma, got fallback 0.4"
+    assert result['sigma_20'] != 0.4, "Expected computed sigma, got fallback 0.4"
 
 
 def test_exactly_50_periods():

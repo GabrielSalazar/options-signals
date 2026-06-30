@@ -8,10 +8,11 @@ Estratégia:
 - DataFrame sintético de 300 linhas
 - Chain mockada com 3 opções (2 CALL + 1 PUT)
 """
+from unittest.mock import patch
+
 import numpy as np
 import pandas as pd
 import pytest
-from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from backend.api.main import app

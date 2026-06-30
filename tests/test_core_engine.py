@@ -12,8 +12,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from backend.services import core_engine
 from backend.domain.indicators import calcular_indicadores
+from backend.services import core_engine
 
 
 def _make_df(seed: int, n: int = 90, drop: float = 1.6) -> pd.DataFrame:
@@ -330,6 +330,7 @@ def test_cache_key_inclui_period(monkeypatch):
 
 def test_montar_estrutura_opcao_expoe_hv_20d_iv_impl_e_fonte(monkeypatch):
     import pandas as pd
+
     from backend.services import core_engine as ce
 
     monkeypatch.setattr(ce, "get_real_options_from_opcoes_net", lambda *a, **k: None)
@@ -352,8 +353,9 @@ def test_montar_estrutura_opcao_expoe_hv_20d_iv_impl_e_fonte(monkeypatch):
 
 def test_montar_estrutura_opcao_usa_iv_de_tela_quando_disponivel(monkeypatch):
     import pandas as pd
-    from backend.services import core_engine as ce
+
     from backend.domain.greeks import bs_call_price
+    from backend.services import core_engine as ce
 
     preco, strike, dte = 100.0, 105.0, 20
     T = dte / 252
@@ -659,8 +661,8 @@ def test_gatilho_b9_canal_baixista():
 def test_montar_estrutura_usa_iv_implicita_de_vizinhos_quando_sem_tela_direta(monkeypatch):
     """Quando há preço de tela mas não no strike exato, o fallback consulta
     strikes vizinhos (linhas 270-281) e tenta extrair IV implícita deles."""
-    from backend.services import core_engine as ce
     from backend.domain.greeks import bs_call_price
+    from backend.services import core_engine as ce
 
     preco, strike, dte = 100.0, 105.0, 20
     T = dte / 252
@@ -687,8 +689,8 @@ def test_montar_estrutura_usa_iv_de_vizinho_quando_tela_exata_eh_invalida(monkey
     """IV da tela no strike exato fica fora de [0.05, 3.0] (preço de tela ínfimo) →
     resolver_iv recorre à mediana das IVs dos vizinhos (linhas 270-281, loop completo
     sem excecão)."""
-    from backend.services import core_engine as ce
     from backend.domain.greeks import bs_call_price
+    from backend.services import core_engine as ce
 
     monkeypatch.setitem(ce.CONFIG, "delta_min", 0.0)
     monkeypatch.setitem(ce.CONFIG, "delta_max", 1.0)
@@ -744,7 +746,7 @@ def test_montar_estrutura_vizinho_com_preco_intrinsico_eh_ignorado(monkeypatch):
     `if vizinho["preco_tela"] > intrinsico`) — branch de exclusão exercitado."""
     from backend.services import core_engine as ce
 
-    preco, strike, dte = 100.0, 105.0, 20
+    preco, dte = 100.0, 20
     monkeypatch.setattr(ce, "mes_vencimento_ideal", lambda: (6, 2026, dte))
     # Sem strike exato disponível (preco_tela=None) força o fallback aos vizinhos.
     monkeypatch.setattr(ce, "get_real_options_from_opcoes_net", lambda *a, **k: None)

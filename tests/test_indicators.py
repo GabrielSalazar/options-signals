@@ -8,17 +8,19 @@ Cobre:
   - detectar_canal_linear
   - Edge cases (df curto, NaN, etc.)
 """
-import pytest
+from unittest.mock import patch
+
 import numpy as np
 import pandas as pd
+
 from backend.domain.indicators import (
     calcular_indicadores,
+    detectar_canal_linear,
     detectar_divergencia,
     encontrar_zonas_demanda_oferta,
-    detectar_canal_linear,
+    pivots_confirmados,
+    ultimos_pivots_confirmados,
 )
-from backend.domain.indicators import pivots_confirmados, ultimos_pivots_confirmados
-from unittest.mock import patch
 
 
 def _make_ohlcv(n=100, base=100.0, seed=42):
@@ -114,7 +116,6 @@ class TestDetectarDivergencia:
         df = _make_ohlcv(50)
         df = calcular_indicadores(df).dropna()
         # Forçar divergência altista
-        n = len(df)
         df.iloc[-1, df.columns.get_loc("Close")] = df.iloc[-5, df.columns.get_loc("Close")] * 0.95
         df.iloc[-1, df.columns.get_loc("rsi")] = df.iloc[-5, df.columns.get_loc("rsi")] + 10
         alta, baixa = detectar_divergencia(df, janela=5)
@@ -124,7 +125,6 @@ class TestDetectarDivergencia:
         """Preço sobe mas RSI cai → divergência baixista."""
         df = _make_ohlcv(50)
         df = calcular_indicadores(df).dropna()
-        n = len(df)
         df.iloc[-1, df.columns.get_loc("Close")] = df.iloc[-5, df.columns.get_loc("Close")] * 1.05
         df.iloc[-1, df.columns.get_loc("rsi")] = df.iloc[-5, df.columns.get_loc("rsi")] - 10
         alta, baixa = detectar_divergencia(df, janela=5)

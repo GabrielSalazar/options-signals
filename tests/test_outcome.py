@@ -5,7 +5,10 @@ sinal e, reprecificando a opção via Black-Scholes a cada dia, decide se o sina
 bateu alvo (ganho), bateu stop (perda), expirou ou ainda está aberto.
 """
 from backend.domain.outcome import (
-    avaliar_desfecho, comparar_por_desfecho, eh_ganho, retorno_pct_do_desfecho,
+    avaliar_desfecho,
+    comparar_por_desfecho,
+    eh_ganho,
+    retorno_pct_do_desfecho,
 )
 
 

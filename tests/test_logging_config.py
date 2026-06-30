@@ -1,6 +1,7 @@
 """Testes da configuração central de logging (P1-4: reduzir ruído de providers)."""
 import logging
-from backend.core.logging_config import configure_logging, NOISY_LOGGERS
+
+from backend.core.logging_config import NOISY_LOGGERS, configure_logging
 
 
 def test_silencia_loggers_ruidosos():

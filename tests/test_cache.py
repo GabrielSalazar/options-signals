@@ -10,7 +10,8 @@ Nota: Sem Redis rodando, cache_set/cache_get retornam None.
       Os testes verificam o comportamento graceful nesse cenário.
 """
 import pytest
-from backend.core.cache import cache_get, cache_set, cache_get_df, cache_set_df, redis_status
+
+from backend.core.cache import cache_get, cache_get_df, cache_set, cache_set_df, redis_status
 
 
 class TestRedisStatus:
@@ -69,6 +70,7 @@ class TestInMemoryFallback:
 
     def test_df_roundtrip_sem_redis(self, monkeypatch):
         import pandas as pd
+
         from backend.core import cache
         monkeypatch.setattr(cache, "_get_redis", lambda: None)
         df = pd.DataFrame({"A": [1, 2, 3]})
@@ -89,6 +91,7 @@ class TestInMemoryFallback:
 
     def test_df_get_retorna_copia(self, monkeypatch):
         import pandas as pd
+
         from backend.core import cache
         monkeypatch.setattr(cache, "_get_redis", lambda: None)
         df = pd.DataFrame({"A": [1, 2, 3]})
@@ -158,9 +161,10 @@ class TestGetRedisConnectFlow:
 
     def test_conexao_falha_marca_unavailable(self, monkeypatch):
         """Se redis.from_url/ping lançar, _get_redis retorna None e marca _unavailable."""
-        from backend.core import cache
         import sys
         import types
+
+        from backend.core import cache
 
         fake_redis_mod = types.ModuleType("redis")
 
@@ -179,9 +183,10 @@ class TestGetRedisConnectFlow:
 
     def test_conexao_sucesso_retorna_client_e_armazena(self, monkeypatch):
         """Se ping() funcionar, _get_redis retorna o client e o guarda em _client."""
-        from backend.core import cache
         import sys
         import types
+
+        from backend.core import cache
 
         class _FakeClient:
             def ping(self):
@@ -263,6 +268,7 @@ class TestCacheComRedisMockado:
 
     def test_cache_get_df_hit_deserializa_dataframe(self, monkeypatch):
         import pandas as pd
+
         from backend.core import cache
 
         df_original = pd.DataFrame({"A": [1, 2, 3]})
@@ -299,6 +305,7 @@ class TestCacheComRedisMockado:
 
     def test_cache_set_df_chama_setex_com_to_json(self, monkeypatch):
         import pandas as pd
+
         from backend.core import cache
         chamadas = {}
 
@@ -317,6 +324,7 @@ class TestCacheComRedisMockado:
 
     def test_cache_set_df_excecao_no_redis_nao_propaga(self, monkeypatch):
         import pandas as pd
+
         from backend.core import cache
 
         class _FakeRedis:

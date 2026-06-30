@@ -1,6 +1,6 @@
 """Testes dos vencimentos B3 — semanais (sexta) + mensais (3ª sexta)."""
-from backend.domain.options_math import _proximo_vencimento_b3, mes_vencimento_ideal
 from backend.core.config import CONFIG
+from backend.domain.options_math import _proximo_vencimento_b3, mes_vencimento_ideal
 
 
 def test_proximo_vencimento_retorna_data_valida_no_range():

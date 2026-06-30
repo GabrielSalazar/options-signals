@@ -8,8 +8,8 @@ import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from backend.services.signal_service import run_scan, cleanup_old_signals
 from backend.services.iv_history_service import coletar_iv_diaria
+from backend.services.signal_service import cleanup_old_signals, run_scan
 
 logger = logging.getLogger("b3_api")
 

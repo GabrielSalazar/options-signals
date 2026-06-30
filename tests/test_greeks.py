@@ -8,14 +8,17 @@ Cobre:
   - implied_volatility convergência
   - Edge cases (T=0, sigma=0, etc.)
 """
-import pytest
 import math
-from backend.domain.greeks import (
-    bs_call_price, bs_put_price,
-    calculate_greeks, implied_volatility,
-    _d1_d2, RISK_FREE_RATE_DEFAULT,
-)
 
+import pytest
+
+from backend.domain.greeks import (
+    _d1_d2,
+    bs_call_price,
+    bs_put_price,
+    calculate_greeks,
+    implied_volatility,
+)
 
 # ── Constantes de teste ──────────────────────────────────────────────────────
 

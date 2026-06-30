@@ -1,5 +1,6 @@
 """Testes do iv_history_service — coleta diária de IV ATM e cálculo de IV Rank."""
 import pandas as pd
+
 from backend.services import iv_history_service as ihs
 
 

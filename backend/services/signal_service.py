@@ -10,14 +10,14 @@ Dependências em sentido único: ``routers → services → domain/core``.
 import asyncio
 import logging
 import threading
-from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta, timezone
 
 from backend.core.config import ATIVOS_B3, CONFIG
-from backend.services.ticker_loader import carregar_tickers_b3, nome_ativo
 from backend.services.core_engine import analisar_ativo
 from backend.services.supabase_client import get_supabase
 from backend.services.telegram_service import enviar_telegram, notificar_lote
+from backend.services.ticker_loader import carregar_tickers_b3, nome_ativo
 
 logger = logging.getLogger("b3_api")
 

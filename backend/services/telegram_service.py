@@ -3,10 +3,10 @@
 Mantém a config do bot em ``CONFIG`` (backend.core.config), persistida em um
 arquivo JSON para sobreviver a soft-restarts, e envia os sinais formatados.
 """
-import os
 import json
-import time
 import logging
+import os
+import time
 
 import requests
 

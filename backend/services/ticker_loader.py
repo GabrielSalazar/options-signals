@@ -7,11 +7,11 @@ Redis) para reuso entre scans.
 Camadas: este módulo (service) é a casa da montagem de universo — o core
 (config) não importa services.
 """
-import time
 import logging
+import time
 from typing import Dict, Optional
 
-from backend.core.config import CONFIG, ATIVOS_B3
+from backend.core.config import ATIVOS_B3, CONFIG
 from backend.services.data_providers import (
     fetch_all_b3_tickers,
     fetch_b3_official_tickers,

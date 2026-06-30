@@ -1,12 +1,14 @@
-import math
 import calendar
+import math
+from datetime import datetime, timezone
+
 import numpy as np
 import pandas as pd
-from datetime import datetime, timezone
 from scipy.stats import norm
+
 from backend.core.config import CONFIG
-from backend.domain.volatility import compute_log_returns
 from backend.domain.greeks import implied_volatility
+from backend.domain.volatility import compute_log_returns
 
 MESES_CALL = {"A":1,"B":2,"C":3,"D":4,"E":5,"F":6,"G":7,"H":8,"I":9,"J":10,"K":11,"L":12}
 MESES_PUT  = {"M":1,"N":2,"O":3,"P":4,"Q":5,"R":6,"S":7,"T":8,"U":9,"V":10,"W":11,"X":12}
@@ -103,14 +105,14 @@ def estimar_iv_historica(df: pd.DataFrame, janela: int = 20, interval: str = "1d
     if len(retornos) < janela:
         return 0.40
     iv_periodo = retornos.tail(janela).std()
-    
+
     # Anualização baseada no timeframe
     if interval == "1h":
         # Assumindo 7 horas de pregão B3 por dia
         fator_anualizacao = np.sqrt(252 * 7)
     else:
         fator_anualizacao = np.sqrt(252)
-        
+
     return float(iv_periodo * fator_anualizacao)
 
 def estimar_premio_otm(preco: float, strike: float, dte_du: int,
@@ -121,7 +123,7 @@ def estimar_premio_otm(preco: float, strike: float, dte_du: int,
     try:
         d1 = (math.log(preco / strike) + 0.5 * iv**2 * t) / (iv * math.sqrt(t))
         d2 = d1 - iv * math.sqrt(t)
-        
+
         if tipo == "PUT":
             premio = strike * norm.cdf(-d2) - preco * norm.cdf(-d1)
         else:

@@ -20,9 +20,9 @@ atingir o nome no módulo de origem `backend.services.backtest.rodar_backtest`
 — não em `backend.api.routers.backtest`, que não tem esse nome até a função
 rodar.
 """
-import pandas as pd
 from unittest.mock import patch
 
+import pandas as pd
 from fastapi.testclient import TestClient
 
 from backend.api.main import app

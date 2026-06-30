@@ -1,5 +1,6 @@
-import requests
 import pytest
+import requests
+
 from backend.services.http_client import get_with_retry
 
 

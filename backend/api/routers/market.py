@@ -1,18 +1,17 @@
 """Endpoints de dados de mercado: cotações de índices/ações e opções líquidas."""
 import logging
-import numpy as np
-import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import numpy as np
+import pandas as pd
 from fastapi import APIRouter, HTTPException
 
-from backend.services.data_providers import fetch_brapi_historical, _fetch_chain
-from backend.domain.options_math import estimar_iv_historica, mes_vencimento_ideal
-from backend.domain.indicators import _rsi_manual, _stoch_manual, _adx_manual, calcular_indicadores
-from backend.domain.setups import detectar_setups
-from backend.domain.greeks import implied_volatility
 from backend.domain.analytics import compute_statistical_indicators
-from backend.domain.volatility import compute_log_returns
+from backend.domain.greeks import implied_volatility
+from backend.domain.indicators import _adx_manual, _stoch_manual, calcular_indicadores
+from backend.domain.options_math import mes_vencimento_ideal
+from backend.domain.setups import detectar_setups
+from backend.services.data_providers import _fetch_chain
 
 logger = logging.getLogger("b3_api")
 router = APIRouter(prefix="/market", tags=["Market"])
@@ -102,7 +101,6 @@ def get_market_options():
 @router.get("/opcoes/chain/{ticker}")
 def get_options_chain(ticker: str):
     """Retorna a cadeia completa de opções em tempo real para o ticker."""
-    from backend.services.data_providers import _fetch_chain
     chain = _fetch_chain(ticker)
     opcoes = []
     for op in chain:
@@ -122,7 +120,9 @@ def get_options_chain(ticker: str):
 def _fetch_historical_with_fallback(ticker: str) -> "pd.DataFrame":
     """Tenta brapi → yfinance → Yahoo Finance HTTP direto."""
     import time
+
     import yfinance as yf
+
     import backend.services.data_providers as dp
 
     df = dp.fetch_brapi_historical(ticker, "6mo")
@@ -244,6 +244,7 @@ def get_market_analysis(ticker: str):
     preco_dcf: float | None = None
     try:
         import math
+
         import yfinance as yf
         yf_ticker_str = ticker if ticker.upper().endswith(".SA") else f"{ticker.upper()}.SA"
         t = yf.Ticker(yf_ticker_str)
@@ -351,6 +352,7 @@ def get_market_indicators(ticker: str):
     """Indicadores técnicos + setups de price action + leitura de vol para a
     sub-página 'Indicadores e Setup'. Contrato: IndicatorsPayload (ver spec)."""
     import math
+
     import backend.api.routers.market as _self
 
     df = _self._fetch_historical_with_fallback(ticker)

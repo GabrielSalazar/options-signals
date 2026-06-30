@@ -1,8 +1,8 @@
 """Testes de run_scan — seleção de universo, lote único de Telegram (sem rede)."""
 import asyncio
 
-from backend.services import signal_service as ss
 from backend.core.config import ATIVOS_B3
+from backend.services import signal_service as ss
 
 
 def _stub_common(monkeypatch):
@@ -136,8 +136,6 @@ def test_maybe_broadcast_sem_loop_rodando_nao_quebra():
 
 
 def test_maybe_broadcast_com_loop_rodando_agenda_task(monkeypatch):
-    criado = {}
-
     async def _run():
         q = ss.register_alert_queue()
         try:

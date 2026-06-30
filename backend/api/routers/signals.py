@@ -1,15 +1,14 @@
 """Endpoints de consulta de sinais: listagem, histórico, watchlist, analytics
 e performance agregada. (O scan em si fica em routers/scan.py.)"""
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.core.config import ATIVOS_B3
-from backend.services.ticker_loader import get_all_b3_assets
-from backend.services import signal_service
-from backend.services import signals_repository
+from backend.services import signal_service, signals_repository
 from backend.services.supabase_client import get_supabase
+from backend.services.ticker_loader import get_all_b3_assets
 
 logger = logging.getLogger("b3_api")
 router = APIRouter(tags=["Signals"])

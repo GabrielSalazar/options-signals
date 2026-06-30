@@ -142,8 +142,9 @@ def test_persistir_trigger_outcomes_falha_upsert_loga_e_nao_propaga(monkeypatch,
 # ── _precos_desde: caminho real (sem mock), via _baixar_ohlcv ──────────────
 
 def test_precos_desde_retorna_closes_a_partir_da_data(monkeypatch):
-    import pandas as pd
     from datetime import datetime, timezone
+
+    import pandas as pd
 
     idx = pd.date_range("2026-05-01", periods=10, freq="D")
     df = pd.DataFrame({"Close": [float(i) for i in range(10)]}, index=idx)
@@ -176,8 +177,9 @@ def test_precos_desde_sem_coluna_close_retorna_lista_vazia(monkeypatch):
 def test_precos_desde_normaliza_colunas_multiindex(monkeypatch):
     """Colunas tipo (campo, ticker) — formato do yfinance multi-ticker — são
     normalizadas para o nome simples antes de procurar 'Close'."""
-    import pandas as pd
     from datetime import datetime, timezone
+
+    import pandas as pd
 
     idx = pd.date_range("2026-05-01", periods=3, freq="D")
     df = pd.DataFrame({("Close", "PETR4.SA"): [10.0, 11.0, 12.0]}, index=idx)

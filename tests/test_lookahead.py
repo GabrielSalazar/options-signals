@@ -7,10 +7,12 @@ zonas de demanda/oferta — os demais indicadores (RSI, MACD, EMA…) são causa
 import numpy as np
 import pandas as pd
 
-from backend.domain.indicators import (
-    calcular_indicadores, ultimos_pivots_confirmados, encontrar_zonas_demanda_oferta,
-)
 from backend.core.config import CONFIG
+from backend.domain.indicators import (
+    calcular_indicadores,
+    encontrar_zonas_demanda_oferta,
+    ultimos_pivots_confirmados,
+)
 
 
 def _ohlcv(seed: int, n: int = 150) -> pd.DataFrame:

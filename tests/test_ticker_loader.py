@@ -1,6 +1,6 @@
 """Testes do ticker_loader — orquestração do universo líquido (sem rede)."""
-from backend.services import ticker_loader as tl
 from backend.core.config import ATIVOS_B3
+from backend.services import ticker_loader as tl
 
 
 def setup_function():
@@ -79,6 +79,7 @@ def test_config_nao_exporta_mais_get_all_b3_assets():
 def test_config_nao_importa_services():
     """config (core) não pode importar services (regra de camadas)."""
     import inspect
+
     import backend.core.config as cfg
     src = inspect.getsource(cfg)
     assert "backend.services" not in src

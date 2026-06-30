@@ -16,6 +16,8 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt
       - run: pip install pytest pytest-cov
+      - run: pip install ruff
+      - run: ruff check backend/ tests/
       - run: python -m pytest tests/ -q --ignore=tests/test_market_analysis.py
       - run: python -m pytest tests/test_market_analysis.py -q -k "not test_analysis_dados_insuficientes_retorna_422" --no-header
 

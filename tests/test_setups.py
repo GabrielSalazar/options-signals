@@ -1,9 +1,18 @@
 import pandas as pd
-from backend.domain.setups import SetupResult, _tendencia_ema9, larry_91
-from backend.domain.setups import larry_92, larry_93
-from backend.domain.setups import inside_bar, rompimento
-from backend.domain.setups import engolfo, pin_bar, doji
-from backend.domain.setups import pullback_media, detectar_setups
+
+from backend.domain.setups import (
+    _tendencia_ema9,
+    detectar_setups,
+    doji,
+    engolfo,
+    inside_bar,
+    larry_91,
+    larry_92,
+    larry_93,
+    pin_bar,
+    pullback_media,
+    rompimento,
+)
 
 
 def _df(rows):

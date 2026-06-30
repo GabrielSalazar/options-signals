@@ -5,7 +5,6 @@ disparar o lifespan (scheduler/Telegram/Supabase) — instanciamos o TestClient
 sem o context manager, então os eventos de startup não rodam. Sem Supabase no
 ambiente de teste, os endpoints caem para o estado em memória.
 """
-import pytest
 from fastapi.testclient import TestClient
 
 from backend.api.main import app

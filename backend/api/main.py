@@ -4,24 +4,24 @@ Responsável apenas por compor a aplicação: ciclo de vida (lifespan),
 middlewares (CORS, rate limit), métricas e registro dos routers. Toda a lógica
 de negócio vive em backend/services e os endpoints em backend/api/routers.
 """
-import os
 import logging
+import os
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
 from prometheus_client import make_asgi_app
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 
+from backend.api.routers import backtest, config, health, market, scan, signals
 from backend.core.cache import redis_status
 from backend.core.logging_config import configure_logging
-from backend.services import signal_service, scheduler
+from backend.services import scheduler, signal_service
 from backend.services.telegram_service import load_telegram_config
-from backend.api.routers import health, signals, scan, backtest, market, config
 
 load_dotenv()
 

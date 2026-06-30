@@ -1,6 +1,6 @@
 """Volatility and return calculations."""
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 
 def compute_log_returns(close: pd.Series) -> pd.Series:
