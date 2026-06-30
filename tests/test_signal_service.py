@@ -49,3 +49,36 @@ def test_scan_batch_usa_nome_enriquecido(monkeypatch):
     monkeypatch.setattr(ss, "notificar_lote", lambda s: None)
     ss.scan_batch(["XPTO3"])  # não-curado → deve vir o nome da B3, não o código
     assert captured["nome"] == "XPTO Corp"
+
+
+def test_persist_signals_propaga_campos_da_camada_2(monkeypatch):
+    capturado = {}
+
+    class _FakeTable:
+        def insert(self, rows):
+            capturado["rows"] = rows
+            return self
+        def execute(self):
+            return type("R", (), {"data": capturado["rows"]})()
+
+    class _FakeSupabase:
+        def table(self, nome):
+            return _FakeTable()
+
+    monkeypatch.setattr(ss, "get_supabase", lambda: _FakeSupabase())
+
+    sinal = {
+        "ticker": "TESTE3", "tipo_sinal": "CALL", "score": 9,
+        "gatilhos_ids": ["G2", "G3"], "familias_ativas": 2,
+        "score_familias_capped": 4, "consenso_decisao": "passaria",
+        "setup": "REVERSAO", "setup_params_shadow": {"otm_mult": 0.7},
+    }
+    ss.persist_signals([sinal])
+
+    row = capturado["rows"][0]
+    assert row["gatilhos_ids"] == ["G2", "G3"]
+    assert row["familias_ativas"] == 2
+    assert row["score_familias_capped"] == 4
+    assert row["consenso_decisao"] == "passaria"
+    assert row["setup"] == "REVERSAO"
+    assert row["setup_params_shadow"] == {"otm_mult": 0.7}
