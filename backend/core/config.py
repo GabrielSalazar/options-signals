@@ -1,78 +1,16 @@
-import os
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from backend.core.settings import MotorSettings
+
 _TZ_SP = ZoneInfo("America/Sao_Paulo")
 
-CONFIG = {
-    # ── Indicadores ────────────────────────────────────────────────────────
-    "stoch_k_period":    14,
-    "stoch_d_period":    3,
-    "stoch_smooth":      3,
-    "stoch_oversold":    25,
-    "stoch_overbought":  75,
-    "rsi_period":        14,
-    "rsi_oversold":      35,
-    "rsi_overbought":    65,
-    "ema_fast":          9,
-    "ema_slow":          21,
-    "volume_mult":       1.5,
-
-    # ── Gestão de risco (calibrado sobre 31 sinais reais) ──────────────────
-    "stop_pct":          -0.43,
-    "alvo1_pct":         0.25,
-    "alvo2_pct":         2.50,
-    "alvo_final_pct":    7.00,
-    "buy_band_pct":      0.035,   # faixa de compra = ±3,5% do preço central
-    "book_days":         7,       # validade da ordem no book (dias corridos)
-
-    # ── Filtros ────────────────────────────────────────────────────────────
-    "min_volume_acoes":     1_000_000,   # volume mínimo diário em QUANTIDADE DE AÇÕES (filtro fino do core_engine)
-    "min_variacao_gatilho": 0.015,
-    "lookback_dias":        30,
-    "min_score":            5,
-    "scoring_mode":        "classico",  # "classico" | "ponderado"
-    "min_score_ponderado": 60,           # limiar para modo ponderado (0-100)
-    "iv_filter_mode":       "shadow",   # "shadow" (loga decisao sem filtrar) | "ativo" (filtra de fato) — Camada 1.3
-    "familia_cap_oscilador":   4,   # teto de contribuicao por familia (Camada 2.1)
-    "familia_cap_tendencia":   4,
-    "familia_cap_estrutura":   3,
-    "familia_cap_divergencia": 3,
-    "familia_cap_liquidez":    4,
-    "delta_min":           0.15,         # filtro de qualidade |delta| mínimo
-    "delta_max":           0.45,         # filtro de qualidade |delta| máximo
-    "option_price_min":    0.10,         # preço mínimo da opção (R$)
-    "option_price_max":    3.00,         # preço máximo da opção (R$)
-    "min_negocios_opcao":  10,           # nº mínimo de negócios na opção (proxy de OI/liquidez)
-
-    # ── DTE (Days to Expiration) ───────────────────────────────────────────
-    "dte_minimo":   1,     # B3: vencimentos semanais (sexta) + mensais (3ª sexta)
-    "dte_maximo":   45,
-
-    # ── Reentrada ──────────────────────────────────────────────────────────
-    "reentrada_min_dias": 3,
-    "reentrada_mesma_direcao_dias": 3,         # bloqueio de mesma direção (ticker, tipo)
-    "reentrada_direcao_oposta_delta_score": 2, # reversão só se score >= vigente + delta
-
-    # ── Pivots locais (anti-look-ahead) ────────────────────────────────────
-    "pivot_ordem": 1,   # candles à esquerda E à direita p/ confirmar pivot.
-                        # 1 = preserva o comportamento de produção atual e elimina
-                        # o look-ahead no backtest. ↑ (3–5) = pivots mais robustos
-                        # (calibração da Camada 2/5).
-
-    # ── Carregador de tickers (universo líquido) ───────────────────────────
-    "min_volume_rs":         5_000_000,   # piso de volume financeiro diário (R$) p/ pré-filtro
-    "ticker_top_n":          150,         # nº máx de tickers no universo líquido (None = sem limite)
-    "ticker_cache_segundos": 3600,        # TTL do cache da lista líquida (em processo)
-
-    # ── Scan / notificações (pontos expostos A2/A3) ────────────────────────
-    "scan_max_workers":      8,           # workers do scan completo (alavanca anti rate-limit)
-    "telegram_throttle_s":   0.5,         # delay entre envios de Telegram (evita 429)
-
-    # ── Telegram (opcional) ───────────────────────────────────────────────
-    "telegram_token":   os.getenv("TELEGRAM_TOKEN", ""),
-    "telegram_chat_id": os.getenv("TELEGRAM_CHAT_ID", ""),
-}
+_settings = MotorSettings()
+CONFIG: dict = _settings.model_dump(by_alias=False)
+# CONFIG continua sendo um dict mutável (compatibilidade com os usos
+# existentes de CONFIG["x"]/CONFIG.get("x") e com a mutação em runtime de
+# _historico_sinais já documentada). A validação de schema acontece uma
+# vez, no boot, via MotorSettings.
 
 ATIVOS_B3 = {
     "ITUB4.SA":  "Itaú Unibanco",
