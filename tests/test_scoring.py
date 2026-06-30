@@ -8,11 +8,15 @@ Cobre:
   - Limite do score em [0, 100]
   - Sinal passando ou não com base no limiar
 """
+import inspect
+import re
+
 import pytest
 from unittest.mock import patch
 from backend.domain.scoring import score_ponderado, avaliar_filtro_iv
 from backend.domain.scoring import GATILHOS, calcular_familias
 from backend.domain.scoring import classificar_setup, parametros_setup_shadow
+from backend.services import core_engine
 
 
 def _make_row(**overrides):
@@ -352,3 +356,22 @@ def test_parametros_setup_shadow_continuacao():
 
 def test_parametros_setup_shadow_hibrido_usa_valores_de_continuacao():
     assert parametros_setup_shadow("HIBRIDO") == parametros_setup_shadow("CONTINUACAO")
+
+
+def test_paridade_ids_avaliar_gatilhos_vs_registro_gatilhos():
+    """Todo ID 'append'ado em ids_alta/ids_baixa dentro de _avaliar_gatilhos
+    precisa existir como chave em GATILHOS — senão calcular_familias()
+    o ignora silenciosamente (scoring.py: "if not info: continue")."""
+    codigo = inspect.getsource(core_engine._avaliar_gatilhos)
+    ids_no_codigo = set(re.findall(r'ids_(?:alta|baixa)\.append\("([GB]\d+)"\)', codigo))
+
+    assert ids_no_codigo, (
+        "Regex não encontrou nenhum ID — _avaliar_gatilhos pode ter mudado de "
+        "formato (ex.: append deixou de usar string literal direta). Ajustar a regex."
+    )
+    faltando_no_registro = ids_no_codigo - set(GATILHOS.keys())
+    assert not faltando_no_registro, (
+        f"IDs disparados em _avaliar_gatilhos mas ausentes do registro GATILHOS: "
+        f"{faltando_no_registro}. Adicione-os em backend/domain/scoring.py::GATILHOS "
+        f"com sua família e pontuação."
+    )
