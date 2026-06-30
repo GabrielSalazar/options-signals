@@ -8,6 +8,7 @@ reprecificado contra alvos/stop, classificamos o sinal como ganho/perda/aberto.
 Isso permite comparar, de forma justa, o score clássico vs. o ponderado (shadow):
 dos sinais que deram certo/errado, quantos o ponderado teria aprovado.
 """
+from backend.core.config import CONFIG
 from backend.domain.greeks import bs_call_price, bs_put_price
 
 _GANHOS = ("alvo1", "alvo2", "alvo_final")
@@ -99,3 +100,22 @@ def comparar_por_desfecho(avaliados: list) -> dict:
         # vencedores que o ponderado teria barrado (custo do ponderado)
         "ganhos_barrados_ponderado": len([a for a in ganhos if not a.get("ponderado_passou")]),
     }
+
+
+_RETORNO_PCT_POR_DESFECHO = {
+    "alvo1": "alvo1_pct", "alvo2": "alvo2_pct",
+    "alvo_final": "alvo_final_pct", "stop": "stop_pct",
+}
+
+
+def retorno_pct_do_desfecho(desfecho: str) -> float | None:
+    """Retorno percentual nominal associado ao desfecho (Camada 2.4 —
+    telemetria por gatilho). Usa os percentuais de CONFIG que definem
+    alvos/stop (mesma fonte que gera os valores absolutos do sinal), não o
+    caminho de preço real — é uma categorização, não uma medição exata do
+    retorno realizado. `expirou`/`aberto`/`indeterminado` não têm percentual
+    associado de forma confiável -> None."""
+    campo = _RETORNO_PCT_POR_DESFECHO.get(desfecho)
+    if campo is None:
+        return None
+    return round(CONFIG[campo] * 100, 1)

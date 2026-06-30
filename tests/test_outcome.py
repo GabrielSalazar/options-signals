@@ -4,7 +4,9 @@ avaliar_desfecho recebe o sinal + a série de preços da AÇÃO a partir do dia 
 sinal e, reprecificando a opção via Black-Scholes a cada dia, decide se o sinal
 bateu alvo (ganho), bateu stop (perda), expirou ou ainda está aberto.
 """
-from backend.domain.outcome import avaliar_desfecho, comparar_por_desfecho, eh_ganho
+from backend.domain.outcome import (
+    avaliar_desfecho, comparar_por_desfecho, eh_ganho, retorno_pct_do_desfecho,
+)
 
 
 def _sinal(**over):
@@ -88,3 +90,29 @@ def test_comparar_ignora_abertos_e_expirados():
     rep = comparar_por_desfecho(avaliados)
     assert rep["resolvidos"] == 1  # só o alvo1 conta
     assert rep["win_rate_classico"] == 100.0
+
+
+# ── retorno_pct_do_desfecho ────────────────────────────────────────────────
+
+def test_retorno_pct_do_desfecho_alvo1():
+    assert retorno_pct_do_desfecho("alvo1") == 25.0
+
+
+def test_retorno_pct_do_desfecho_alvo2():
+    assert retorno_pct_do_desfecho("alvo2") == 250.0
+
+
+def test_retorno_pct_do_desfecho_alvo_final():
+    assert retorno_pct_do_desfecho("alvo_final") == 700.0
+
+
+def test_retorno_pct_do_desfecho_stop():
+    assert retorno_pct_do_desfecho("stop") == -43.0
+
+
+def test_retorno_pct_do_desfecho_expirou_retorna_none():
+    assert retorno_pct_do_desfecho("expirou") is None
+
+
+def test_retorno_pct_do_desfecho_aberto_retorna_none():
+    assert retorno_pct_do_desfecho("aberto") is None
