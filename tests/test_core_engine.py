@@ -206,6 +206,23 @@ def test_avaliar_gatilhos_retorna_ids_dos_gatilhos_disparados():
     assert gat["ids_baixa"] == ["B9"]
 
 
+def test_avaliar_gatilhos_ids_e_sinais_tem_o_mesmo_tamanho():
+    """Guarda contra desincronizacao entre sinais_* (texto) e ids_* (Camada 2.1) —
+    cada gatilho deve fazer os dois appends juntos; se algum editor futuro
+    adicionar/remover um gatilho e esquecer um dos dois, este teste falha."""
+    for seed in range(5):
+        df = _make_df(seed)
+        ultimo, penult = df.iloc[-1], df.iloc[-2]
+        preco = float(ultimo["Close"])
+        volume = float(ultimo["Volume"])
+        vol_med = float(ultimo.get("vol_media_20", volume))
+
+        gat = core_engine._avaliar_gatilhos(df, ultimo, penult, preco, vol_med, volume)
+
+        assert len(gat["ids_alta"]) == len(gat["sinais_alta"]), f"seed {seed}: ids_alta/sinais_alta desincronizados"
+        assert len(gat["ids_baixa"]) == len(gat["sinais_baixa"]), f"seed {seed}: ids_baixa/sinais_baixa desincronizados"
+
+
 def test_montar_estrutura_opcao_seed0(monkeypatch):
     _relax_and_mock(monkeypatch)
     df = _make_df(0)
