@@ -13,13 +13,48 @@ import pandas as pd
 
 from backend.services.supabase_client import get_supabase
 from backend.services.core_engine import _baixar_ohlcv
-from backend.domain.outcome import avaliar_desfecho, comparar_por_desfecho
+from backend.domain.outcome import avaliar_desfecho, comparar_por_desfecho, retorno_pct_do_desfecho
+from backend.domain.scoring import GATILHOS
 
 logger = logging.getLogger("b3_api")
 
-_CAMPOS = ("ticker, tipo_sinal, strike_ref, premio_est, preco_tela, alvo1, alvo2, "
+_CAMPOS = ("id, ticker, tipo_sinal, strike_ref, premio_est, preco_tela, alvo1, alvo2, "
            "alvo_final, stop, hv_20d, iv_mercado, dte, preco_acao, score, "
-           "score_ponderado, ponderado_passou, timestamp")
+           "score_ponderado, ponderado_passou, gatilhos_ids, setup, timestamp")
+
+_DESFECHOS_TERMINAIS = ("alvo1", "alvo2", "alvo_final", "stop", "expirou")
+
+
+def _persistir_trigger_outcomes(supabase, sinal: dict, resultado: dict) -> None:
+    """Explode o desfecho do sinal em uma linha por gatilho disparado
+    (Camada 2.4). Só persiste desfechos terminais (ignora aberto/indeterminado,
+    que ainda não têm resultado definitivo); idempotente via upsert em
+    (signal_id, gatilho_id) — chamadas repetidas de `avaliar_sinais` sobre o
+    mesmo sinal não duplicam linhas. Sinais sem `gatilhos_ids` (legados,
+    anteriores a esta camada) são pulados. Falha de persistência não impede
+    a avaliação do sinal (apenas loga)."""
+    if resultado["desfecho"] not in _DESFECHOS_TERMINAIS:
+        return
+    ids = sinal.get("gatilhos_ids") or []
+    if not ids:
+        return
+
+    retorno_pct = retorno_pct_do_desfecho(resultado["desfecho"])
+    linhas = [{
+        "signal_id":          sinal["id"],
+        "gatilho_id":         gid,
+        "familia":            GATILHOS.get(gid, {}).get("familia"),
+        "pontos":             GATILHOS.get(gid, {}).get("pontos"),
+        "setup":              sinal.get("setup"),
+        "resultado_final":    resultado["desfecho"],
+        "retorno_pct":        retorno_pct,
+        "dias_ate_resolucao": resultado["dias_ate"],
+    } for gid in ids]
+
+    try:
+        supabase.table("trigger_outcomes").upsert(linhas, on_conflict="signal_id,gatilho_id").execute()
+    except Exception as e:
+        logger.warning(f"Erro ao persistir trigger_outcomes do sinal {sinal.get('id')}: {e}")
 
 
 def _precos_desde(ticker_sa: str, desde: datetime) -> list:
@@ -72,6 +107,7 @@ def avaliar_sinais(dias: int = 30) -> dict:
         if len(precos) < 2:
             continue
         r = avaliar_desfecho(s, precos)
+        _persistir_trigger_outcomes(supabase, s, r)
         avaliados.append({
             **r,
             "ticker": s.get("ticker"),
