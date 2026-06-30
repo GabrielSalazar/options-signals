@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from backend.core.config import ATIVOS_B3
 from backend.services.ticker_loader import get_all_b3_assets
 from backend.services import signal_service
+from backend.services import signals_repository
 from backend.services.supabase_client import get_supabase
 
 logger = logging.getLogger("b3_api")
@@ -32,14 +33,7 @@ def get_signals(
         return {"data": sinais[offset:offset + limit], "count": len(sinais), "source": "memory"}
 
     try:
-        query = (supabase.table("signals")
-                 .select("*", count="exact")
-                 .order("timestamp", desc=True))
-        if tipo:
-            query = query.eq("tipo_sinal", tipo)
-        if min_score > 0:
-            query = query.gte("score", min_score)
-        res = query.range(offset, offset + limit - 1).execute()
+        res = signals_repository.fetch_signals(supabase, limit, offset, tipo, min_score)
         return {"data": res.data, "count": res.count, "source": "supabase"}
     except Exception as e:
         logger.error(f"Erro ao buscar sinais: {e}")
@@ -63,12 +57,7 @@ def get_history(
     if not supabase:
         return {"data": filtered[offset:offset + limit], "source": "memory"}
     try:
-        query = supabase.table("signals").select("*").order("timestamp", desc=True)
-        if ticker:
-            query = query.eq("ticker", ticker.upper())
-        if tipo_sinal:
-            query = query.eq("tipo_sinal", tipo_sinal.upper())
-        res = query.range(offset, offset + limit - 1).execute()
+        res = signals_repository.fetch_history(supabase, limit, offset, ticker, tipo_sinal)
         return {"data": res.data, "source": "supabase"}
     except Exception as e:
         logger.error(f"Erro ao buscar histórico: {e}")
@@ -90,12 +79,7 @@ def analytics(ticker: str):
     if not supabase:
         raise HTTPException(status_code=503, detail="Supabase não configurado")
     try:
-        res = (supabase.table("signals")
-               .select("*")
-               .eq("ticker", ticker_upper)
-               .order("timestamp", desc=True)
-               .limit(100)
-               .execute())
+        res = signals_repository.fetch_analytics(supabase, ticker_upper)
         sinais = res.data
         calls = [s for s in sinais if s.get("tipo_sinal") == "CALL"]
         puts = [s for s in sinais if s.get("tipo_sinal") == "PUT"]
@@ -121,12 +105,7 @@ def signals_performance(days: int = Query(default=30, ge=1, le=365)):
         return {"error": "Supabase indisponível"}
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     try:
-        res = (supabase.table("signals")
-               .select("ticker, tipo_sinal, score, score_ponderado, ponderado_passou, entrada_max, alvo1, alvo2, alvo_final, stop, timestamp, greeks")
-               .gte("timestamp", cutoff)
-               .order("timestamp", desc=True)
-               .limit(2000)
-               .execute())
+        res = signals_repository.fetch_performance(supabase, cutoff)
         rows = res.data or []
     except Exception as e:
         return {"error": str(e)}
