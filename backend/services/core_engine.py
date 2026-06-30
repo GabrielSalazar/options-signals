@@ -93,9 +93,11 @@ def _carregar_ohlcv(ticker: str, interval: str, df_provided: pd.DataFrame | None
 def _avaliar_gatilhos(df: pd.DataFrame, ultimo, penult, preco: float,
                       vol_med: float, volume: float) -> dict:
     """Avalia os gatilhos técnicos (alta/baixa) sobre o df e retorna os scores,
-    as listas de sinais e os escalares usados a jusante (stoch_k, rsi, vol_ratio).
+    as listas de sinais (texto, p/ exibição) e de IDs (Camada 2.1, ex.: "G1"),
+    e os escalares usados a jusante (stoch_k, rsi, vol_ratio).
     Não inclui o bônus de horário (somado pelo orquestrador)."""
     sinais_alta, sinais_baixa = [], []
+    ids_alta, ids_baixa = [], []
     score_alta = score_baixa = 0
 
     stoch_k      = float(ultimo.get("stoch_k",     50))
@@ -121,94 +123,115 @@ def _avaliar_gatilhos(df: pd.DataFrame, ultimo, penult, preco: float,
     # ── GATILHOS DE ALTA ─────────────────────────────────────────────
     if (stoch_k < CONFIG["stoch_oversold"] + 10 and stoch_k > stoch_d and stoch_k_prev <= stoch_d_prev):
         sinais_alta.append("📈 Estocástico: cruzamento altista em sobrevenda")
+        ids_alta.append("G1")
         score_alta += 3
 
     if rsi < CONFIG["rsi_oversold"]:
         sinais_alta.append(f"📈 RSI sobrevenda: {rsi:.1f}")
+        ids_alta.append("G2")
         score_alta += 2
 
     if preco <= sup20 + atr:
         sinais_alta.append(f"📈 Preço em suporte 20D: R${sup20:.2f}")
+        ids_alta.append("G3")
         score_alta += 2
 
     if ema9 > ema21 and ema9_prev <= ema21_prev:
         sinais_alta.append("📈 EMA9 cruzou acima EMA21")
+        ids_alta.append("G4")
         score_alta += 2
 
     if vol_ratio >= CONFIG["volume_mult"]:
         sinais_alta.append(f"📈 Volume {vol_ratio:.1f}x acima da média")
+        ids_alta.append("G5")
         score_alta += 1
 
     if macd_d > 0 and macd_d_prev <= 0:
         sinais_alta.append("📈 MACD cruzou zero (momentum altista)")
+        ids_alta.append("G6")
         score_alta += 2
 
     if (len(ultimos_fundos) >= 3 and all(ultimos_fundos[i] < ultimos_fundos[i+1] for i in range(2))):
         sinais_alta.append("📈 Fundos ascendentes (reversão)")
+        ids_alta.append("G7")
         score_alta += 2
 
     if bb_lo > 0 and preco <= bb_lo * 1.01:
         sinais_alta.append(f"📈 Preço na Bollinger inferior: R${bb_lo:.2f}")
+        ids_alta.append("G8")
         score_alta += 1
 
     div_alta, _ = detectar_divergencia(df, janela=5)
     if div_alta:
         sinais_alta.append("📈 Divergência altista RSI (preço cai, RSI sobe)")
+        ids_alta.append("G9")
         score_alta += 3
 
     zona_dem, _ = encontrar_zonas_demanda_oferta(df)
     if zona_dem:
         sinais_alta.append("📈 Preço em zona de demanda histórica")
+        ids_alta.append("G10")
         score_alta += 3
 
     canal_alt, _, slope = detectar_canal_linear(df)
     if canal_alt:
         sinais_alta.append(f"📈 Canal altista (slope={slope:.3f})")
+        ids_alta.append("G11")
         score_alta += 2
 
     # ── GATILHOS DE BAIXA ────────────────────────────────────────────
     if (stoch_k > CONFIG["stoch_overbought"] - 10 and stoch_k < stoch_d and stoch_k_prev >= stoch_d_prev):
         sinais_baixa.append("📉 Estocástico: cruzamento baixista em sobrecompra")
+        ids_baixa.append("B1")
         score_baixa += 3
 
     if rsi > CONFIG["rsi_overbought"]:
         sinais_baixa.append(f"📉 RSI sobrecompra: {rsi:.1f}")
+        ids_baixa.append("B2")
         score_baixa += 2
 
     if preco >= res20 - atr:
         sinais_baixa.append(f"📉 Preço em resistência 20D: R${res20:.2f}")
+        ids_baixa.append("B3")
         score_baixa += 2
 
     if ema9 < ema21 and ema9_prev >= ema21_prev:
         sinais_baixa.append("📉 EMA9 cruzou abaixo EMA21")
+        ids_baixa.append("B4")
         score_baixa += 2
 
     if (len(ultimos_topos) >= 3 and all(ultimos_topos[i] > ultimos_topos[i+1] for i in range(2))):
         sinais_baixa.append("📉 Topos descendentes (tendência de baixa)")
+        ids_baixa.append("B5")
         score_baixa += 2
 
     if macd_d < 0 and macd_d_prev >= 0:
         sinais_baixa.append("📉 MACD cruzou zero negativamente")
+        ids_baixa.append("B6")
         score_baixa += 2
 
     _, div_baixa = detectar_divergencia(df, janela=5)
     if div_baixa:
         sinais_baixa.append("📉 Divergência baixista RSI (preço sobe, RSI cai)")
+        ids_baixa.append("B7")
         score_baixa += 3
 
     _, zona_ofe = encontrar_zonas_demanda_oferta(df)
     if zona_ofe:
         sinais_baixa.append("📉 Preço em zona de oferta histórica")
+        ids_baixa.append("B8")
         score_baixa += 3
 
     _, canal_bx, slope_bx = detectar_canal_linear(df)
     if canal_bx:
         sinais_baixa.append(f"📉 Canal baixista (slope={slope_bx:.3f})")
+        ids_baixa.append("B9")
         score_baixa += 2
 
     return {
         "score_alta": score_alta, "score_baixa": score_baixa,
         "sinais_alta": sinais_alta, "sinais_baixa": sinais_baixa,
+        "ids_alta": ids_alta, "ids_baixa": ids_baixa,
         "stoch_k": stoch_k, "rsi": rsi, "vol_ratio": vol_ratio,
     }
 

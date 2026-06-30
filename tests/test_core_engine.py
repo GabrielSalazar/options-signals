@@ -193,6 +193,19 @@ def test_avaliar_gatilhos_seed0_alta():
     assert g["vol_ratio"] == pytest.approx(volume / vol_med)
 
 
+def test_avaliar_gatilhos_retorna_ids_dos_gatilhos_disparados():
+    df = _make_df(0)
+    ultimo, penult = df.iloc[-1], df.iloc[-2]
+    preco = float(ultimo["Close"])
+    volume = float(ultimo["Volume"])
+    vol_med = float(ultimo.get("vol_media_20", volume))
+
+    gat = core_engine._avaliar_gatilhos(df, ultimo, penult, preco, vol_med, volume)
+
+    assert gat["ids_alta"] == ["G2", "G3", "G7", "G10"]
+    assert gat["ids_baixa"] == ["B9"]
+
+
 def test_montar_estrutura_opcao_seed0(monkeypatch):
     _relax_and_mock(monkeypatch)
     df = _make_df(0)
