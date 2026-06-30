@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { getSupabase } from './supabase';
 
 export interface DatabaseSignal {
   id?: string;
@@ -22,6 +22,7 @@ export interface DatabaseSignal {
 
 export async function getSignalsByTicker(ticker: string, limit: number = 50) {
   try {
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from('signals')
       .select('*')
@@ -41,6 +42,7 @@ export async function getSignalsByTicker(ticker: string, limit: number = 50) {
 
 export async function getAllSignals(limit: number = 50, offset: number = 0) {
   try {
+    const supabase = getSupabase();
     const { data, error, count } = await supabase
       .from('signals')
       .select('*', { count: 'exact' })
@@ -60,6 +62,7 @@ export async function getAllSignals(limit: number = 50, offset: number = 0) {
 
 export async function saveSignal(signal: DatabaseSignal) {
   try {
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from('signals')
       .insert([signal])
@@ -77,6 +80,7 @@ export async function saveSignal(signal: DatabaseSignal) {
 
 export async function updateSignal(id: string, updates: Partial<DatabaseSignal>) {
   try {
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from('signals')
       .update(updates)
@@ -95,6 +99,7 @@ export async function updateSignal(id: string, updates: Partial<DatabaseSignal>)
 
 export async function deleteSignal(id: string) {
   try {
+    const supabase = getSupabase();
     const { error } = await supabase.from('signals').delete().eq('id', id);
 
     if (error) throw error;
@@ -108,6 +113,7 @@ export async function deleteSignal(id: string) {
 
 export async function getSignalsByStrategy(strategy: string, limit: number = 50) {
   try {
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from('signals')
       .select('*')
@@ -127,6 +133,7 @@ export async function getSignalsByStrategy(strategy: string, limit: number = 50)
 
 export async function getUserSignals(userId: string, limit: number = 50) {
   try {
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from('signals')
       .select('*')

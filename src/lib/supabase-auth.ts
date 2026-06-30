@@ -1,8 +1,9 @@
 import { getSupabase } from './supabase';
+import type { User, Session } from '@supabase/supabase-js';
 
 export interface AuthResponse {
-  user: any;
-  session: any;
+  user: User | null;
+  session: Session | null;
   error: string | null;
 }
 
