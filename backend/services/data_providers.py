@@ -2,12 +2,12 @@ import os
 import time
 import json
 import base64
-import requests
 import logging
 import yfinance as yf
 from typing import Dict, List, Optional
 from backend.core.cache import cache_get, cache_set
 from backend.domain.options_math import decodificar_opcao_b3
+from backend.services.http_client import get_with_retry
 
 logger = logging.getLogger("b3_scanner")
 
@@ -35,8 +35,7 @@ def fetch_brapi_historical(ticker: str, range_: str = "6mo", interval: str = "1d
     if token:
         params["token"] = token
     try:
-        r = requests.get(f"{_BRAPI_BASE}/quote/{ticker_clean}", params=params, timeout=15)
-        r.raise_for_status()
+        r = get_with_retry(f"{_BRAPI_BASE}/quote/{ticker_clean}", params=params, timeout=15)
         results = r.json().get("results", [])
         if not results or "historicalDataPrice" not in results[0]:
             return pd.DataFrame()
@@ -65,8 +64,7 @@ def fetch_all_b3_tickers() -> List[str]:
     token = os.getenv("BRAPI_TOKEN", "")
     params = {"token": token} if token else {}
     try:
-        r = requests.get(f"{_BRAPI_BASE}/available", params=params, timeout=15)
-        r.raise_for_status()
+        r = get_with_retry(f"{_BRAPI_BASE}/available", params=params, timeout=15)
         stocks = r.json().get("stocks", [])
         tickers = [s for s in stocks if 5 <= len(s) <= 6 and s[-1].isdigit()]
         cache_set("b3_all_tickers", tickers, ttl=86400)
@@ -108,8 +106,7 @@ def fetch_b3_official_tickers() -> Dict[str, str]:
     try:
         page, total_pages = 1, 1
         while page <= total_pages:
-            r = requests.get(_b3_page_url(page), headers=_B3_HEADERS, timeout=15)
-            r.raise_for_status()
+            r = get_with_retry(_b3_page_url(page), headers=_B3_HEADERS, timeout=15)
             data = r.json()
             total_pages = data.get("page", {}).get("totalPages", 1) or 1
             for emp in data.get("results", []):
@@ -203,7 +200,7 @@ def _fetch_chain(ticker: str) -> List[list]:
 
     try:
         url = f"{_OPCOES_NET_BASE}?idAcao={ticker}&listarVencimentos=true&cotacoes=true"
-        response = requests.get(url, timeout=10)
+        response = get_with_retry(url, timeout=10)
         data = response.json()
         if data.get("success") != "data":
             cache_set(cache_key, [], ttl=180)

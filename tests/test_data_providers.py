@@ -15,7 +15,7 @@ def test_fetch_b3_official_expands_suffixes(monkeypatch):
     resp = _fake_b3_response([{"issuingCompany": "PETR", "tradingName": "PETROBRAS"}], 1)
     monkeypatch.setattr(dp, "cache_get", lambda k: None)
     monkeypatch.setattr(dp, "cache_set", lambda k, v, ttl=0: None)
-    monkeypatch.setattr(dp.requests, "get", lambda *a, **k: resp)
+    monkeypatch.setattr(dp, "get_with_retry", lambda *a, **k: resp)
     out = dp.fetch_b3_official_tickers()
     assert out == {"PETR3": "PETROBRAS", "PETR4": "PETROBRAS", "PETR11": "PETROBRAS"}
 
@@ -26,7 +26,7 @@ def test_fetch_b3_official_paginates(monkeypatch):
     seq = iter([r1, r2])
     monkeypatch.setattr(dp, "cache_get", lambda k: None)
     monkeypatch.setattr(dp, "cache_set", lambda k, v, ttl=0: None)
-    monkeypatch.setattr(dp.requests, "get", lambda *a, **k: next(seq))
+    monkeypatch.setattr(dp, "get_with_retry", lambda *a, **k: next(seq))
     monkeypatch.setattr(dp.time, "sleep", lambda s: None)
     out = dp.fetch_b3_official_tickers()
     assert "PETR3" in out and "VALE3" in out
@@ -36,7 +36,7 @@ def test_fetch_b3_official_graceful_on_error(monkeypatch):
     monkeypatch.setattr(dp, "cache_get", lambda k: None)
     def boom(*a, **k):
         raise RuntimeError("down")
-    monkeypatch.setattr(dp.requests, "get", boom)
+    monkeypatch.setattr(dp, "get_with_retry", boom)
     assert dp.fetch_b3_official_tickers() == {}
 
 
@@ -153,7 +153,7 @@ def test_fetch_brapi_historical_cache_corrompido_segue_para_rede(monkeypatch):
     resp = MagicMock()
     resp.raise_for_status.return_value = None
     resp.json.return_value = {"results": []}
-    monkeypatch.setattr(dp.requests, "get", lambda *a, **k: resp)
+    monkeypatch.setattr(dp, "get_with_retry", lambda *a, **k: resp)
     out = dp.fetch_brapi_historical("PETR4.SA")
     assert out.empty
 
@@ -171,7 +171,7 @@ def test_fetch_brapi_historical_usa_token_quando_definido(monkeypatch):
         resp.json.return_value = {"results": []}
         return resp
 
-    monkeypatch.setattr(dp.requests, "get", fake_get)
+    monkeypatch.setattr(dp, "get_with_retry", fake_get)
     dp.fetch_brapi_historical("PETR4.SA")
     assert captured["params"]["token"] == "minha-chave"
 
@@ -181,7 +181,7 @@ def test_fetch_brapi_historical_sem_resultados_retorna_df_vazio(monkeypatch):
     resp = MagicMock()
     resp.raise_for_status.return_value = None
     resp.json.return_value = {"results": []}
-    monkeypatch.setattr(dp.requests, "get", lambda *a, **k: resp)
+    monkeypatch.setattr(dp, "get_with_retry", lambda *a, **k: resp)
     out = dp.fetch_brapi_historical("PETR4.SA")
     assert out.empty
 
@@ -191,7 +191,7 @@ def test_fetch_brapi_historical_sem_historical_data_price_retorna_df_vazio(monke
     resp = MagicMock()
     resp.raise_for_status.return_value = None
     resp.json.return_value = {"results": [{"symbol": "PETR4"}]}
-    monkeypatch.setattr(dp.requests, "get", lambda *a, **k: resp)
+    monkeypatch.setattr(dp, "get_with_retry", lambda *a, **k: resp)
     out = dp.fetch_brapi_historical("PETR4.SA")
     assert out.empty
 
@@ -212,7 +212,7 @@ def test_fetch_brapi_historical_sucesso_monta_df_ohlcv(monkeypatch):
             ]
         }]
     }
-    monkeypatch.setattr(dp.requests, "get", lambda *a, **k: resp)
+    monkeypatch.setattr(dp, "get_with_retry", lambda *a, **k: resp)
     out = dp.fetch_brapi_historical("PETR4.SA")
     assert list(out.columns) == ["Open", "High", "Low", "Close", "Volume"]
     assert len(out) == 2
@@ -225,7 +225,7 @@ def test_fetch_brapi_historical_erro_de_rede_retorna_df_vazio(monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("timeout")
 
-    monkeypatch.setattr(dp.requests, "get", boom)
+    monkeypatch.setattr(dp, "get_with_retry", boom)
     out = dp.fetch_brapi_historical("PETR4.SA")
     assert out.empty
 
@@ -246,7 +246,7 @@ def test_fetch_all_b3_tickers_filtra_e_armazena_cache(monkeypatch):
     resp = MagicMock()
     resp.raise_for_status.return_value = None
     resp.json.return_value = {"stocks": ["PETR4", "VALE3", "AB", "PETR11", "XYZW9A"]}
-    monkeypatch.setattr(dp.requests, "get", lambda *a, **k: resp)
+    monkeypatch.setattr(dp, "get_with_retry", lambda *a, **k: resp)
     out = dp.fetch_all_b3_tickers()
     assert "PETR4" in out and "VALE3" in out and "PETR11" in out
     assert "AB" not in out  # menor que 5 chars
@@ -266,7 +266,7 @@ def test_fetch_all_b3_tickers_token_no_params(monkeypatch):
         resp.json.return_value = {"stocks": []}
         return resp
 
-    monkeypatch.setattr(dp.requests, "get", fake_get)
+    monkeypatch.setattr(dp, "get_with_retry", fake_get)
     dp.fetch_all_b3_tickers()
     assert captured["params"]["token"] == "tok123"
 
@@ -277,7 +277,7 @@ def test_fetch_all_b3_tickers_erro_retorna_lista_vazia(monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("down")
 
-    monkeypatch.setattr(dp.requests, "get", boom)
+    monkeypatch.setattr(dp, "get_with_retry", boom)
     assert dp.fetch_all_b3_tickers() == []
 
 
@@ -372,7 +372,7 @@ def test_fetch_chain_success_diferente_de_data_retorna_vazio(monkeypatch):
     monkeypatch.setattr(dp, "cache_set", lambda k, v, ttl=0: sets.setdefault("v", v))
     resp = MagicMock()
     resp.json.return_value = {"success": "error"}
-    monkeypatch.setattr(dp.requests, "get", lambda *a, **k: resp)
+    monkeypatch.setattr(dp, "get_with_retry", lambda *a, **k: resp)
     out = dp._fetch_chain("PETR4")
     assert out == []
     assert sets["v"] == []
@@ -383,7 +383,7 @@ def test_fetch_chain_sucesso_retorna_chain(monkeypatch):
     monkeypatch.setattr(dp, "cache_set", lambda k, v, ttl=0: None)
     resp = MagicMock()
     resp.json.return_value = {"success": "data", "data": {"cotacoesOpcoes": [["a"]]}}
-    monkeypatch.setattr(dp.requests, "get", lambda *a, **k: resp)
+    monkeypatch.setattr(dp, "get_with_retry", lambda *a, **k: resp)
     out = dp._fetch_chain("PETR4")
     assert out == [["a"]]
 
@@ -396,7 +396,7 @@ def test_fetch_chain_erro_de_rede_retorna_vazio(monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("timeout")
 
-    monkeypatch.setattr(dp.requests, "get", boom)
+    monkeypatch.setattr(dp, "get_with_retry", boom)
     out = dp._fetch_chain("PETR4")
     assert out == []
     assert sets["v"] == []
