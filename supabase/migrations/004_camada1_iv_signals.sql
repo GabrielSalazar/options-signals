@@ -3,7 +3,18 @@
 -- Run via: Supabase Dashboard → SQL Editor
 -- ============================================================
 
-ALTER TABLE signals RENAME COLUMN iv_hist TO hv_20d;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'signals' AND column_name = 'iv_hist'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'signals' AND column_name = 'hv_20d'
+  ) THEN
+    ALTER TABLE signals RENAME COLUMN iv_hist TO hv_20d;
+  END IF;
+END $$;
 
 ALTER TABLE signals
   ADD COLUMN IF NOT EXISTS iv_impl          NUMERIC,
