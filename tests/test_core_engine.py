@@ -371,3 +371,21 @@ def test_montar_estrutura_opcao_usa_iv_de_tela_quando_disponivel(monkeypatch):
     assert estrutura["iv_source"] == "tela"
     assert estrutura["iv_impl"] == pytest.approx(0.35, abs=0.01)
     assert estrutura["iv_mercado"] == pytest.approx(0.35, abs=0.01)
+
+
+def test_analisar_ativo_persiste_campos_shadow_da_camada_2(monkeypatch):
+    _relax_and_mock(monkeypatch)
+    df = _make_df(0)
+
+    s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=df, indicators_calculated=True)
+
+    assert s is not None
+    assert s["gatilhos_ids"] == ["G2", "G3", "G7", "G10"]
+    assert s["familias_ativas"] == 4
+    assert s["score_familias_capped"] == 9
+    assert s["consenso_decisao"] == "passaria"
+    assert s["setup"] == "REVERSAO"
+    assert s["setup_params_shadow"] == {"otm_mult": 0.7, "dte_min": 10, "dte_max": 25,
+                                         "alvo2_pct": 1.50, "stop_pct": -0.35}
+    # Campos shadow não alteram a estrutura real (regressão — mesmos valores da Camada 1)
+    assert (s["alvo1"], s["alvo2"], s["alvo_final"], s["stop"]) == (0.12, 0.35, 0.8, 0.06)

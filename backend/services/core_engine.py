@@ -16,7 +16,10 @@ from backend.domain.indicators import (
 from backend.domain.options_math import mes_vencimento_ideal, estimar_iv_historica, estimar_premio_otm, resolver_iv
 from backend.services.data_providers import get_real_options_from_opcoes_net, fetch_brapi_historical, obter_opcoes_vizinhas
 from backend.domain.greeks import calculate_greeks, implied_volatility
-from backend.domain.scoring import score_ponderado, avaliar_filtro_iv
+from backend.domain.scoring import (
+    score_ponderado, avaliar_filtro_iv, calcular_familias, classificar_setup,
+    parametros_setup_shadow,
+)
 from backend.services.iv_history_service import iv_rank as obter_iv_rank
 
 logger = logging.getLogger("b3_scanner")
@@ -390,6 +393,12 @@ def _montar_sinal(ticker_base: str, nome: str, tipo_sinal: str, direcao_label: s
         "rsi":          rsi,
         "vol_ratio":    vol_ratio,
         "gatilhos":     gatilhos,
+        "gatilhos_ids": estrutura.get("gatilhos_ids", []),
+        "familias_ativas": estrutura.get("familias_ativas"),
+        "score_familias_capped": estrutura.get("score_familias_capped"),
+        "consenso_decisao": estrutura.get("consenso_decisao"),
+        "setup":        estrutura.get("setup"),
+        "setup_params_shadow": estrutura.get("setup_params_shadow"),
     }
 
 
@@ -475,6 +484,19 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
                 return None
         elif filtro["decisao"] != "normal" and verbose:
             logger.info(f"ℹ {ticker_base}: filtro IV (shadow) indicaria '{filtro['decisao']}' — {filtro['motivo']}")
+
+        # ── FAMÍLIAS / CONSENSO / SETUP (Camada 2.1-2.2 — shadow) ─────────
+        gatilhos_ids = gat["ids_alta"] if tipo_sinal == "CALL" else gat["ids_baixa"]
+        familias = calcular_familias(gatilhos_ids)
+        consenso_decisao = ("passaria" if (score >= MIN_SCORE and familias["familias_ativas"] >= 2)
+                            else "bloquearia")
+        setup = classificar_setup(familias["breakdown"])
+        estrutura["gatilhos_ids"] = gatilhos_ids
+        estrutura["familias_ativas"] = familias["familias_ativas"]
+        estrutura["score_familias_capped"] = familias["score_capped"]
+        estrutura["consenso_decisao"] = consenso_decisao
+        estrutura["setup"] = setup
+        estrutura["setup_params_shadow"] = parametros_setup_shadow(setup)
 
         if df_provided is None:
             registrar_sinal(ticker_base, tipo_sinal, score)
