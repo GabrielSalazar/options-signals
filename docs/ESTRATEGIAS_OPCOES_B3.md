@@ -176,3 +176,32 @@ Resultado real: +26% Alvo 1 ✅
 
 > [!WARNING]
 > **Importante:** Nenhum gatilho isolado garante lucro. O motor funciona por **consenso multifatorial**. Uma divergência sozinha não dispara o sinal — precisa de suporte, tendência, estrutura E liquidez. Por isso a taxa de acerto é 82% com expectância +60%.
+
+---
+
+## Famílias de gatilhos e a assimetria CALL × PUT (Camada 2)
+
+Os 20 gatilhos são agrupados em 5 famílias (Camada 2.1 — `backend/domain/scoring.py::GATILHOS`):
+
+| Família | Gatilhos de alta | Gatilhos de baixa |
+|---|---|---|
+| OSCILADOR | G1, G2, G6 | B1, B2, B6 |
+| TENDENCIA | G4, G7, G11 | B4, B5, B9 |
+| ESTRUTURA | G3, G8 | B3 |
+| DIVERGENCIA | G9 | B7 |
+| LIQUIDEZ | G5, G10 | B8 |
+
+O lado de alta tem 11 gatilhos (máx. 23 pts); o de baixa tem 9 (máx. 21 pts). Isso é uma
+**decisão atual, não uma lacuna não examinada**: faltam dois gatilhos espelho do lado
+baixista —
+
+1. **Espelho de G8** (Bollinger inferior → família ESTRUTURA): um gatilho de preço na
+   banda superior de Bollinger para o lado de baixa.
+2. **Espelho de G5** (volume relativo → família LIQUIDEZ): um gatilho de volume em
+   distribuição (alta em queda de preço) para o lado de baixa.
+
+Ambos ficam para uma iteração futura, com seu próprio ciclo de validação (Camada 5) —
+adicionar gatilhos novos muda a distribuição de pontos por família e exige
+recalibração, o que está fora do escopo da Camada 2 (que reorganiza os gatilhos
+*existentes*, não adiciona novos). Até essa iteração, o viés estrutural de 2 pontos a
+mais no lado de alta é aceito conscientemente.
