@@ -8,10 +8,21 @@ from fastapi import APIRouter, HTTPException
 
 from backend.domain.analytics import compute_statistical_indicators
 from backend.domain.greeks import implied_volatility
-from backend.domain.indicators import _adx_manual, _stoch_manual, calcular_indicadores
-from backend.domain.options_math import mes_vencimento_ideal
+from backend.domain.indicators import (  # noqa: F401
+    _adx_manual,
+    _rsi_manual,  # usado via _self._rsi_manual em tests/test_market_analysis.py
+    _stoch_manual,
+    calcular_indicadores,
+)
+from backend.domain.options_math import (  # noqa: F401
+    estimar_iv_historica,  # usado via _self.estimar_iv_historica / monkeypatch em tests/test_market_analysis.py
+    mes_vencimento_ideal,
+)
 from backend.domain.setups import detectar_setups
-from backend.services.data_providers import _fetch_chain
+from backend.services.data_providers import (  # noqa: F401
+    _fetch_chain,
+    fetch_brapi_historical,  # usado via mock.patch em tests/test_market_analysis.py
+)
 
 logger = logging.getLogger("b3_api")
 router = APIRouter(prefix="/market", tags=["Market"])
@@ -101,6 +112,11 @@ def get_market_options():
 @router.get("/opcoes/chain/{ticker}")
 def get_options_chain(ticker: str):
     """Retorna a cadeia completa de opções em tempo real para o ticker."""
+    # Reimport local (não redundante): permite que
+    # mock.patch("backend.services.data_providers._fetch_chain", ...) nos
+    # testes substitua a referência usada aqui em tempo de chamada.
+    from backend.services.data_providers import _fetch_chain  # noqa: F811
+
     chain = _fetch_chain(ticker)
     opcoes = []
     for op in chain:
