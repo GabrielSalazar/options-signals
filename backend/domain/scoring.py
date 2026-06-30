@@ -258,3 +258,39 @@ def calcular_familias(gatilhos_ids: list[str]) -> dict:
         "familias_ativas": len(bruto),
         "breakdown": breakdown,
     }
+
+
+def classificar_setup(breakdown: dict) -> str:
+    """
+    Classifica o sinal por família dominante (Camada 2.2):
+      REVERSAO    se OSCILADOR+DIVERGENCIA+ESTRUTURA > TENDENCIA
+      CONTINUACAO se TENDENCIA > OSCILADOR+DIVERGENCIA+ESTRUTURA
+      HIBRIDO     em caso de empate (inclusive 0 a 0)
+    `breakdown` é o dict {familia: pontos} retornado por `calcular_familias`
+    (já com os tetos aplicados).
+    """
+    reversao = (breakdown.get("OSCILADOR", 0) + breakdown.get("DIVERGENCIA", 0)
+                + breakdown.get("ESTRUTURA", 0))
+    continuacao = breakdown.get("TENDENCIA", 0)
+    if reversao > continuacao:
+        return "REVERSAO"
+    if continuacao > reversao:
+        return "CONTINUACAO"
+    return "HIBRIDO"
+
+
+def parametros_setup_shadow(setup: str) -> dict:
+    """
+    Parâmetros de estrutura de opção que SERIAM usados por setup (Camada 2.2).
+    Shadow apenas — não afeta a estrutura real da opção, que continua usando
+    os parâmetros únicos atuais de CONFIG. Valores da tabela do plano,
+    hipóteses a validar na Camada 5. HIBRIDO usa os mesmos valores da
+    Continuação (que já coincidem com os defaults atuais de produção:
+    alvo2_pct=2.50, stop_pct=-0.43), por não haver família dominante que
+    justifique desviar.
+    """
+    if setup == "REVERSAO":
+        return {"otm_mult": 0.7, "dte_min": 10, "dte_max": 25,
+                "alvo2_pct": 1.50, "stop_pct": -0.35}
+    return {"otm_mult": 1.0, "dte_min": 5, "dte_max": 20,
+            "alvo2_pct": 2.50, "stop_pct": -0.43}

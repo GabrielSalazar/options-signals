@@ -12,6 +12,7 @@ import pytest
 from unittest.mock import patch
 from backend.domain.scoring import score_ponderado, avaliar_filtro_iv
 from backend.domain.scoring import GATILHOS, calcular_familias
+from backend.domain.scoring import classificar_setup, parametros_setup_shadow
 
 
 def _make_row(**overrides):
@@ -317,3 +318,37 @@ def test_calcular_familias_ignora_ids_desconhecidos():
 def test_calcular_familias_lista_vazia():
     r = calcular_familias([])
     assert r == {"score_capped": 0, "familias_ativas": 0, "breakdown": {}}
+
+
+def test_classificar_setup_reversao_quando_familias_de_reversao_dominam():
+    breakdown = {"OSCILADOR": 2, "ESTRUTURA": 2, "TENDENCIA": 2, "LIQUIDEZ": 3}
+    assert classificar_setup(breakdown) == "REVERSAO"
+
+
+def test_classificar_setup_continuacao_quando_tendencia_domina():
+    breakdown = {"TENDENCIA": 6}
+    assert classificar_setup(breakdown) == "CONTINUACAO"
+
+
+def test_classificar_setup_hibrido_em_empate():
+    assert classificar_setup({"OSCILADOR": 2, "TENDENCIA": 2}) == "HIBRIDO"
+
+
+def test_classificar_setup_hibrido_sem_nenhuma_familia():
+    assert classificar_setup({}) == "HIBRIDO"
+
+
+def test_parametros_setup_shadow_reversao():
+    p = parametros_setup_shadow("REVERSAO")
+    assert p == {"otm_mult": 0.7, "dte_min": 10, "dte_max": 25,
+                 "alvo2_pct": 1.50, "stop_pct": -0.35}
+
+
+def test_parametros_setup_shadow_continuacao():
+    p = parametros_setup_shadow("CONTINUACAO")
+    assert p == {"otm_mult": 1.0, "dte_min": 5, "dte_max": 20,
+                 "alvo2_pct": 2.50, "stop_pct": -0.43}
+
+
+def test_parametros_setup_shadow_hibrido_usa_valores_de_continuacao():
+    assert parametros_setup_shadow("HIBRIDO") == parametros_setup_shadow("CONTINUACAO")
