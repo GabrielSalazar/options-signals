@@ -984,3 +984,23 @@ def test_analisar_ativo_sem_df_provided_registra_sinal(monkeypatch):
     assert s is not None
     assert len(chamadas) == 1
     assert chamadas[0][0] == "TESTE3"
+
+
+def test_vol_ratio_e_persistido_no_dataframe_de_indicadores(monkeypatch):
+    """Caracteriza se calcular_indicadores grava 'vol_ratio' no df —
+    score_ponderado depende dessa coluna (scoring.py) e se ela não existir,
+    o shadow score fica enviesado sempre no fallback."""
+    idx = pd.date_range("2026-01-01", periods=60, freq="B")
+    df = pd.DataFrame({
+        "Open": np.linspace(100, 110, 60), "High": np.linspace(101, 111, 60),
+        "Low": np.linspace(99, 109, 60), "Close": np.linspace(100, 110, 60),
+        "Volume": np.linspace(1_000_000, 3_000_000, 60),
+    }, index=idx)
+
+    resultado = calcular_indicadores(df)
+
+    assert "vol_ratio" in resultado.columns, (
+        "calcular_indicadores NÃO grava 'vol_ratio' no DataFrame — "
+        "score_ponderado (scoring.py) está lendo essa coluna via .get() com "
+        "fallback genérico, então o shadow score está enviesado."
+    )
