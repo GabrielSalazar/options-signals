@@ -34,6 +34,45 @@ All notable changes to this project will be documented in this file.
 > Supabase (SQL Editor) e medir o delta de backtest pós-correção de look-ahead quando
 > houver dados de mercado (`BRAPI_TOKEN`).
 
+### Added (Camada 2 — Redesenho do Motor de Score)
+- **Famílias de gatilhos com teto de contribuição** (`GATILHOS`, `calcular_familias`,
+  [backend/domain/scoring.py](../backend/domain/scoring.py)): os 20 gatilhos canônicos
+  (G1-G11 alta, B1-B9 baixa) ganham metadado de família (OSCILADOR, TENDENCIA,
+  ESTRUTURA, DIVERGENCIA, LIQUIDEZ) e pontuação capada por família (`CONFIG`),
+  evitando que múltiplos gatilhos correlacionados (ex.: vários osciladores)
+  inflem o score sem informação nova. `_avaliar_gatilhos` passa a retornar também
+  `ids_alta`/`ids_baixa`. Sinais carregam `gatilhos_ids`, `familias_ativas`,
+  `score_familias_capped` e `consenso_decisao` ("passaria"/"bloquearia" — informativo,
+  shadow, não altera a emissão real).
+- **Classificação de setup Reversão × Continuação (shadow)** (`classificar_setup`,
+  `parametros_setup_shadow`, [backend/domain/scoring.py](../backend/domain/scoring.py)):
+  cada sinal é classificado como `REVERSAO`, `CONTINUACAO` ou `HIBRIDO` a partir do
+  breakdown de famílias, e carrega os parâmetros de estrutura de opção (OTM, DTE,
+  alvos, stop) que *seriam* usados por setup em `setup_params_shadow` — sem alterar a
+  estrutura real da opção, que continua usando os parâmetros únicos atuais.
+- **Assimetria CALL/PUT documentada** ([docs/ESTRATEGIAS_OPCOES_B3.md](../docs/ESTRATEGIAS_OPCOES_B3.md)):
+  registrada a assimetria intencional de 11×9 gatilhos (23×21 pts) entre alta e
+  baixa, citando os gatilhos espelho (volume/Bollinger superior) ainda não
+  implementados do lado baixista.
+- **Telemetria por gatilho** (`trigger_outcomes`, migração `006`,
+  [backend/services/outcome_service.py](../backend/services/outcome_service.py)):
+  ao resolver um sinal com desfecho terminal (alvo1/alvo2/alvo_final/stop/expirou),
+  o resultado é explodido em uma linha por `gatilho_id` disparado, com retorno
+  percentual (`retorno_pct_do_desfecho`), família, pontos e setup — base para validar
+  empiricamente os caps e a classificação de setup na Camada 5.
+- **Cobertura de testes do projeto elevada de 67% para 96%**: revisão completa da
+  suíte com testes novos cobrindo routers (`market`, `config`, `signals`, `backtest`,
+  `scan`), serviços (`core_engine`, `outcome_service`, `data_providers`,
+  `signal_service`, `telegram_service`, `backtest`) e infraestrutura (`cache`,
+  `options_math`, `indicators`). Revisão de qualidade consolidada confirmou ausência
+  de testes vazios/frágeis; duplicação de fakes de Supabase entre arquivos de teste
+  fica documentada como melhoria futura não-bloqueante.
+
+> **Pendências da Camada 2 (não-bloqueantes):** aplicar a migração `006` no Supabase
+> (SQL Editor); nenhuma promoção shadow→ativo nesta camada (`consenso_filter_mode`/
+> `setup_filter_mode` não existem ainda — só serão introduzidos quando houver decisão
+> real a controlar).
+
 ### Fixed (Camada 1 — Volatilidade Implícita)
 - **Rótulo de IV corrigido**: o campo que era exibido como "IV" na verdade era
   volatilidade histórica de 20 dias. Renomeado para `hv_20d` em todo o backend
