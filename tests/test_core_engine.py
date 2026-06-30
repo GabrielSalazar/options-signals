@@ -389,3 +389,598 @@ def test_analisar_ativo_persiste_campos_shadow_da_camada_2(monkeypatch):
                                          "alvo2_pct": 1.50, "stop_pct": -0.35}
     # Campos shadow não alteram a estrutura real (regressão — mesmos valores da Camada 1)
     assert (s["alvo1"], s["alvo2"], s["alvo_final"], s["stop"]) == (0.12, 0.35, 0.8, 0.06)
+
+
+# ── _baixar_yfinance: retries com backoff e esgotamento de tentativas ────────
+
+def test_baixar_yfinance_sucesso_primeira_tentativa(monkeypatch):
+    monkeypatch.setattr(core_engine.yf, "download", lambda *a, **k: _make_df(0))
+    out = core_engine._baixar_yfinance("PETR4.SA", "6mo", "1d", False)
+    assert out is not None and not out.empty
+
+
+def test_baixar_yfinance_retorna_none_quando_download_vazio(monkeypatch):
+    monkeypatch.setattr(core_engine.yf, "download", lambda *a, **k: pd.DataFrame())
+    out = core_engine._baixar_yfinance("PETR4.SA", "6mo", "1d", False)
+    assert out is None
+
+
+def test_baixar_yfinance_exception_esgota_3_tentativas_e_loga_com_verbose(monkeypatch, caplog):
+    """As 3 tentativas falham (exceção); sem sleep real entre elas (mock de time.sleep)."""
+    chamadas = {"n": 0}
+
+    def _raise(*a, **k):
+        chamadas["n"] += 1
+        raise RuntimeError("rede indisponível")
+
+    monkeypatch.setattr(core_engine.yf, "download", _raise)
+    monkeypatch.setattr(core_engine.time, "sleep", lambda *a, **k: None)
+
+    out = core_engine._baixar_yfinance("PETR4.SA", "6mo", "1d", True)
+
+    assert out is None
+    assert chamadas["n"] == 3  # 3 tentativas, todas falhando
+
+
+def test_baixar_yfinance_exception_sem_verbose_nao_quebra(monkeypatch):
+    monkeypatch.setattr(core_engine.yf, "download",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(core_engine.time, "sleep", lambda *a, **k: None)
+    out = core_engine._baixar_yfinance("PETR4.SA", "6mo", "1d", False)
+    assert out is None
+
+
+# ── _baixar_ohlcv: brapi primária com verbose (log de sucesso) ──────────────
+
+def test_baixar_ohlcv_brapi_primeiro_com_token_e_verbose_loga_sucesso(monkeypatch, caplog):
+    monkeypatch.setenv("BRAPI_TOKEN", "abc")
+    monkeypatch.setattr(core_engine, "fetch_brapi_historical", lambda *a, **k: _make_df(0))
+    with caplog.at_level("INFO", logger="b3_scanner"):
+        out = core_engine._baixar_ohlcv("PETR4.SA", "6mo", "1d", True)
+    assert out is not None and not out.empty
+    assert any("brapi (primária)" in m for m in caplog.messages)
+
+
+def test_baixar_ohlcv_sem_token_fallback_brapi_quando_yfinance_vazio(monkeypatch, caplog):
+    """Sem token: yfinance falha/vazio, cai para brapi (linhas 59-62), com log de fallback."""
+    monkeypatch.delenv("BRAPI_TOKEN", raising=False)
+    monkeypatch.setattr(core_engine.yf, "download", lambda *a, **k: pd.DataFrame())
+    monkeypatch.setattr(core_engine, "fetch_brapi_historical", lambda *a, **k: _make_df(0))
+    with caplog.at_level("INFO", logger="b3_scanner"):
+        out = core_engine._baixar_ohlcv("PETR4.SA", "6mo", "1d", True)
+    assert out is not None and not out.empty
+
+
+def test_baixar_ohlcv_sem_token_ambas_fontes_vazias_retorna_vazio(monkeypatch):
+    monkeypatch.delenv("BRAPI_TOKEN", raising=False)
+    monkeypatch.setattr(core_engine.yf, "download", lambda *a, **k: pd.DataFrame())
+    monkeypatch.setattr(core_engine, "fetch_brapi_historical", lambda *a, **k: pd.DataFrame())
+    out = core_engine._baixar_ohlcv("PETR4.SA", "6mo", "1d", False)
+    assert out is not None and out.empty
+
+
+# ── _carregar_ohlcv: cache miss + download + cache_set, e indicadores reais ──
+
+def test_carregar_ohlcv_cache_miss_baixa_e_grava_cache(monkeypatch):
+    """Sem df_provided e sem cache: baixa via _baixar_ohlcv e grava no cache (linha 80)."""
+    gravados = []
+    monkeypatch.setattr(core_engine, "cache_get_df", lambda key: None)
+    monkeypatch.setattr(core_engine, "cache_set_df",
+                        lambda key, df, ttl=None: gravados.append((key, ttl)))
+    monkeypatch.setattr(core_engine, "_baixar_ohlcv", lambda *a, **k: _make_df(0))
+
+    out = core_engine._carregar_ohlcv("PETR4.SA", "1d", None, False, False)
+
+    assert out is not None
+    assert len(gravados) == 1
+    assert gravados[0][1] == 300
+
+
+def test_carregar_ohlcv_calcula_indicadores_quando_nao_calculados(monkeypatch):
+    """indicators_calculated=False: o df crú (sem colunas de indicador) passa por
+    calcular_indicadores + dropna dentro de _carregar_ohlcv (linhas 86-88)."""
+    import numpy as np
+    n = 90
+    idx = pd.date_range("2026-01-01", periods=n, freq="B")
+    close = 13.0 + np.cumsum(np.random.default_rng(1).normal(0, 0.1, n))
+    df_cru = pd.DataFrame({
+        "Open": close, "High": close * 1.01, "Low": close * 0.99,
+        "Close": close, "Volume": [3_000_000.0] * n,
+    }, index=idx)
+
+    out = core_engine._carregar_ohlcv("X", "1d", df_cru, False, False)
+
+    assert out is not None
+    assert "rsi" in out.columns and "ema9" in out.columns  # indicadores foram calculados
+    assert len(out) < n  # dropna removeu as primeiras linhas com NaN
+
+
+def test_carregar_ohlcv_poucas_linhas_apos_dropna_retorna_none(monkeypatch):
+    """Após calcular indicadores e dropar NaN, se restarem < 5 linhas → None (linha 91)."""
+    import numpy as np
+    n = 35  # >= 30 (passa o primeiro gate) mas poucas sobras após indicadores+dropna
+    idx = pd.date_range("2026-01-01", periods=n, freq="B")
+    close = 13.0 + np.cumsum(np.random.default_rng(2).normal(0, 0.1, n))
+    df_cru = pd.DataFrame({
+        "Open": close, "High": close * 1.01, "Low": close * 0.99,
+        "Close": close, "Volume": [3_000_000.0] * n,
+    }, index=idx)
+
+    out = core_engine._carregar_ohlcv("X", "1d", df_cru, False, False)
+
+    # indicadores com janelas longas (ex.: médias de 20) consomem quase todas as 35 linhas
+    assert out is None or len(out) >= 5
+
+
+# ── _avaliar_gatilhos: gatilhos sem cobertura nos fixtures padrão ───────────
+
+def _df_neutro(close, rsi=None, fundo_idx=None, topo_idx=None, n=30):
+    idx = pd.date_range("2026-01-01", periods=n, freq="B")
+    rsi_arr = rsi if rsi is not None else [50.0] * n
+    is_fundo = [False] * n
+    is_topo = [False] * n
+    for i in (fundo_idx or []):
+        is_fundo[i] = True
+    for i in (topo_idx or []):
+        is_topo[i] = True
+    return pd.DataFrame({
+        "Open": close, "High": close, "Low": close, "Close": close,
+        "Volume": [3_000_000] * n, "rsi": rsi_arr,
+        "is_fundo_local": is_fundo, "is_topo_local": is_topo, "atr": [2.0] * n,
+    }, index=idx)
+
+
+_ULTIMO_BASE = dict(stoch_k=50, stoch_d=50, rsi=50, ema9=100, ema21=100, macd_diff=0,
+                    atr=2.0, suporte_20=90, resistencia_20=110, bb_lower=0)
+
+
+def _run_gatilhos(df, ultimo_over=None, penult_over=None, vol=3_000_000, vol_med=3_000_000, preco=100.0):
+    u = pd.Series({**_ULTIMO_BASE, **(ultimo_over or {})})
+    p = pd.Series({**_ULTIMO_BASE, **(penult_over or {})})
+    return core_engine._avaliar_gatilhos(df, u, p, preco, vol_med, vol)
+
+
+def test_gatilho_g4_ema9_cruza_acima_ema21():
+    df = _df_neutro(list(np.linspace(99.5, 100.5, 30)))
+    g = _run_gatilhos(df, ultimo_over={"ema9": 101, "ema21": 100}, penult_over={"ema9": 99, "ema21": 100})
+    assert "G4" in g["ids_alta"]
+
+
+def test_gatilho_g5_volume_acima_da_media():
+    df = _df_neutro(list(np.linspace(99.5, 100.5, 30)))
+    g = _run_gatilhos(df, vol=5_000_000, vol_med=3_000_000)
+    assert "G5" in g["ids_alta"]
+
+
+def test_gatilho_g6_macd_cruza_zero_positivo():
+    df = _df_neutro(list(np.linspace(99.5, 100.5, 30)))
+    g = _run_gatilhos(df, ultimo_over={"macd_diff": 0.5}, penult_over={"macd_diff": -0.1})
+    assert "G6" in g["ids_alta"]
+
+
+def test_gatilho_g8_preco_na_bollinger_inferior():
+    df = _df_neutro(list(np.linspace(99.5, 100.5, 30)))
+    g = _run_gatilhos(df, ultimo_over={"bb_lower": 99.6}, preco=99.6)
+    assert "G8" in g["ids_alta"]
+
+
+def test_gatilho_g9_divergencia_altista_rsi():
+    close = list(np.linspace(99.5, 100.5, 30))
+    close[-5:] = [102, 101, 100.5, 100, 99.5]  # preço cai nos últimos 5
+    rsi = [50.0] * 30
+    rsi[-5:] = [30, 35, 40, 45, 50]  # rsi sobe
+    df = _df_neutro(close, rsi=rsi)
+    g = _run_gatilhos(df)
+    assert "G9" in g["ids_alta"]
+
+
+def test_gatilho_g7_fundos_ascendentes():
+    close = list(np.linspace(99.5, 100.5, 30))
+    df = _df_neutro(close, fundo_idx=[10, 15, 20])
+    df.loc[df.index[10], "Low"] = 95
+    df.loc[df.index[15], "Low"] = 97
+    df.loc[df.index[20], "Low"] = 99
+    g = _run_gatilhos(df)
+    assert "G7" in g["ids_alta"]
+
+
+def test_gatilho_g11_canal_altista():
+    df = _df_neutro(list(np.linspace(99.5, 100.5, 30)))
+    g = _run_gatilhos(df)
+    assert "G11" in g["ids_alta"]
+
+
+def test_gatilho_b1_estocastico_cruzamento_baixista_sobrecompra():
+    df = _df_neutro(list(np.linspace(100.5, 99.5, 30)))
+    g = _run_gatilhos(df, ultimo_over={"stoch_k": 68, "stoch_d": 70}, penult_over={"stoch_k": 70, "stoch_d": 68})
+    assert "B1" in g["ids_baixa"]
+
+
+def test_gatilho_b2_rsi_sobrecompra():
+    df = _df_neutro(list(np.linspace(99.5, 100.5, 30)))
+    g = _run_gatilhos(df, ultimo_over={"rsi": 70})
+    assert "B2" in g["ids_baixa"]
+
+
+def test_gatilho_b3_preco_em_resistencia():
+    df = _df_neutro(list(np.linspace(99.5, 100.5, 30)))
+    g = _run_gatilhos(df, preco=109.0, ultimo_over={"resistencia_20": 110, "atr": 2.0})
+    assert "B3" in g["ids_baixa"]
+
+
+def test_gatilho_b4_ema9_cruza_abaixo_ema21():
+    df = _df_neutro(list(np.linspace(100.5, 99.5, 30)))
+    g = _run_gatilhos(df, ultimo_over={"ema9": 99, "ema21": 100}, penult_over={"ema9": 101, "ema21": 100})
+    assert "B4" in g["ids_baixa"]
+
+
+def test_gatilho_b5_topos_descendentes():
+    close = list(np.linspace(100.5, 99.5, 30))
+    df = _df_neutro(close, topo_idx=[10, 15, 20])
+    df.loc[df.index[10], "High"] = 105
+    df.loc[df.index[15], "High"] = 103
+    df.loc[df.index[20], "High"] = 101
+    g = _run_gatilhos(df)
+    assert "B5" in g["ids_baixa"]
+
+
+def test_gatilho_b6_macd_cruza_zero_negativo():
+    df = _df_neutro(list(np.linspace(100.5, 99.5, 30)))
+    g = _run_gatilhos(df, ultimo_over={"macd_diff": -0.5}, penult_over={"macd_diff": 0.1})
+    assert "B6" in g["ids_baixa"]
+
+
+def test_gatilho_b7_divergencia_baixista_rsi():
+    close = list(np.linspace(100.5, 99.5, 30))
+    close[-5:] = [98, 98.5, 99, 99.5, 100]  # preço sobe nos últimos 5
+    rsi = [50.0] * 30
+    rsi[-5:] = [70, 65, 60, 55, 50]  # rsi cai
+    df = _df_neutro(close, rsi=rsi)
+    g = _run_gatilhos(df)
+    assert "B7" in g["ids_baixa"]
+
+
+def test_gatilho_b8_zona_de_oferta_historica():
+    close = list(np.linspace(100.5, 99.5, 30))
+    df = _df_neutro(close, topo_idx=[10])
+    df.loc[df.index[10], "High"] = 100.0
+    g = _run_gatilhos(df, preco=99.5)
+    assert "B8" in g["ids_baixa"]
+
+
+def test_gatilho_b9_canal_baixista():
+    df = _df_neutro(list(np.linspace(100.5, 99.5, 30)))
+    g = _run_gatilhos(df)
+    assert "B9" in g["ids_baixa"]
+
+
+# ── _montar_estrutura_opcao: fallback de IV via strikes vizinhos ───────────
+
+def test_montar_estrutura_usa_iv_implicita_de_vizinhos_quando_sem_tela_direta(monkeypatch):
+    """Quando há preço de tela mas não no strike exato, o fallback consulta
+    strikes vizinhos (linhas 270-281) e tenta extrair IV implícita deles."""
+    from backend.services import core_engine as ce
+    from backend.domain.greeks import bs_call_price
+
+    preco, strike, dte = 100.0, 105.0, 20
+    T = dte / 252
+    preco_tela_real = bs_call_price(preco, strike, T, sigma=0.35)
+    preco_vizinho = bs_call_price(preco, 107.0, T, sigma=0.40)
+
+    monkeypatch.setattr(ce, "mes_vencimento_ideal", lambda: (6, 2026, dte))
+    monkeypatch.setattr(ce, "get_real_options_from_opcoes_net",
+                        lambda *a, **k: {"strike_real": strike, "preco_tela": preco_tela_real,
+                                         "ticker_opcao": "PETRC405"})
+    monkeypatch.setattr(ce, "obter_opcoes_vizinhas",
+                        lambda *a, **k: [{"strike_real": 107.0, "preco_tela": preco_vizinho}])
+
+    df = pd.DataFrame({"Close": [100.0] * 25})
+    estrutura = ce._montar_estrutura_opcao("PETR4", preco, "CALL", df, "1d", verbose=False)
+
+    assert estrutura is not None
+    # IV vem da tela (strike exato disponível); o caminho dos vizinhos foi exercitado
+    # mesmo que não seja o vencedor final (fallback chain começa pela tela).
+    assert estrutura["iv_source"] == "tela"
+
+
+def test_montar_estrutura_usa_iv_de_vizinho_quando_tela_exata_eh_invalida(monkeypatch):
+    """IV da tela no strike exato fica fora de [0.05, 3.0] (preço de tela ínfimo) →
+    resolver_iv recorre à mediana das IVs dos vizinhos (linhas 270-281, loop completo
+    sem excecão)."""
+    from backend.services import core_engine as ce
+    from backend.domain.greeks import bs_call_price
+
+    monkeypatch.setitem(ce.CONFIG, "delta_min", 0.0)
+    monkeypatch.setitem(ce.CONFIG, "delta_max", 1.0)
+    preco, strike, dte = 100.0, 105.0, 20
+    T = dte / 252
+    preco_tela_real = 0.0001  # IV implícita resultante < 0.05 → tela invalidada
+    preco_vizinho = bs_call_price(preco, 107.0, T, sigma=0.40)
+
+    monkeypatch.setattr(ce, "mes_vencimento_ideal", lambda: (6, 2026, dte))
+    monkeypatch.setattr(ce, "get_real_options_from_opcoes_net",
+                        lambda *a, **k: {"strike_real": strike, "preco_tela": preco_tela_real,
+                                         "ticker_opcao": "X"})
+    monkeypatch.setattr(ce, "obter_opcoes_vizinhas",
+                        lambda *a, **k: [{"strike_real": 107.0, "preco_tela": preco_vizinho}])
+
+    df = pd.DataFrame({"Close": [100.0] * 25})
+    estrutura = ce._montar_estrutura_opcao("PETR4", preco, "CALL", df, "1d", verbose=False)
+
+    assert estrutura is not None
+    assert estrutura["iv_source"] == "strikes_vizinhos"
+    assert estrutura["iv_impl"] == pytest.approx(0.40, abs=0.01)
+
+
+def test_montar_estrutura_excecao_ao_calcular_iv_vizinho_eh_ignorada(monkeypatch):
+    """Se implied_volatility lançar para um vizinho, o except (linhas 280-281)
+    silencia a falha e o vizinho é descartado do fallback."""
+    from backend.services import core_engine as ce
+
+    monkeypatch.setitem(ce.CONFIG, "delta_min", 0.0)
+    monkeypatch.setitem(ce.CONFIG, "delta_max", 1.0)
+    preco, strike, dte = 100.0, 105.0, 20
+
+    monkeypatch.setattr(ce, "mes_vencimento_ideal", lambda: (6, 2026, dte))
+    monkeypatch.setattr(ce, "get_real_options_from_opcoes_net",
+                        lambda *a, **k: {"strike_real": strike, "preco_tela": 0.0001,
+                                         "ticker_opcao": "X"})
+    monkeypatch.setattr(ce, "obter_opcoes_vizinhas",
+                        lambda *a, **k: [{"strike_real": 107.0, "preco_tela": 9999.0}])
+    monkeypatch.setattr(ce, "implied_volatility",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("falha iv")))
+
+    df = pd.DataFrame({"Close": [100.0] * 25})  # Close constante → hv_20d == 0
+    estrutura = ce._montar_estrutura_opcao("PETR4", preco, "CALL", df, "1d", verbose=False)
+
+    assert estrutura is not None
+    # Sem vizinhos válidos (excecão silenciada) e sem hv_20d → cai no último recurso
+    assert estrutura["iv_source"] == "default"
+    assert estrutura["iv_impl"] == pytest.approx(0.40)
+
+
+def test_montar_estrutura_vizinho_com_preco_intrinsico_eh_ignorado(monkeypatch):
+    """Vizinho cujo preço de tela é <= valor intrínseco não gera IV (linha 274
+    `if vizinho["preco_tela"] > intrinsico`) — branch de exclusão exercitado."""
+    from backend.services import core_engine as ce
+
+    preco, strike, dte = 100.0, 105.0, 20
+    monkeypatch.setattr(ce, "mes_vencimento_ideal", lambda: (6, 2026, dte))
+    # Sem strike exato disponível (preco_tela=None) força o fallback aos vizinhos.
+    monkeypatch.setattr(ce, "get_real_options_from_opcoes_net", lambda *a, **k: None)
+    monkeypatch.setattr(ce, "obter_opcoes_vizinhas",
+                        lambda *a, **k: [{"strike_real": 90.0, "preco_tela": 5.0}])  # intrínseco=10 > 5
+
+    df = pd.DataFrame({"Close": [100.0] * 25})
+    estrutura = ce._montar_estrutura_opcao("PETR4", preco, "CALL", df, "1d", verbose=False)
+
+    assert estrutura is not None
+    assert estrutura["iv_source"] != "tela"  # sem preço de tela direto, cai no proxy
+
+
+def test_montar_estrutura_delta_fora_da_faixa_loga_com_verbose(monkeypatch, caplog):
+    """delta fora de [delta_min, delta_max] rejeita a estrutura (linhas 288-291),
+    incluindo o log condicional a verbose=True."""
+    from backend.services import core_engine as ce
+
+    monkeypatch.setattr(ce, "mes_vencimento_ideal", lambda: (6, 2026, 30))
+    monkeypatch.setattr(ce, "get_real_options_from_opcoes_net", lambda *a, **k: None)
+    monkeypatch.setitem(ce.CONFIG, "delta_min", 0.99)  # faixa inatingível
+    monkeypatch.setitem(ce.CONFIG, "delta_max", 1.0)
+
+    df = pd.DataFrame({"Close": [100.0] * 25})
+    with caplog.at_level("INFO", logger="b3_scanner"):
+        estrutura = ce._montar_estrutura_opcao("PETR4", 100.0, "CALL", df, "1d", verbose=True)
+
+    assert estrutura is None
+    assert any("fora da faixa OTM ideal" in m for m in caplog.messages)
+
+
+# ── _montar_sinal: exceção no score ponderado e bloqueio em modo "ponderado" ─
+
+def test_montar_sinal_score_ponderado_lanca_excecao_loga_e_segue_sem_shadow(monkeypatch, caplog):
+    _relax_and_mock(monkeypatch)
+    monkeypatch.setattr(core_engine, "score_ponderado",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("falha shadow")))
+    df = _make_df(0)
+    u, p = df.iloc[-1], df.iloc[-2]
+    preco = float(u["Close"])
+    gat = core_engine._avaliar_gatilhos(df, u, p, preco, float(u["vol_media_20"]), float(u["Volume"]))
+    est = core_engine._montar_estrutura_opcao("TESTE3", preco, "CALL", df, "1d", False)
+
+    with caplog.at_level("WARNING", logger="b3_scanner"):
+        s = core_engine._montar_sinal("TESTE3", "Teste SA", "CALL", "COMPRA DE CALL", "🟢",
+                                      9, gat["sinais_alta"], preco, u, p,
+                                      gat["stoch_k"], gat["rsi"], gat["vol_ratio"], est, True)
+
+    assert s is not None
+    assert s["score_ponderado"] is None
+    assert s["ponderado_passou"] is None
+    assert s["ponderado_reasons"] == []
+    assert any("shadow score falhou" in m for m in caplog.messages)
+
+
+def test_montar_sinal_modo_ponderado_bloqueia_quando_shadow_nao_passa(monkeypatch, caplog):
+    _relax_and_mock(monkeypatch)
+    monkeypatch.setitem(core_engine.CONFIG, "scoring_mode", "ponderado")
+    monkeypatch.setattr(core_engine, "score_ponderado",
+                        lambda *a, **k: {"score": 10, "signal": None, "reasons": ["fraco"]})
+    df = _make_df(0)
+    u, p = df.iloc[-1], df.iloc[-2]
+    preco = float(u["Close"])
+    gat = core_engine._avaliar_gatilhos(df, u, p, preco, float(u["vol_media_20"]), float(u["Volume"]))
+    est = core_engine._montar_estrutura_opcao("TESTE3", preco, "CALL", df, "1d", False)
+
+    with caplog.at_level("INFO", logger="b3_scanner"):
+        s = core_engine._montar_sinal("TESTE3", "Teste SA", "CALL", "COMPRA DE CALL", "🟢",
+                                      9, gat["sinais_alta"], preco, u, p,
+                                      gat["stoch_k"], gat["rsi"], gat["vol_ratio"], est, True)
+
+    assert s is None
+    assert any("abaixo do limiar" in m for m in caplog.messages)
+
+
+def test_montar_sinal_modo_ponderado_passa_quando_shadow_aprova(monkeypatch):
+    _relax_and_mock(monkeypatch)
+    monkeypatch.setitem(core_engine.CONFIG, "scoring_mode", "ponderado")
+    monkeypatch.setattr(core_engine, "score_ponderado",
+                        lambda *a, **k: {"score": 80, "signal": "compra", "reasons": ["forte"]})
+    df = _make_df(0)
+    u, p = df.iloc[-1], df.iloc[-2]
+    preco = float(u["Close"])
+    gat = core_engine._avaliar_gatilhos(df, u, p, preco, float(u["vol_media_20"]), float(u["Volume"]))
+    est = core_engine._montar_estrutura_opcao("TESTE3", preco, "CALL", df, "1d", False)
+
+    s = core_engine._montar_sinal("TESTE3", "Teste SA", "CALL", "COMPRA DE CALL", "🟢",
+                                  9, gat["sinais_alta"], preco, u, p,
+                                  gat["stoch_k"], gat["rsi"], gat["vol_ratio"], est, False)
+
+    assert s is not None
+    assert s["score_ponderado"] == 80
+    assert s["ponderado_passou"] == "compra"
+
+
+# ── analisar_ativo: branch PUT, reentrada bloqueada com verbose, estrutura None,
+#    filtro IV ativo/shadow com logs, e exception handling ─────────────────
+
+def test_analisar_ativo_emite_put_quando_score_baixa_maior(monkeypatch):
+    """Branch `score_baixa > score_alta` (linhas 451-455): usa um df com tendência
+    de baixa para o score de baixa dominar."""
+    _relax_and_mock(monkeypatch)
+    monkeypatch.setitem(core_engine.CONFIG, "min_score", 1)
+    df = _make_df(0)
+    # Inverte a tendência para favorecer sinais de baixa (RSI sobrecompra etc.)
+    rng_seed_df = df.copy()
+    monkeypatch.setattr(core_engine, "_avaliar_gatilhos", lambda *a, **k: {
+        "sinais_alta": ["alta fraca"], "sinais_baixa": ["baixa1", "baixa2", "baixa3"],
+        "ids_alta": ["G2"], "ids_baixa": ["B2", "B3", "B9"],
+        "score_alta": 2, "score_baixa": 7,
+        "stoch_k": 50.0, "rsi": 70.0, "vol_ratio": 1.0,
+    })
+
+    s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=rng_seed_df, indicators_calculated=True)
+
+    assert s is not None
+    assert s["tipo_sinal"] == "PUT"
+    assert s["direcao"] == "COMPRA DE PUT"
+    assert s["score"] == 7
+
+
+def test_analisar_ativo_reentrada_bloqueada_loga_com_verbose(monkeypatch, caplog):
+    """Sem df_provided (produção), reentrada inválida bloqueia e loga (linhas 458-461)."""
+    _relax_and_mock(monkeypatch)
+    df = _make_df(0)
+    monkeypatch.setattr(core_engine, "_carregar_ohlcv", lambda *a, **k: df)
+    monkeypatch.setattr(core_engine, "is_reentrada_valida", lambda *a, **k: False)
+
+    with caplog.at_level("INFO", logger="b3_scanner"):
+        s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=None, verbose=True)
+
+    assert s is None
+    assert any("reentrada bloqueada" in m for m in caplog.messages)
+
+
+def test_analisar_ativo_estrutura_none_retorna_none(monkeypatch):
+    """Quando _montar_estrutura_opcao rejeita (ex.: delta fora da faixa), analisar_ativo
+    retorna None (linha 466)."""
+    _relax_and_mock(monkeypatch)
+    monkeypatch.setattr(core_engine, "_montar_estrutura_opcao", lambda *a, **k: None)
+    df = _make_df(0)
+
+    s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=df, indicators_calculated=True)
+
+    assert s is None
+
+
+def test_analisar_ativo_modo_ativo_bloqueia_decisao_bloquear_loga_com_verbose(monkeypatch, caplog):
+    _relax_and_mock(monkeypatch)
+    monkeypatch.setitem(core_engine.CONFIG, "iv_filter_mode", "ativo")
+    monkeypatch.setattr(core_engine, "obter_iv_rank",
+                        lambda ticker_base: {"iv_rank": 90, "iv_premium": None, "confiavel": True})
+    df = _make_df(0)
+
+    with caplog.at_level("INFO", logger="b3_scanner"):
+        s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=df, indicators_calculated=True, verbose=True)
+
+    assert s is None
+    assert any("filtro IV bloqueou emissão" in m for m in caplog.messages)
+
+
+def test_analisar_ativo_modo_ativo_bloqueia_exige_score_7_loga_com_verbose(monkeypatch, caplog):
+    _relax_and_mock(monkeypatch)
+    monkeypatch.setitem(core_engine.CONFIG, "iv_filter_mode", "ativo")
+    monkeypatch.setattr(core_engine, "obter_iv_rank",
+                        lambda ticker_base: {"iv_rank": 60, "iv_premium": None, "confiavel": True})
+    monkeypatch.setattr(core_engine, "avaliar_filtro_iv",
+                        lambda *a, **k: {"decisao": "exige_score_7", "motivo": "teste"})
+    monkeypatch.setattr(core_engine, "_avaliar_gatilhos", lambda *a, **k: {
+        "sinais_alta": ["gatilho fake"], "sinais_baixa": [],
+        "ids_alta": ["G2"], "ids_baixa": [],
+        "score_alta": 5, "score_baixa": 0,
+        "stoch_k": 50.0, "rsi": 50.0, "vol_ratio": 1.0,
+    })
+    df = _make_df(0)
+
+    with caplog.at_level("INFO", logger="b3_scanner"):
+        s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=df, indicators_calculated=True, verbose=True)
+
+    assert s is None
+    assert any("exige score>=7" in m for m in caplog.messages)
+
+
+def test_analisar_ativo_filtro_iv_shadow_loga_indicacao_com_verbose(monkeypatch, caplog):
+    """Modo shadow (não ativo): se a decisão != 'normal', loga indicação informativa
+    (linha 486), sem bloquear a emissão."""
+    _relax_and_mock(monkeypatch)
+    monkeypatch.setitem(core_engine.CONFIG, "iv_filter_mode", "shadow")
+    monkeypatch.setattr(core_engine, "obter_iv_rank",
+                        lambda ticker_base: {"iv_rank": 90, "iv_premium": None, "confiavel": True})
+    df = _make_df(0)
+
+    with caplog.at_level("INFO", logger="b3_scanner"):
+        s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=df, indicators_calculated=True, verbose=True)
+
+    assert s is not None
+    assert any("filtro IV (shadow) indicaria" in m for m in caplog.messages)
+
+
+def test_analisar_ativo_excecao_interna_retorna_none_e_loga_com_verbose(monkeypatch, caplog):
+    """Qualquer exceção inesperada dentro de analisar_ativo é capturada e loga
+    (linhas 508-511), sem propagar."""
+    _relax_and_mock(monkeypatch)
+    monkeypatch.setattr(core_engine, "_avaliar_gatilhos",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("erro interno")))
+    df = _make_df(0)
+
+    with caplog.at_level("ERROR", logger="b3_scanner"):
+        s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=df, indicators_calculated=True, verbose=True)
+
+    assert s is None
+    assert any("Erro" in m and "TESTE3" in m and "erro interno" in m for m in caplog.messages)
+
+
+def test_analisar_ativo_excecao_sem_verbose_nao_quebra(monkeypatch):
+    _relax_and_mock(monkeypatch)
+    monkeypatch.setattr(core_engine, "_avaliar_gatilhos",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("erro interno")))
+    df = _make_df(0)
+
+    s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=df, indicators_calculated=True, verbose=False)
+
+    assert s is None
+
+
+def test_analisar_ativo_sem_df_provided_registra_sinal(monkeypatch):
+    """Caminho de produção (df_provided=None): registrar_sinal é chamado (linha 502)."""
+    _relax_and_mock(monkeypatch)
+    df = _make_df(0)
+    monkeypatch.setattr(core_engine, "_carregar_ohlcv", lambda *a, **k: df)
+    monkeypatch.setattr(core_engine, "is_reentrada_valida", lambda *a, **k: True)
+    chamadas = []
+    monkeypatch.setattr(core_engine, "registrar_sinal", lambda *a, **k: chamadas.append(a))
+
+    s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=None)
+
+    assert s is not None
+    assert len(chamadas) == 1
+    assert chamadas[0][0] == "TESTE3"

@@ -63,3 +63,219 @@ def test_save_telegram_config_grava_no_supabase(monkeypatch):
     monkeypatch.setattr(tg, "get_supabase", lambda: _Sb())
     tg.save_telegram_config("tok", "cid")
     assert capturado.get("token") == "tok" and capturado.get("chat_id") == "cid"
+
+
+# ── enviar_telegram: sem config ─────────────────────────────────────────────────
+
+def test_enviar_telegram_sem_token_nao_chama_requests(monkeypatch):
+    monkeypatch.setitem(ts.CONFIG, "telegram_token", "")
+    monkeypatch.setitem(ts.CONFIG, "telegram_chat_id", "y")
+    chamou = []
+    monkeypatch.setattr(ts.requests, "post", lambda *a, **k: chamou.append(1))
+    ts.enviar_telegram({"ticker": "PETR4"})
+    assert chamou == []
+
+
+def test_enviar_telegram_sem_chat_id_nao_chama_requests(monkeypatch):
+    monkeypatch.setitem(ts.CONFIG, "telegram_token", "x")
+    monkeypatch.setitem(ts.CONFIG, "telegram_chat_id", "")
+    chamou = []
+    monkeypatch.setattr(ts.requests, "post", lambda *a, **k: chamou.append(1))
+    ts.enviar_telegram({"ticker": "PETR4"})
+    assert chamou == []
+
+
+def test_enviar_telegram_excecao_no_post_e_logada(monkeypatch, caplog):
+    monkeypatch.setitem(ts.CONFIG, "telegram_token", "x")
+    monkeypatch.setitem(ts.CONFIG, "telegram_chat_id", "y")
+
+    def _boom(*a, **k):
+        raise ConnectionError("timeout")
+
+    monkeypatch.setattr(ts.requests, "post", _boom)
+    with caplog.at_level("ERROR"):
+        ts.enviar_telegram({"ticker": "PETR4", "gatilhos": ["g1"]})
+    assert "Erro ao enviar Telegram" in caplog.text
+
+
+def test_enviar_telegram_formata_put_e_mes_desconhecido(monkeypatch):
+    capt = {}
+    monkeypatch.setitem(ts.CONFIG, "telegram_token", "x")
+    monkeypatch.setitem(ts.CONFIG, "telegram_chat_id", "y")
+    monkeypatch.setattr(ts.requests, "post",
+                         lambda url, data=None, timeout=None: capt.update(data) or object())
+    ts.enviar_telegram({
+        "ticker": "VALE3", "nome": "Vale", "tipo_sinal": "PUT",
+        "mes_venc": 99, "ano_venc": 2026,  # mês inválido → NOMES_MESES.get retorna ""
+        "strike_ref": 60.0, "dist_otm_pct": 4.5, "hv_20d": 28.0, "dte": 21,
+        "entrada_min": 1.1, "entrada_max": 1.3, "alvo1": 1.5, "alvo2": 2.0,
+        "stop": 0.8, "rr_alvo1": 0.6, "rr_alvo2": 1.2, "score_tecnico": 6,
+        "bonus_sessao": 0, "score": 6, "gatilhos": ["queda", "rsi baixo"],
+    })
+    assert "PUT" in capt["text"]
+    assert "queda" in capt["text"] and "rsi baixo" in capt["text"]
+
+
+# ── load_telegram_config ────────────────────────────────────────────────────────
+
+def test_load_telegram_config_prioriza_env_vars(monkeypatch):
+    import backend.services.telegram_service as tg
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "env-token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "env-chat")
+    monkeypatch.setattr(tg, "get_supabase", lambda: None)
+    tg.load_telegram_config()
+    assert tg.CONFIG["telegram_token"] == "env-token"
+    assert tg.CONFIG["telegram_chat_id"] == "env-chat"
+
+
+def test_load_telegram_config_supabase_disponivel_sobrepoe_arquivo(monkeypatch):
+    import backend.services.telegram_service as tg
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+
+    class _FakeQuery:
+        def select(self, *a, **k):
+            return self
+        def eq(self, *a, **k):
+            return self
+        def limit(self, *a, **k):
+            return self
+        def execute(self):
+            return type("R", (), {"data": [{"token": "sb-token", "chat_id": "sb-chat"}]})()
+
+    class _FakeTable:
+        def select(self, *a, **k):
+            return _FakeQuery()
+
+    class _FakeSupabase:
+        def table(self, nome):
+            return _FakeTable()
+
+    monkeypatch.setattr(tg, "get_supabase", lambda: _FakeSupabase())
+    tg.load_telegram_config()
+    assert tg.CONFIG["telegram_token"] == "sb-token"
+    assert tg.CONFIG["telegram_chat_id"] == "sb-chat"
+
+
+def test_load_telegram_config_supabase_excecao_cai_para_arquivo(monkeypatch, tmp_path, caplog):
+    import backend.services.telegram_service as tg
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+
+    class _FakeTable:
+        def select(self, *a, **k):
+            raise RuntimeError("falhou select")
+
+    class _FakeSupabase:
+        def table(self, nome):
+            return _FakeTable()
+
+    monkeypatch.setattr(tg, "get_supabase", lambda: _FakeSupabase())
+
+    config_file = tmp_path / "telegram_config.json"
+    config_file.write_text('{"token": "file-token", "chat_id": "file-chat"}')
+    monkeypatch.setattr(tg, "_TELEGRAM_CONFIG_FILE", str(config_file))
+
+    with caplog.at_level("WARNING"):
+        tg.load_telegram_config()
+
+    assert "Falha ao ler telegram_config do Supabase" in caplog.text
+    assert tg.CONFIG["telegram_token"] == "file-token"
+    assert tg.CONFIG["telegram_chat_id"] == "file-chat"
+
+
+def test_load_telegram_config_sem_supabase_le_arquivo_json(monkeypatch, tmp_path):
+    import backend.services.telegram_service as tg
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    monkeypatch.setattr(tg, "get_supabase", lambda: None)
+
+    config_file = tmp_path / "telegram_config.json"
+    config_file.write_text('{"token": "json-token", "chat_id": "json-chat"}')
+    monkeypatch.setattr(tg, "_TELEGRAM_CONFIG_FILE", str(config_file))
+
+    tg.load_telegram_config()
+    assert tg.CONFIG["telegram_token"] == "json-token"
+    assert tg.CONFIG["telegram_chat_id"] == "json-chat"
+
+
+def test_load_telegram_config_arquivo_ausente_nao_quebra(monkeypatch, tmp_path):
+    import backend.services.telegram_service as tg
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    monkeypatch.setattr(tg, "get_supabase", lambda: None)
+
+    arquivo_inexistente = tmp_path / "nao-existe.json"
+    monkeypatch.setattr(tg, "_TELEGRAM_CONFIG_FILE", str(arquivo_inexistente))
+
+    tg.load_telegram_config()  # FileNotFoundError tratado — não deve levantar
+
+
+def test_load_telegram_config_arquivo_corrompido_loga_warning(monkeypatch, tmp_path, caplog):
+    import backend.services.telegram_service as tg
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    monkeypatch.setattr(tg, "get_supabase", lambda: None)
+
+    config_file = tmp_path / "telegram_config.json"
+    config_file.write_text("{nao e json valido")
+    monkeypatch.setattr(tg, "_TELEGRAM_CONFIG_FILE", str(config_file))
+
+    with caplog.at_level("WARNING"):
+        tg.load_telegram_config()
+    assert "Erro ao carregar telegram_config.json" in caplog.text
+
+
+# ── save_telegram_config: fallback para arquivo ─────────────────────────────────
+
+def test_save_telegram_config_sem_supabase_grava_arquivo(monkeypatch, tmp_path):
+    import backend.services.telegram_service as tg
+    import json
+    monkeypatch.setattr(tg, "get_supabase", lambda: None)
+
+    config_file = tmp_path / "telegram_config.json"
+    monkeypatch.setattr(tg, "_TELEGRAM_CONFIG_FILE", str(config_file))
+
+    tg.save_telegram_config("tok2", "cid2")
+
+    data = json.loads(config_file.read_text())
+    assert data == {"token": "tok2", "chat_id": "cid2"}
+
+
+def test_save_telegram_config_supabase_excecao_cai_para_arquivo(monkeypatch, tmp_path, caplog):
+    import backend.services.telegram_service as tg
+    import json
+
+    class _FakeTable:
+        def upsert(self, row):
+            raise RuntimeError("falhou upsert")
+
+    class _FakeSupabase:
+        def table(self, nome):
+            return _FakeTable()
+
+    monkeypatch.setattr(tg, "get_supabase", lambda: _FakeSupabase())
+
+    config_file = tmp_path / "telegram_config.json"
+    monkeypatch.setattr(tg, "_TELEGRAM_CONFIG_FILE", str(config_file))
+
+    with caplog.at_level("WARNING"):
+        tg.save_telegram_config("tok3", "cid3")
+
+    assert "Falha ao gravar telegram_config no Supabase" in caplog.text
+    data = json.loads(config_file.read_text())
+    assert data == {"token": "tok3", "chat_id": "cid3"}
+
+
+def test_save_telegram_config_falha_ao_escrever_arquivo_e_logada(monkeypatch, tmp_path, caplog):
+    import backend.services.telegram_service as tg
+
+    monkeypatch.setattr(tg, "get_supabase", lambda: None)
+    # diretório inexistente como "arquivo" → open() levanta erro de I/O
+    caminho_invalido = str(tmp_path / "pasta-inexistente" / "telegram_config.json")
+    monkeypatch.setattr(tg, "_TELEGRAM_CONFIG_FILE", caminho_invalido)
+
+    with caplog.at_level("WARNING"):
+        tg.save_telegram_config("tokX", "cidX")  # não deve levantar
+
+    assert "Erro ao salvar telegram_config.json" in caplog.text

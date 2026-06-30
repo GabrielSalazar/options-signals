@@ -18,6 +18,7 @@ from backend.domain.indicators import (
     detectar_canal_linear,
 )
 from backend.domain.indicators import pivots_confirmados, ultimos_pivots_confirmados
+from unittest.mock import patch
 
 
 def _make_ohlcv(n=100, base=100.0, seed=42):
@@ -147,6 +148,13 @@ class TestDetectarDivergencia:
         alta, baixa = detectar_divergencia(df, janela=5)
         assert alta is False and baixa is False
 
+    def test_rsi_com_nan_retorna_false_false(self):
+        """Se algum valor de RSI na janela (cauda) for NaN, não dá pra avaliar divergência → (False, False)."""
+        df = _make_ohlcv(20)
+        df["rsi"] = [50.0] * 15 + [np.nan] * 5
+        alta, baixa = detectar_divergencia(df, janela=5)
+        assert bool(alta) is False and bool(baixa) is False
+
 
 class TestDetectarCanalLinear:
     """Testes para detectar_canal_linear."""
@@ -184,6 +192,32 @@ class TestDetectarCanalLinear:
         df = pd.DataFrame({"High": [105], "Low": [95], "Close": [100]})
         alt, bx, sl = detectar_canal_linear(df, janela=20)
         assert alt is False and bx is False and sl == 0.0
+
+    def test_excecao_no_polyfit_retorna_false_false_zero(self):
+        """Se np.polyfit lançar (ex: dados não-finitos), captura e retorna (False, False, 0.0)."""
+        n = 40
+        idx = pd.date_range("2024-01-01", periods=n, freq="B")
+        df = pd.DataFrame({
+            "High": [105.0] * n,
+            "Low": [95.0] * n,
+            "Close": [100.0] * n,
+        }, index=idx)
+        with patch("backend.domain.indicators.np.polyfit", side_effect=ValueError("falha no fit")):
+            alt, bx, sl = detectar_canal_linear(df, janela=20)
+        assert alt is False and bx is False and sl == 0.0
+
+    def test_canal_lateral_sem_tendencia_clara(self):
+        """Topos sobem mas fundos caem → sinais opostos, nem altista nem baixista."""
+        n = 30
+        idx = pd.date_range("2024-01-01", periods=n, freq="B")
+        df = pd.DataFrame({
+            "High": 105 + np.linspace(0, 5, n),   # topos subindo
+            "Low": 95 - np.linspace(0, 5, n),     # fundos caindo
+            "Close": 100 + np.zeros(n),
+        }, index=idx)
+        alt, bx, sl = detectar_canal_linear(df, janela=20)
+        assert bool(alt) is False
+        assert bool(bx) is False
 
 
 class TestEncontrarZonas:
@@ -230,3 +264,36 @@ class TestPivotsConfirmados:
         lim = t - ordem
         assert f_trunc.iloc[:lim + 1].equals(f_full.iloc[:lim + 1])
         assert t_trunc.iloc[:lim + 1].equals(t_full.iloc[:lim + 1])
+
+
+class TestUltimosPivotsConfirmados:
+    """ultimos_pivots_confirmados: extrai os últimos N fundos/topos confirmados."""
+
+    def test_df_menor_ou_igual_a_ordem_retorna_listas_vazias(self):
+        df = pd.DataFrame({"Low": [10, 9, 8], "High": [11, 10, 9],
+                            "is_fundo_local": [False, True, False],
+                            "is_topo_local": [False, False, True]})
+        fundos, topos = ultimos_pivots_confirmados(df, ordem=3, n=3)
+        assert list(fundos) == []
+        assert list(topos) == []
+
+    def test_df_igual_a_ordem_retorna_listas_vazias(self):
+        """len(df) == ordem também deve cair no caso base (<=)."""
+        df = pd.DataFrame({"Low": [10, 9], "High": [11, 10],
+                            "is_fundo_local": [True, False],
+                            "is_topo_local": [False, True]})
+        fundos, topos = ultimos_pivots_confirmados(df, ordem=2, n=3)
+        assert list(fundos) == []
+        assert list(topos) == []
+
+    def test_extrai_ultimos_n_fundos_e_topos_confirmados(self):
+        low  = [10, 9, 8, 9, 10, 11, 12, 11, 10]
+        high = [11, 10, 9, 10, 11, 12, 13, 12, 11]
+        df = pd.DataFrame({"Low": low, "High": high})
+        is_fundo, is_topo = pivots_confirmados(df, ordem=1)
+        df["is_fundo_local"] = is_fundo
+        df["is_topo_local"] = is_topo
+        fundos, topos = ultimos_pivots_confirmados(df, ordem=1, n=3)
+        # fundo confirmado em low[2]=8; topo confirmado em high[6]=13.
+        assert 8 in list(fundos)
+        assert 13 in list(topos)
