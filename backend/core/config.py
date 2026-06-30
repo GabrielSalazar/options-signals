@@ -34,6 +34,11 @@ CONFIG = {
     "scoring_mode":        "classico",  # "classico" | "ponderado"
     "min_score_ponderado": 60,           # limiar para modo ponderado (0-100)
     "iv_filter_mode":       "shadow",   # "shadow" (loga decisao sem filtrar) | "ativo" (filtra de fato) — Camada 1.3
+    "familia_cap_oscilador":   4,   # teto de contribuicao por familia (Camada 2.1)
+    "familia_cap_tendencia":   4,
+    "familia_cap_estrutura":   3,
+    "familia_cap_divergencia": 3,
+    "familia_cap_liquidez":    4,
     "delta_min":           0.15,         # filtro de qualidade |delta| mínimo
     "delta_max":           0.45,         # filtro de qualidade |delta| máximo
     "option_price_min":    0.10,         # preço mínimo da opção (R$)

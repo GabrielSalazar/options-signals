@@ -198,3 +198,63 @@ def avaliar_filtro_iv(iv_rank: float | None, iv_premium: float | None,
             return {"decisao": "normal", "motivo": "IV moderada, mas score tecnico compensa"}
         return {"decisao": "exige_score_7", "motivo": "IV moderada — exige score tecnico >= 7"}
     return {"decisao": "normal", "motivo": "IV normal"}
+
+
+# ── Camada 2.1 — famílias de gatilhos e teto de contribuição ──────────────
+
+GATILHOS: dict[str, dict] = {
+    # Gatilhos de alta (G1-G11, docs/ESTRATEGIAS_OPCOES_B3.md)
+    "G1":  {"familia": "OSCILADOR",   "pontos": 3},
+    "G2":  {"familia": "OSCILADOR",   "pontos": 2},
+    "G3":  {"familia": "ESTRUTURA",   "pontos": 2},
+    "G4":  {"familia": "TENDENCIA",   "pontos": 2},
+    "G5":  {"familia": "LIQUIDEZ",    "pontos": 1},
+    "G6":  {"familia": "OSCILADOR",   "pontos": 2},
+    "G7":  {"familia": "TENDENCIA",   "pontos": 2},
+    "G8":  {"familia": "ESTRUTURA",   "pontos": 1},
+    "G9":  {"familia": "DIVERGENCIA", "pontos": 3},
+    "G10": {"familia": "LIQUIDEZ",    "pontos": 3},
+    "G11": {"familia": "TENDENCIA",   "pontos": 2},
+    # Gatilhos de baixa (B1-B9)
+    "B1": {"familia": "OSCILADOR",   "pontos": 3},
+    "B2": {"familia": "OSCILADOR",   "pontos": 2},
+    "B3": {"familia": "ESTRUTURA",   "pontos": 2},
+    "B4": {"familia": "TENDENCIA",   "pontos": 2},
+    "B5": {"familia": "TENDENCIA",   "pontos": 2},
+    "B6": {"familia": "OSCILADOR",   "pontos": 2},
+    "B7": {"familia": "DIVERGENCIA", "pontos": 3},
+    "B8": {"familia": "LIQUIDEZ",    "pontos": 3},
+    "B9": {"familia": "TENDENCIA",   "pontos": 2},
+}
+
+
+def calcular_familias(gatilhos_ids: list[str]) -> dict:
+    """
+    Aplica o teto de contribuição por família (Camada 2.1) sobre os gatilhos
+    que dispararam. Cada família contribui no máximo `familia_cap_<nome>`
+    (CONFIG) ao score, mesmo que a soma bruta dos gatilhos da família exceda
+    o teto. `familias_ativas` conta famílias distintas com pelo menos 1
+    gatilho disparado (antes do cap) — é a "largura de consenso".
+    IDs fora do registro `GATILHOS` são ignorados (não derruba o cálculo).
+    Retorna {"score_capped": int, "familias_ativas": int, "breakdown": dict}.
+    """
+    caps = {
+        "OSCILADOR":   CONFIG.get("familia_cap_oscilador", 4),
+        "TENDENCIA":   CONFIG.get("familia_cap_tendencia", 4),
+        "ESTRUTURA":   CONFIG.get("familia_cap_estrutura", 3),
+        "DIVERGENCIA": CONFIG.get("familia_cap_divergencia", 3),
+        "LIQUIDEZ":    CONFIG.get("familia_cap_liquidez", 4),
+    }
+    bruto: dict[str, int] = {}
+    for gid in gatilhos_ids:
+        info = GATILHOS.get(gid)
+        if not info:
+            continue
+        bruto[info["familia"]] = bruto.get(info["familia"], 0) + info["pontos"]
+
+    breakdown = {fam: min(pts, caps.get(fam, pts)) for fam, pts in bruto.items()}
+    return {
+        "score_capped": sum(breakdown.values()),
+        "familias_ativas": len(bruto),
+        "breakdown": breakdown,
+    }

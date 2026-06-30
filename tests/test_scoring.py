@@ -11,6 +11,7 @@ Cobre:
 import pytest
 from unittest.mock import patch
 from backend.domain.scoring import score_ponderado, avaliar_filtro_iv
+from backend.domain.scoring import GATILHOS, calcular_familias
 
 
 def _make_row(**overrides):
@@ -281,3 +282,38 @@ def test_avaliar_filtro_iv_premium_exatamente_1_5_exige_score_7():
 def test_avaliar_filtro_iv_score_tecnico_exatamente_7_compensa_faixa_media():
     r = avaliar_filtro_iv(iv_rank=60, iv_premium=None, iv_rank_confiavel=True, score_tecnico=7)
     assert r["decisao"] == "normal"
+
+
+def test_gatilhos_alta_somam_23_pontos():
+    soma = sum(v["pontos"] for k, v in GATILHOS.items() if k.startswith("G"))
+    assert soma == 23
+
+
+def test_gatilhos_baixa_somam_21_pontos():
+    soma = sum(v["pontos"] for k, v in GATILHOS.items() if k.startswith("B"))
+    assert soma == 21
+
+
+def test_calcular_familias_sem_teto_quando_dentro_do_cap():
+    r = calcular_familias(["G2", "G3", "G7", "G10"])
+    assert r["breakdown"] == {"OSCILADOR": 2, "ESTRUTURA": 2, "TENDENCIA": 2, "LIQUIDEZ": 3}
+    assert r["score_capped"] == 9
+    assert r["familias_ativas"] == 4
+
+
+def test_calcular_familias_aplica_teto_quando_familia_excede_cap():
+    # G1(+3) + G2(+2) = 5 pts em OSCILADOR, mas o cap é 4
+    r = calcular_familias(["G1", "G2"])
+    assert r["breakdown"] == {"OSCILADOR": 4}
+    assert r["score_capped"] == 4
+    assert r["familias_ativas"] == 1
+
+
+def test_calcular_familias_ignora_ids_desconhecidos():
+    r = calcular_familias(["G1", "ZZZ"])
+    assert r["breakdown"] == {"OSCILADOR": 3}
+
+
+def test_calcular_familias_lista_vazia():
+    r = calcular_familias([])
+    assert r == {"score_capped": 0, "familias_ativas": 0, "breakdown": {}}
