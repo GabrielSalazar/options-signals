@@ -9,7 +9,6 @@ São testes de roteamento puro (não invocam handlers nem fazem I/O de rede).
 import os
 
 import pytest
-from starlette.routing import Match
 
 os.environ.setdefault("ALLOWED_ORIGINS", "*")
 
@@ -17,12 +16,27 @@ from backend.api.main import app  # noqa: E402
 
 
 def _resolve(method: str, path: str) -> str | None:
-    """Retorna o nome do handler que casa com (method, path), ou None."""
-    scope = {"type": "http", "method": method, "path": path, "headers": []}
+    """Retorna o nome do handler que casa com (method, path), ou None.
+
+    Resolve na ordem de registro das rotas (primeira que casa vence),
+    exatamente como o roteador do Starlette faz — o que é justamente o que
+    este teste precisa validar (rota literal não pode ser sombreada pela
+    paramétrica /{ticker}).
+
+    Usa os atributos estáveis `path_regex` e `methods` do Route em vez de
+    `route.matches(scope)`: a semântica de scope do `matches()` mudou no
+    Starlette 1.x e passou a devolver Match.NONE para um scope montado à mão,
+    quebrando este teste no CI (onde o pip instala o Starlette mais novo)
+    enquanto passava localmente. `path_regex`/`methods` existem em todas as
+    versões e independem do formato do scope.
+    """
     for route in app.router.routes:
-        match, _ = route.matches(scope)
-        if match == Match.FULL:
-            return getattr(route, "name", None)
+        path_regex = getattr(route, "path_regex", None)
+        methods = getattr(route, "methods", None)
+        if path_regex is None or methods is None:
+            continue
+        if path_regex.match(path) and method in methods:
+            return route.name
     return None
 
 
