@@ -5,11 +5,10 @@ de obter o cliente, sem duplicar a leitura de variáveis de ambiente.
 """
 import logging
 import os
+import threading
 
 logger = logging.getLogger("b3_api")
 
-
-import threading
 
 _supabase_client = None
 _client_lock = threading.Lock()

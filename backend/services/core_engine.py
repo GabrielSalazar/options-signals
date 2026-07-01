@@ -11,10 +11,10 @@ from backend.core.config import (
     CONFIG,
     OTM_DEFAULT,
     OTM_POR_ATIVO,
+    get_ticker_lock,
     is_reentrada_valida,
     registrar_sinal,
     score_horario,
-    get_ticker_lock,
 )
 from backend.domain.greeks import calculate_greeks, implied_volatility
 from backend.domain.indicators import (

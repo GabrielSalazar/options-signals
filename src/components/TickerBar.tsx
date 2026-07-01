@@ -24,6 +24,12 @@ const FALLBACK: TickerItem[] = [
     { name: "DI Jan26", price: "14,87%", change: "+0,02pp", positive: false },
 ]
 
+interface MarketQuote {
+    ticker: string
+    price: number | string
+    chg_pct: number
+}
+
 export default function TickerBar() {
     const [items, setItems] = useState<TickerItem[]>(FALLBACK)
     const [isFallback, setIsFallback] = useState(true)
@@ -37,7 +43,7 @@ export default function TickerBar() {
             .then((data) => {
                 const list: TickerItem[] = []
                 if (data.indices) {
-                    data.indices.forEach((ind: any) => {
+                    data.indices.forEach((ind: MarketQuote) => {
                         list.push({
                             name: ind.ticker,
                             price: typeof ind.price === "number" 
@@ -49,7 +55,7 @@ export default function TickerBar() {
                     })
                 }
                 if (data.acoes) {
-                    data.acoes.forEach((ac: any) => {
+                    data.acoes.forEach((ac: MarketQuote) => {
                         list.push({
                             name: ac.ticker,
                             price: typeof ac.price === "number"

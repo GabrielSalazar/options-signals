@@ -136,11 +136,11 @@ def get_options_chain(ticker: str):
 def _fetch_historical_with_fallback(ticker: str) -> "pd.DataFrame":
     """Tenta brapi → yfinance → Yahoo Finance HTTP direto."""
     import time
+    from unittest.mock import Mock
 
     import yfinance as yf
 
     import backend.api.routers.market as _self
-    from unittest.mock import Mock
 
     if isinstance(getattr(_self, "fetch_brapi_historical", None), Mock):
         df = _self.fetch_brapi_historical(ticker, "6mo")
