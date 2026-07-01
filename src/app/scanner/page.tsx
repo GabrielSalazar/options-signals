@@ -55,7 +55,7 @@ export default function ScannerPage() {
     const [minDTE, setMinDTE] = useState(5);
     const [maxDTE, setMaxDTE] = useState(60);
     const [minConfidence, setMinConfidence] = useState(50);
-    const [minDelta, setMinDelta] = useState(0.10);
+    const [minDelta, setMinDelta] = useState(0.05);
     const [maxDelta, setMaxDelta] = useState(0.90);
 
     const [backendStatus, setBackendStatus] = useState<BackendStatus>('checking');
