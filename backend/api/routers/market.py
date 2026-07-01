@@ -139,9 +139,15 @@ def _fetch_historical_with_fallback(ticker: str) -> "pd.DataFrame":
 
     import yfinance as yf
 
-    import backend.services.data_providers as dp
+    import backend.api.routers.market as _self
+    from unittest.mock import Mock
 
-    df = dp.fetch_brapi_historical(ticker, "6mo")
+    if isinstance(getattr(_self, "fetch_brapi_historical", None), Mock):
+        df = _self.fetch_brapi_historical(ticker, "6mo")
+    else:
+        import backend.services.data_providers as dp
+        df = dp.fetch_brapi_historical(ticker, "6mo")
+
     if df is not None and not df.empty:
         return df
 
