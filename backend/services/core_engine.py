@@ -423,10 +423,15 @@ def _montar_sinal(ticker_base: str, nome: str, tipo_sinal: str, direcao_label: s
     }
 
 
-def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool = False, df_provided: pd.DataFrame = None, indicators_calculated: bool = False) -> dict | None:
+def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool = False, df_provided: pd.DataFrame = None, indicators_calculated: bool = False, incluir_em_cooldown: bool = False) -> dict | None:
     """
     Analisa um ativo e retorna sinal de opção se critérios forem atendidos.
     Pode receber df_provided para testes e backtest, ou baixar direto via yfinance.
+
+    incluir_em_cooldown: quando True (scan manual), um sinal bloqueado apenas
+    pela regra de reentrada ainda é retornado, marcado com em_cooldown=True e
+    SEM re-registrar o cooldown — o chamador decide exibi-lo, mas não deve
+    persistir nem notificar (o dedup continua valendo para esses caminhos).
     """
     try:
         ticker_base = ticker.replace(".SA", "")
@@ -476,7 +481,8 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
             emoji         = "🔴"
 
         # ── REENTRADA por (ticker, direção, score) — só em produção ──────
-        if df_provided is None and not is_reentrada_valida(ticker_base, tipo_sinal, score):
+        em_cooldown = df_provided is None and not is_reentrada_valida(ticker_base, tipo_sinal, score)
+        if em_cooldown and not incluir_em_cooldown:
             if verbose:
                 logger.info(f"↩ {ticker_base}: reentrada bloqueada ({tipo_sinal}, score {score})")
             return None
@@ -519,12 +525,16 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
         estrutura["setup"] = setup
         estrutura["setup_params_shadow"] = parametros_setup_shadow(setup)
 
-        if df_provided is None:
+        # Sinal em cooldown não re-registra (não estende a janela de reentrada).
+        if df_provided is None and not em_cooldown:
             registrar_sinal(ticker_base, tipo_sinal, score)
 
-        return _montar_sinal(ticker_base, nome, tipo_sinal, direcao_label, emoji, score,
-                             gatilhos, preco, ultimo, penult, stoch_k, rsi, vol_ratio,
-                             estrutura, verbose, bonus_sessao=bonus_sessao)
+        sinal = _montar_sinal(ticker_base, nome, tipo_sinal, direcao_label, emoji, score,
+                              gatilhos, preco, ultimo, penult, stoch_k, rsi, vol_ratio,
+                              estrutura, verbose, bonus_sessao=bonus_sessao)
+        if sinal is not None:
+            sinal["em_cooldown"] = em_cooldown
+        return sinal
 
     except Exception as e:
         if verbose:

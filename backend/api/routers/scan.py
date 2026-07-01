@@ -45,9 +45,20 @@ async def scan_stream(tickers: str = Query(default="")):
 
         async def scan_one_async(ticker: str):
             async with sem:
-                t_sa = ticker.upper() if ticker.upper().endswith(".SA") else ticker.upper() + ".SA"
-                nome = ATIVOS_B3.get(t_sa, ticker.upper())
-                result = await loop.run_in_executor(None, analyse_ticker, t_sa, nome)
+                # Qualquer exceção aqui precisa virar (ticker, None) na queue:
+                # o loop consumidor espera exatamente `total` eventos — um put
+                # perdido penduraria o stream SSE para sempre.
+                try:
+                    t_sa = ticker.upper() if ticker.upper().endswith(".SA") else ticker.upper() + ".SA"
+                    nome = ATIVOS_B3.get(t_sa, ticker.upper())
+                    # incluir_em_cooldown=True: scan manual exibe sinais em cooldown
+                    # de reentrada; persistência/notificação abaixo filtram os novos.
+                    result = await loop.run_in_executor(
+                        None, lambda: analyse_ticker(t_sa, nome, incluir_em_cooldown=True)
+                    )
+                except Exception as e:
+                    logger.warning(f"Erro no scan de {ticker}: {e}")
+                    result = None
                 await q.put((ticker, result))
 
         tasks = [asyncio.create_task(scan_one_async(t)) for t in ticker_list]
@@ -71,10 +82,11 @@ async def scan_stream(tickers: str = Query(default="")):
 
         await asyncio.gather(*tasks, return_exceptions=True)
 
-        if sinais:
-            persist_signals(sinais)
-            notificar_lote(sinais)
-            signal_service.update_last_scan(sinais)
+        novos = signal_service.sinais_novos(sinais)
+        if novos:
+            persist_signals(novos)
+            notificar_lote(novos)
+            signal_service.update_last_scan(novos)
 
         yield f"data: {json.dumps({'type': 'done', 'count': len(sinais)}, default=str)}\n\n"
 

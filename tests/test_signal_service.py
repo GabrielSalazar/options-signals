@@ -45,7 +45,7 @@ def test_scan_batch_usa_nome_enriquecido(monkeypatch):
     from backend.services import ticker_loader as tl
     monkeypatch.setattr(tl, "fetch_b3_official_tickers", lambda: {"XPTO3": "XPTO Corp"})
     captured = {}
-    monkeypatch.setattr(ss, "analyse_ticker", lambda t_sa, nome: captured.update(nome=nome) or None)
+    monkeypatch.setattr(ss, "analyse_ticker", lambda t_sa, nome, **k: captured.update(nome=nome) or None)
     monkeypatch.setattr(ss, "persist_signals", lambda s: None)
     monkeypatch.setattr(ss, "update_last_scan", lambda s: None)
     monkeypatch.setattr(ss, "notificar_lote", lambda s: None)
@@ -317,7 +317,7 @@ def test_analyse_ticker_excecao_retorna_none_e_loga(monkeypatch, caplog):
 
 
 def test_analyse_ticker_sucesso_retorna_sinal(monkeypatch):
-    monkeypatch.setattr(ss, "analisar_ativo", lambda t, n, verbose=False: {"ticker": t})
+    monkeypatch.setattr(ss, "analisar_ativo", lambda t, n, verbose=False, **k: {"ticker": t})
     resultado = ss.analyse_ticker("PETR4.SA", "Petrobras")
     assert resultado == {"ticker": "PETR4.SA"}
 
@@ -326,7 +326,7 @@ def test_analyse_ticker_sucesso_retorna_sinal(monkeypatch):
 
 def test_scan_single_sem_sinal_retorna_none(monkeypatch):
     monkeypatch.setattr(ss, "nome_ativo", lambda t: "Nome")
-    monkeypatch.setattr(ss, "analisar_ativo", lambda t, n, verbose=True: None)
+    monkeypatch.setattr(ss, "analisar_ativo", lambda t, n, verbose=True, **k: None)
     persistiu = []
     monkeypatch.setattr(ss, "persist_signals", lambda s: persistiu.append(s))
     enviou = []
@@ -340,7 +340,7 @@ def test_scan_single_sem_sinal_retorna_none(monkeypatch):
 def test_scan_single_com_sinal_persiste_notifica_e_broadcast(monkeypatch):
     monkeypatch.setattr(ss, "nome_ativo", lambda t: "Petrobras")
     sinal = {"ticker": "PETR4.SA", "score": 8}
-    monkeypatch.setattr(ss, "analisar_ativo", lambda t, n, verbose=True: sinal)
+    monkeypatch.setattr(ss, "analisar_ativo", lambda t, n, verbose=True, **k: sinal)
     persistiu = []
     monkeypatch.setattr(ss, "persist_signals", lambda s: persistiu.append(s))
     enviou = []
@@ -356,10 +356,31 @@ def test_scan_single_com_sinal_persiste_notifica_e_broadcast(monkeypatch):
     assert broadcasts == [sinal]
 
 
+def test_scan_single_sinal_em_cooldown_retorna_mas_nao_persiste_nem_notifica(monkeypatch):
+    """Sinal em cooldown de reentrada é exibido (retornado), mas o dedup continua
+    valendo para persistência/Telegram/broadcast."""
+    monkeypatch.setattr(ss, "nome_ativo", lambda t: "Petrobras")
+    sinal = {"ticker": "PETR4.SA", "score": 8, "em_cooldown": True}
+    monkeypatch.setattr(ss, "analisar_ativo", lambda t, n, verbose=True, **k: sinal)
+    persistiu = []
+    monkeypatch.setattr(ss, "persist_signals", lambda s: persistiu.append(s))
+    enviou = []
+    monkeypatch.setattr(ss, "enviar_telegram", lambda s: enviou.append(s))
+    broadcasts = []
+    monkeypatch.setattr(ss, "_maybe_broadcast", lambda s: broadcasts.append(s))
+
+    resultado = ss.scan_single("petr4")
+
+    assert resultado == sinal
+    assert persistiu == []
+    assert enviou == []
+    assert broadcasts == []
+
+
 # ── scan_batch ───────────────────────────────────────────────────────────────────
 
 def test_scan_batch_sem_sinais_nao_persiste_nem_notifica(monkeypatch):
-    monkeypatch.setattr(ss, "analyse_ticker", lambda t, n: None)
+    monkeypatch.setattr(ss, "analyse_ticker", lambda t, n, **k: None)
     persistiu = []
     monkeypatch.setattr(ss, "persist_signals", lambda s: persistiu.append(s))
     notificou = []
@@ -376,7 +397,7 @@ def test_scan_batch_sem_sinais_nao_persiste_nem_notifica(monkeypatch):
 
 
 def test_scan_batch_com_sinais_persiste_e_atualiza_estado(monkeypatch):
-    monkeypatch.setattr(ss, "analyse_ticker", lambda t, n: {"ticker": t})
+    monkeypatch.setattr(ss, "analyse_ticker", lambda t, n, **k: {"ticker": t})
     persistiu = []
     monkeypatch.setattr(ss, "persist_signals", lambda s: persistiu.append(list(s)))
     notificou = []
@@ -390,6 +411,27 @@ def test_scan_batch_com_sinais_persiste_e_atualiza_estado(monkeypatch):
     assert len(persistiu) == 1 and len(persistiu[0]) == 2
     assert len(notificou) == 1 and len(notificou[0]) == 2
     assert len(atualizou) == 1 and len(atualizou[0]) == 2
+
+
+def test_scan_batch_retorna_cooldown_mas_persiste_so_novos(monkeypatch):
+    """Batch devolve todos os sinais (novos + em cooldown), mas persiste/notifica
+    apenas os novos."""
+    def fake_analyse(t, n, **k):
+        if t.startswith("NOVO"):
+            return {"ticker": t, "em_cooldown": False}
+        return {"ticker": t, "em_cooldown": True}
+    monkeypatch.setattr(ss, "analyse_ticker", fake_analyse)
+    persistiu = []
+    monkeypatch.setattr(ss, "persist_signals", lambda s: persistiu.append(list(s)))
+    notificou = []
+    monkeypatch.setattr(ss, "notificar_lote", lambda s: notificou.append(list(s)))
+    monkeypatch.setattr(ss, "update_last_scan", lambda s: None)
+
+    resultado = ss.scan_batch(["NOVO3", "VELHO4"])
+
+    assert len(resultado) == 2
+    assert len(persistiu) == 1 and [s["ticker"] for s in persistiu[0]] == ["NOVO3.SA"]
+    assert len(notificou) == 1 and len(notificou[0]) == 1
 
 
 # ── run_scan: persistência e notificação ao final ───────────────────────────────

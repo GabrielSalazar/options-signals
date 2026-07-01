@@ -73,7 +73,7 @@ def _parse_sse_events(raw_text: str) -> list[dict]:
 
 
 def test_scan_stream_com_tickers_explicitos_emite_progresso_e_done(monkeypatch):
-    monkeypatch.setattr(f"{_MOD}.analyse_ticker", lambda t_sa, nome: {"ticker": t_sa, "score": 7})
+    monkeypatch.setattr(f"{_MOD}.analyse_ticker", lambda t_sa, nome, **k: {"ticker": t_sa, "score": 7})
     persisted = []
     monkeypatch.setattr(f"{_MOD}.persist_signals", lambda s: persisted.append(s))
     monkeypatch.setattr(f"{_MOD}.notificar_lote", lambda s: None)
@@ -94,7 +94,7 @@ def test_scan_stream_com_tickers_explicitos_emite_progresso_e_done(monkeypatch):
 
 
 def test_scan_stream_sem_sinais_nao_persiste(monkeypatch):
-    monkeypatch.setattr(f"{_MOD}.analyse_ticker", lambda t_sa, nome: None)
+    monkeypatch.setattr(f"{_MOD}.analyse_ticker", lambda t_sa, nome, **k: None)
     persisted_calls = []
     monkeypatch.setattr(f"{_MOD}.persist_signals", lambda s: persisted_calls.append(s))
     monkeypatch.setattr(f"{_MOD}.notificar_lote", lambda s: None)
@@ -114,7 +114,7 @@ def test_scan_stream_sem_query_param_usa_universo_curado(monkeypatch):
     """tickers="" (default) deve iterar todo ATIVOS_B3 — validamos que pelo
     menos um evento de progresso por ativo curado é emitido."""
     from backend.core.config import ATIVOS_B3
-    monkeypatch.setattr(f"{_MOD}.analyse_ticker", lambda t_sa, nome: None)
+    monkeypatch.setattr(f"{_MOD}.analyse_ticker", lambda t_sa, nome, **k: None)
     monkeypatch.setattr(f"{_MOD}.persist_signals", lambda s: None)
     monkeypatch.setattr(f"{_MOD}.notificar_lote", lambda s: None)
 

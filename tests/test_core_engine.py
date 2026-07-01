@@ -988,6 +988,43 @@ def test_analisar_ativo_sem_df_provided_registra_sinal(monkeypatch):
     assert chamadas[0][0] == "TESTE3"
 
 
+def test_analisar_ativo_incluir_em_cooldown_retorna_sinal_marcado(monkeypatch):
+    """Scan manual (incluir_em_cooldown=True): reentrada inválida NÃO bloqueia —
+    o sinal volta marcado com em_cooldown=True e registrar_sinal NÃO é chamado
+    (não estende a janela de cooldown)."""
+    _relax_and_mock(monkeypatch)
+    df = _make_df(0)
+    monkeypatch.setattr(core_engine, "_carregar_ohlcv", lambda *a, **k: df)
+    monkeypatch.setattr(core_engine, "is_reentrada_valida", lambda *a, **k: False)
+    chamadas = []
+    monkeypatch.setattr(core_engine, "registrar_sinal", lambda *a, **k: chamadas.append(a))
+
+    s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=None,
+                                   incluir_em_cooldown=True)
+
+    assert s is not None
+    assert s["em_cooldown"] is True
+    assert chamadas == []
+
+
+def test_analisar_ativo_incluir_em_cooldown_sinal_novo_marca_false_e_registra(monkeypatch):
+    """Scan manual com reentrada válida: sinal novo sai com em_cooldown=False e
+    registrar_sinal é chamado normalmente."""
+    _relax_and_mock(monkeypatch)
+    df = _make_df(0)
+    monkeypatch.setattr(core_engine, "_carregar_ohlcv", lambda *a, **k: df)
+    monkeypatch.setattr(core_engine, "is_reentrada_valida", lambda *a, **k: True)
+    chamadas = []
+    monkeypatch.setattr(core_engine, "registrar_sinal", lambda *a, **k: chamadas.append(a))
+
+    s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=None,
+                                   incluir_em_cooldown=True)
+
+    assert s is not None
+    assert s["em_cooldown"] is False
+    assert len(chamadas) == 1
+
+
 def test_vol_ratio_e_persistido_no_dataframe_de_indicadores(monkeypatch):
     """Caracteriza se calcular_indicadores grava 'vol_ratio' no df —
     score_ponderado depende dessa coluna (scoring.py) e se ela não existir,

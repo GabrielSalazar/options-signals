@@ -192,36 +192,50 @@ def _normalize_ticker(ticker: str) -> str:
     return t if t.endswith(".SA") else t + ".SA"
 
 
-def analyse_ticker(ticker: str, nome: str, verbose: bool = False) -> dict | None:
+def analyse_ticker(ticker: str, nome: str, verbose: bool = False,
+                   incluir_em_cooldown: bool = False) -> dict | None:
     """Analisa um único ativo — thread-safe (engana exceções por ativo)."""
     try:
-        return analisar_ativo(ticker, nome, verbose=verbose)
+        return analisar_ativo(ticker, nome, verbose=verbose,
+                              incluir_em_cooldown=incluir_em_cooldown)
     except Exception as e:
         logger.warning(f"Erro ao analisar {ticker}: {e}")
         return None
 
 
+def sinais_novos(sinais: list[dict]) -> list[dict]:
+    """Filtra sinais em cooldown de reentrada: só os novos podem ser
+    persistidos/notificados (o cooldown continua deduplicando esses caminhos;
+    a exibição no scan manual mostra todos)."""
+    return [s for s in sinais if not s.get("em_cooldown")]
+
+
 def scan_single(ticker: str) -> dict | None:
-    """Scan de um ticker: analisa, persiste, notifica e faz broadcast."""
+    """Scan de um ticker: analisa, persiste, notifica e faz broadcast.
+
+    Sinal em cooldown de reentrada é retornado (exibição), mas não é
+    persistido nem notificado de novo."""
     ticker_sa = _normalize_ticker(ticker)
     nome = nome_ativo(ticker_sa)
-    sinal = analisar_ativo(ticker_sa, nome, verbose=True)
+    sinal = analisar_ativo(ticker_sa, nome, verbose=True, incluir_em_cooldown=True)
     if not sinal:
         return None
-    persist_signals([sinal])
-    enviar_telegram(sinal)
-    _maybe_broadcast(sinal)
+    if not sinal.get("em_cooldown"):
+        persist_signals([sinal])
+        enviar_telegram(sinal)
+        _maybe_broadcast(sinal)
     return sinal
 
 
 def scan_batch(tickers: list[str]) -> list[dict]:
-    """Scan em batch: paraleliza com 10 workers."""
+    """Scan em batch: paraleliza com 10 workers. Retorna todos os sinais
+    (inclusive em cooldown); persiste/notifica só os novos."""
     sinais: list[dict] = []
     with ThreadPoolExecutor(max_workers=10) as pool:
         def do_scan(t: str):
             t_sa = _normalize_ticker(t)
             nome = nome_ativo(t_sa)
-            return analyse_ticker(t_sa, nome)
+            return analyse_ticker(t_sa, nome, incluir_em_cooldown=True)
 
         futures = {pool.submit(do_scan, t): t for t in tickers}
         for future in as_completed(futures):
@@ -229,10 +243,11 @@ def scan_batch(tickers: list[str]) -> list[dict]:
             if result:
                 sinais.append(result)
 
-    if sinais:
-        persist_signals(sinais)
-        notificar_lote(sinais)
-        update_last_scan(sinais)
+    novos = sinais_novos(sinais)
+    if novos:
+        persist_signals(novos)
+        notificar_lote(novos)
+        update_last_scan(novos)
 
     return sinais
 
