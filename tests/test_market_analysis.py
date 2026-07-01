@@ -583,7 +583,7 @@ def test_fetch_historical_fallback_brapi_vazio_usa_yfinance():
         "Close": [10.1, 10.6], "Volume": [1000.0, 2000.0],
     }, index=pd.date_range("2026-01-01", periods=2, freq="B"))
 
-    with (patch("backend.services.data_providers.fetch_brapi_historical", return_value=pd.DataFrame()),
+    with (patch(f"{_MOD}.fetch_brapi_historical", return_value=pd.DataFrame()),
           patch("yfinance.download", return_value=yf_df)):
         result = m._fetch_historical_with_fallback("PETR4")
 
@@ -602,7 +602,7 @@ def test_fetch_historical_fallback_brapi_vazio_yfinance_multiindex():
     yf_df = pd.DataFrame([[10.0, 10.2, 9.8, 10.1, 1000.0],
                           [10.5, 10.7, 10.3, 10.6, 2000.0]], index=dates, columns=cols)
 
-    with (patch("backend.services.data_providers.fetch_brapi_historical", return_value=pd.DataFrame()),
+    with (patch(f"{_MOD}.fetch_brapi_historical", return_value=pd.DataFrame()),
           patch("yfinance.download", return_value=yf_df)):
         result = m._fetch_historical_with_fallback("PETR4")
 
@@ -636,7 +636,7 @@ def test_fetch_historical_fallback_yfinance_falha_tenta_yahoo_http():
         def json(self):
             return fake_json
 
-    with (patch("backend.services.data_providers.fetch_brapi_historical", return_value=pd.DataFrame()),
+    with (patch(f"{_MOD}.fetch_brapi_historical", return_value=pd.DataFrame()),
           patch("yfinance.download", side_effect=RuntimeError("yfinance indisponível")),
           patch("requests.get", return_value=_FakeResponse())):
         result = m._fetch_historical_with_fallback("PETR4")
@@ -649,7 +649,7 @@ def test_fetch_historical_fallback_todos_falham_retorna_df_vazio():
     """brapi vazio, yfinance falha e Yahoo HTTP falha → DataFrame vazio (linha 169)."""
     import backend.api.routers.market as m
 
-    with (patch("backend.services.data_providers.fetch_brapi_historical", return_value=pd.DataFrame()),
+    with (patch(f"{_MOD}.fetch_brapi_historical", return_value=pd.DataFrame()),
           patch("yfinance.download", side_effect=RuntimeError("yfinance indisponível")),
           patch("requests.get", side_effect=RuntimeError("rede fora do ar"))):
         result = m._fetch_historical_with_fallback("PETR4")
@@ -669,7 +669,7 @@ def test_fetch_historical_fallback_yahoo_http_sem_resultado_retorna_vazio():
         def json(self):
             return {"chart": {"result": []}}
 
-    with (patch("backend.services.data_providers.fetch_brapi_historical", return_value=pd.DataFrame()),
+    with (patch(f"{_MOD}.fetch_brapi_historical", return_value=pd.DataFrame()),
           patch("yfinance.download", side_effect=RuntimeError("yfinance indisponível")),
           patch("requests.get", return_value=_FakeEmptyResponse())):
         result = m._fetch_historical_with_fallback("PETR4")
@@ -720,7 +720,7 @@ def test_analysis_fundamentalistas_calculados_via_dre_balanco_fluxo():
     # que chama fetch_brapi_historical através do módulo de origem
     # (backend.services.data_providers), não do nome importado em
     # backend.api.routers.market — por isso o patch precisa visar o módulo de origem.
-    with (patch("backend.services.data_providers.fetch_brapi_historical", return_value=df_mock),
+    with (patch(f"{_MOD}.fetch_brapi_historical", return_value=df_mock),
           patch(f"{_MOD}._fetch_chain", return_value=[]),
           patch("yfinance.Ticker", return_value=fake_ticker)):
         response = client.get("/market/analysis/PETR4")
@@ -739,7 +739,7 @@ def test_analysis_fundamentalistas_falha_silenciosa_quando_info_excecao():
     df_mock = _make_synthetic_df(300)
     fake_ticker = _FakeYfTicker(raise_on_info=True)
 
-    with (patch("backend.services.data_providers.fetch_brapi_historical", return_value=df_mock),
+    with (patch(f"{_MOD}.fetch_brapi_historical", return_value=df_mock),
           patch(f"{_MOD}._fetch_chain", return_value=[]),
           patch("yfinance.Ticker", return_value=fake_ticker)):
         response = client.get("/market/analysis/PETR4")
@@ -760,7 +760,7 @@ def test_analysis_fundamentalistas_usa_info_direto_quando_disponivel():
     }
     fake_ticker = _FakeYfTicker(info=info)
 
-    with (patch("backend.services.data_providers.fetch_brapi_historical", return_value=df_mock),
+    with (patch(f"{_MOD}.fetch_brapi_historical", return_value=df_mock),
           patch(f"{_MOD}._fetch_chain", return_value=[]),
           patch("yfinance.Ticker", return_value=fake_ticker)):
         response = client.get("/market/analysis/PETR4")
@@ -780,7 +780,7 @@ def test_analysis_chain_ignora_tipo_invalido_e_linha_curta():
         ["X2", None, "FUTURO", None, None, 40.0, None, None, 1.0, 10],  # tipo inválido — ignorada
         ["X3", None, "PUT", None, None, 38.0, None, None, 1.2, 90],  # válida
     ]
-    with (patch("backend.services.data_providers.fetch_brapi_historical", return_value=df_mock),
+    with (patch(f"{_MOD}.fetch_brapi_historical", return_value=df_mock),
           patch(f"{_MOD}._fetch_chain", return_value=chain_mock)):
         response = client.get("/market/analysis/PETR4")
 
@@ -801,7 +801,7 @@ def test_analysis_rsi_nan_usa_default_50():
         "Volume": [1_000_000.0] * n,
     }, index=idx)
 
-    with (patch("backend.services.data_providers.fetch_brapi_historical", return_value=df_flat),
+    with (patch(f"{_MOD}.fetch_brapi_historical", return_value=df_flat),
           patch(f"{_MOD}._fetch_chain", return_value=[])):
         response = client.get("/market/analysis/PETR4")
 
