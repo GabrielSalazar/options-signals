@@ -147,14 +147,16 @@ export default function ScannerPage() {
     };
 
     const isMatchesFilters = (signal: Signal): boolean => {
-        if (signal.score < minConfidence / 10) return false;
+        if (signal.score < minConfidence) return false;
         if (minVolume > 0 && signal.vol_media_20 !== undefined) {
             const volInThousands = signal.vol_media_20 / 1000;
             if (volInThousands < minVolume) return false;
         }
         if (signal.dte < minDTE || signal.dte > maxDTE) return false;
-        const deltaAbs = Math.abs(signal.greeks?.delta ?? 0);
-        if (deltaAbs < minDelta || deltaAbs > maxDelta) return false;
+        if (signal.greeks?.delta !== undefined) {
+            const deltaAbs = Math.abs(signal.greeks.delta);
+            if (deltaAbs < minDelta || deltaAbs > maxDelta) return false;
+        }
         return true;
     };
 

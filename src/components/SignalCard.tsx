@@ -36,7 +36,7 @@ export default function SignalCard({ signal }: { signal: Signal }) {
                 </div>
                 <div className="text-right">
                     <span className="label">Score</span>
-                    <div className="font-mono font-bold text-dw-ink text-lg">{signal.score}<span className="text-dw-ink-muted text-sm">/10</span></div>
+                    <div className="font-mono font-bold text-dw-ink text-lg">{signal.score}<span className="text-dw-ink-muted text-sm">/100</span></div>
                 </div>
             </div>
 
