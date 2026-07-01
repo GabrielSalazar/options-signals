@@ -15,6 +15,31 @@ os.environ.setdefault("ALLOWED_ORIGINS", "*")
 from backend.api.main import app  # noqa: E402
 
 
+def _iter_leaf_routes(routes):
+    """Percorre a árvore de rotas devolvendo só as rotas-folha (endpoints).
+
+    Necessário porque o FastAPI >= 0.138 mudou o comportamento de
+    `include_router`: ele NÃO achata mais os routers incluídos em
+    `app.router.routes`. Cada router vira um wrapper `_IncludedRouter`
+    (sem path/methods/path_regex) cujas rotas reais ficam em
+    `.original_router.routes`. No FastAPI antigo as rotas já vinham
+    achatadas — os dois casos são cobertos aqui:
+      - `_IncludedRouter`  -> recursa em `.original_router.routes`;
+      - Mount/sub-router   -> recursa em `.routes`;
+      - Route (folha)      -> devolve.
+    """
+    for route in routes:
+        original = getattr(route, "original_router", None)
+        if original is not None and hasattr(original, "routes"):
+            yield from _iter_leaf_routes(original.routes)
+            continue
+        sub = getattr(route, "routes", None)
+        if sub:
+            yield from _iter_leaf_routes(sub)
+            continue
+        yield route
+
+
 def _resolve(method: str, path: str) -> str | None:
     """Retorna o nome do handler que casa com (method, path), ou None.
 
@@ -23,14 +48,14 @@ def _resolve(method: str, path: str) -> str | None:
     este teste precisa validar (rota literal não pode ser sombreada pela
     paramétrica /{ticker}).
 
-    Usa os atributos estáveis `path_regex` e `methods` do Route em vez de
-    `route.matches(scope)`: a semântica de scope do `matches()` mudou no
-    Starlette 1.x e passou a devolver Match.NONE para um scope montado à mão,
-    quebrando este teste no CI (onde o pip instala o Starlette mais novo)
-    enquanto passava localmente. `path_regex`/`methods` existem em todas as
-    versões e independem do formato do scope.
+    Usa os atributos estáveis `path_regex` e `methods` do Route (via
+    `_iter_leaf_routes`) em vez de `route.matches(scope)`: a semântica de
+    scope do `matches()` mudou no Starlette 1.x e passou a devolver
+    Match.NONE para um scope montado à mão, quebrando este teste no CI
+    (onde o pip instala versões mais novas de starlette/fastapi) enquanto
+    passava localmente.
     """
-    for route in app.router.routes:
+    for route in _iter_leaf_routes(app.router.routes):
         path_regex = getattr(route, "path_regex", None)
         methods = getattr(route, "methods", None)
         if path_regex is None or methods is None:
