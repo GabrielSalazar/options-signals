@@ -1,5 +1,6 @@
 """Histórico diário de IV ATM e cálculo de IV Rank (Camada 1.2)."""
 import logging
+import threading
 from datetime import datetime, timezone
 
 from backend.domain.options_math import estimar_iv_historica, mes_vencimento_ideal, resolver_iv
@@ -66,12 +67,44 @@ def coletar_iv_diaria(tickers: dict | None = None) -> int:
             logger.warning(f"Erro ao coletar IV de {ticker_base}: {e}")
 
     logger.info(f"Histórico de IV coletado — {persistidos}/{len(tickers)} tickers")
+    limpar_cache_iv_rank()
     return persistidos
+
+
+_iv_rank_cache = {}  # ticker_base -> (resultado_dict, timestamp)
+_iv_rank_cache_lock = threading.Lock()
+IV_CACHE_TTL_SECONDS = 3600 * 4  # 4 horas
+
+
+def limpar_cache_iv_rank():
+    with _iv_rank_cache_lock:
+        _iv_rank_cache.clear()
+        logger.info("Cache de iv_rank limpo com sucesso.")
 
 
 def iv_rank(ticker_base: str) -> dict:
     """Retorna {'iv_rank': float|None, 'iv_premium': float|None, 'confiavel': bool}.
-    'confiavel' exige >=60 dias úteis de histórico; caso contrário usa o proxy iv_premium."""
+    'confiavel' exige >=60 dias úteis de histórico; caso contrário usa o proxy iv_premium.
+    Usa cache local de 4 horas para reduzir conexões Supabase."""
+    import sys
+    now = datetime.now()
+    if "pytest" not in sys.modules:
+        with _iv_rank_cache_lock:
+            if ticker_base in _iv_rank_cache:
+                res_cached, ts_cached = _iv_rank_cache[ticker_base]
+                if (now - ts_cached).total_seconds() < IV_CACHE_TTL_SECONDS:
+                    return res_cached
+
+    res_computed = _query_iv_rank_db(ticker_base)
+
+    if "pytest" not in sys.modules:
+        with _iv_rank_cache_lock:
+            _iv_rank_cache[ticker_base] = (res_computed, now)
+
+    return res_computed
+
+
+def _query_iv_rank_db(ticker_base: str) -> dict:
     supabase = get_supabase()
     if not supabase:
         return {"iv_rank": None, "iv_premium": None, "confiavel": False}
