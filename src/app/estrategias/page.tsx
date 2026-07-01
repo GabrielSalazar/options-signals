@@ -87,7 +87,7 @@ export default function EstrategiasPage() {
               </h5>
               <p className="mb-1">Gera renda ou serve para comprar o ativo mais barato. Lucra com estabilidade ou alta, mas assume a obrigação de comprar o ativo se cair.</p>
               <div className="mb-4 mt-1 text-[13px] text-dw-ink-muted border-l-2 border-dw-blue/40 pl-3 italic">
-                <strong>Exemplo:</strong> Vender Put de ITUB4 strike R$30,00 quando ela está R$32,00. Se cair abaixo de R$30, você é obrigado a comprar o papel com "desconto". Se subir, embolsa o prêmio.
+                <strong>Exemplo:</strong> Vender Put de ITUB4 strike R$30,00 quando ela está R$32,00. Se cair abaixo de R$30, você é obrigado a comprar o papel com &quot;desconto&quot;. Se subir, embolsa o prêmio.
               </div>
               <StrategyExampleChart id="shortPut" s0={32} strikes={[30]} />
             </div>

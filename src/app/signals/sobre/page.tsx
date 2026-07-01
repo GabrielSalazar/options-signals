@@ -266,7 +266,7 @@ export default function SobrePage() {
                 </div>
                 <div className="card mb-4">
                     <p className="text-base text-dw-ink-mid leading-relaxed mb-5">
-                        Sistemas de trading tradicionais usam regras binárias: <em>"se média rápida cruza a lenta, compre"</em>.
+                        Sistemas de trading tradicionais usam regras binárias: <em>&quot;se média rápida cruza a lenta, compre&quot;</em>.
                         O problema é que toda regra binária falha quando o mercado muda de regime — gera muitos falsos positivos.
                         O motor deste sistema usa <strong className="text-dw-ink">lógica aditiva de consenso</strong>: avalia o ativo
                         simultaneamente sob as óticas CALL e PUT, somando evidências independentes de fontes técnicas diferentes

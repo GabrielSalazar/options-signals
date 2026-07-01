@@ -17,8 +17,13 @@ interface PayoffChartProps {
     legs: PayoffLeg[];
 }
 
+interface PayoffPoint {
+    spot_price: number;
+    pnl: number;
+}
+
 export default function PayoffChart({ spotPrice, legs }: PayoffChartProps) {
-    const [data, setData] = useState<any[]>([]);
+    const [data, setData] = useState<PayoffPoint[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -40,7 +45,7 @@ export default function PayoffChart({ spotPrice, legs }: PayoffChartProps) {
                         setData(response.data.curve || []);
                     }
                 }
-            } catch (err: any) {
+            } catch {
                 if (isMounted) setError("Erro ao carregar gráfico de payoff");
             } finally {
                 if (isMounted) setLoading(false);
@@ -98,7 +103,7 @@ export default function PayoffChart({ spotPrice, legs }: PayoffChartProps) {
                     <Tooltip
                         contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px' }}
                         itemStyle={{ color: '#e2e8f0' }}
-                        formatter={(value: any) => [`R$ ${Number(value).toFixed(2)}`, 'PnL']}
+                        formatter={(value: number | string | undefined) => [`R$ ${Number(value).toFixed(2)}`, 'PnL']}
                         labelFormatter={(label) => `Spot: R$ ${label}`}
                     />
 

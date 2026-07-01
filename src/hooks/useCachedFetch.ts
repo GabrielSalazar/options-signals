@@ -63,6 +63,11 @@ export function useCachedFetch<T>(
   const requestIdRef = useRef(0);
 
   useEffect(() => {
+    // As atualizações síncronas abaixo (reset quando `url` é null e hidratação
+    // a partir do cache) são intencionais neste hook de fetch: reagem à mudança
+    // de `url`/`ttlMs` e evitam um flash de dado obsoleto antes do fetch async.
+    // O react-hooks/set-state-in-effect é conservador demais para esse caso.
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (!url) {
       setData(null);
       setError(null);
@@ -80,6 +85,7 @@ export function useCachedFetch<T>(
     const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     fetch(url)
       .then((res) => {

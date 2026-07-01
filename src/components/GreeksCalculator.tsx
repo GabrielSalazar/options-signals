@@ -58,6 +58,10 @@ export default function GreeksCalculator({ realData }: { realData?: { S: number,
   const [chartTab, setChartTab] = useState<ChartTab>('payoff');
 
   useEffect(() => {
+     // Semeia os sliders (estado local editável) a partir dos dados reais de
+     // mercado quando o prop `realData` chega/muda. É sincronização prop→estado
+     // intencional: o usuário continua podendo ajustar os sliders depois.
+     /* eslint-disable react-hooks/set-state-in-effect */
      if (realData) {
          setS(realData.S);
          setK(realData.K);
@@ -65,6 +69,7 @@ export default function GreeksCalculator({ realData }: { realData?: { S: number,
          setSigma(realData.sigma);
          setOptionType(realData.optType);
      }
+     /* eslint-enable react-hooks/set-state-in-effect */
   }, [realData]);
 
   // Core calculation (recalculates on any input change)

@@ -11,7 +11,7 @@ describe("useCachedFetch", () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ valor: 42 }),
-    }) as any;
+    }) as unknown as typeof fetch;
 
     const { result } = renderHook(() => useCachedFetch<{ valor: number }>("/api/teste"));
 
@@ -22,11 +22,11 @@ describe("useCachedFetch", () => {
   });
 
   it("ignora resposta obsoleta quando a key muda antes do fetch anterior resolver", async () => {
-    let resolveFirst: (v: any) => void;
+    let resolveFirst: (v: unknown) => void;
     const firstPromise = new Promise((resolve) => { resolveFirst = resolve; });
     global.fetch = vi.fn()
       .mockImplementationOnce(() => firstPromise)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ valor: 2 }) }) as any;
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ valor: 2 }) }) as unknown as typeof fetch;
 
     const { result, rerender } = renderHook(
       ({ key }) => useCachedFetch<{ valor: number }>(`/api/${key}`),
@@ -47,7 +47,7 @@ describe("useCachedFetch", () => {
       ok: false,
       status: 422,
       json: async () => ({ detail: "Dados insuficientes" }),
-    }) as any;
+    }) as unknown as typeof fetch;
 
     const { result } = renderHook(() => useCachedFetch<{ valor: number }>("/api/erro"));
 

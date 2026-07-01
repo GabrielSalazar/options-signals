@@ -215,8 +215,9 @@ export default function ScannerPage() {
                     setSearchedTicker(ticker.trim().toUpperCase());
                     setError(`Nenhum sinal encontrado para ${ticker.trim().toUpperCase()} com as estratégias atuais.`);
                 }
-            } catch (err: any) {
-                setError(err.response?.data?.detail || err.message || 'Falha ao escanear.');
+            } catch (err) {
+                const e = err as { response?: { data?: { detail?: string } }; message?: string };
+                setError(e.response?.data?.detail || e.message || 'Falha ao escanear.');
             } finally {
                 setLoading(false);
             }
