@@ -9,7 +9,7 @@ export default function SignalCard({ signal }: { signal: Signal }) {
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
     
     // Fallback: se score_ponderado não existir, escala o score técnico antigo (que era de ~0 a 10)
-    const confidenceScore = signal.score_ponderado ?? ((signal as any).score * 10 || 0);
+    const confidenceScore = signal.score_ponderado ?? (signal.score * 10 || 0);
 
     return (
         <div
