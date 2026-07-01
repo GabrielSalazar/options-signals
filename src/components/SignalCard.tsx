@@ -7,6 +7,9 @@ export default function SignalCard({ signal }: { signal: Signal }) {
     const [expanded, setExpanded] = useState(false)
     const isCall = signal.tipo_sinal === 'CALL'
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    
+    // Fallback: se score_ponderado não existir, escala o score técnico antigo (que era de ~0 a 10)
+    const confidenceScore = signal.score_ponderado ?? ((signal as any).score * 10 || 0);
 
     return (
         <div
@@ -36,7 +39,7 @@ export default function SignalCard({ signal }: { signal: Signal }) {
                 </div>
                 <div className="text-right">
                     <span className="label">Score</span>
-                    <div className="font-mono font-bold text-dw-ink text-lg">{signal.score}<span className="text-dw-ink-muted text-sm">/100</span></div>
+                    <div className="font-mono font-bold text-dw-ink text-lg">{confidenceScore}<span className="text-dw-ink-muted text-sm">/100</span></div>
                 </div>
             </div>
 

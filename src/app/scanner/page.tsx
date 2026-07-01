@@ -147,7 +147,8 @@ export default function ScannerPage() {
     };
 
     const isMatchesFilters = (signal: Signal): boolean => {
-        if (signal.score < minConfidence) return false;
+        const confidenceScore = signal.score_ponderado ?? (signal.score * 10);
+        if (confidenceScore < minConfidence) return false;
         if (minVolume > 0 && signal.vol_media_20 !== undefined) {
             const volInThousands = signal.vol_media_20 / 1000;
             if (volInThousands < minVolume) return false;
