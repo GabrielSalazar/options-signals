@@ -24,13 +24,14 @@ CASOS = [
 
 
 def _rodar_ts(caso: dict) -> dict:
+    import os
     proc = subprocess.run(
         ["npx", "tsx", "scripts/bs_parity_cli.ts"],
         input=json.dumps(caso),
         capture_output=True,
         text=True,
         timeout=30,
-        shell=True,
+        shell=(os.name == "nt"),
     )
     assert proc.returncode == 0, proc.stderr
     return json.loads(proc.stdout)
