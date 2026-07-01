@@ -1,3 +1,4 @@
+import threading
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -113,31 +114,45 @@ def validar_config(cfg: dict = None) -> None:
 validar_config()
 
 
+_historico_sinais_lock = threading.Lock()
+_ticker_locks = {}
+_ticker_locks_lock = threading.Lock()
+
+def get_ticker_lock(ticker: str) -> threading.Lock:
+    with _ticker_locks_lock:
+        if ticker not in _ticker_locks:
+            _ticker_locks[ticker] = threading.Lock()
+        return _ticker_locks[ticker]
+
 # _historico_sinais: ticker -> [{"ts": datetime, "tipo": str|None, "score": int}]
 _historico_sinais = {}
 
 def registrar_sinal(ticker: str, tipo_sinal: str | None = None, score: int = 0):
-    _historico_sinais.setdefault(ticker, []).append(
-        {"ts": datetime.now(), "tipo": tipo_sinal, "score": int(score)}
-    )
+    with _historico_sinais_lock:
+        _historico_sinais.setdefault(ticker, []).append(
+            {"ts": datetime.now(), "tipo": tipo_sinal, "score": int(score)}
+        )
 
 def is_reentrada_valida(ticker: str, tipo_sinal: str | None = None, score: int = 0) -> bool:
     """Cooldown por (ticker, direção):
     - mesma direção dentro de `reentrada_mesma_direcao_dias` → bloqueia;
     - direção oposta vigente → só emite se score >= score_vigente + delta.
     """
-    registros = _historico_sinais.get(ticker)
-    if not registros:
-        return True
+    with _historico_sinais_lock:
+        registros = _historico_sinais.get(ticker)
+        if not registros:
+            return True
+        registros_copia = list(registros)
+
     agora = datetime.now()
     dias = CONFIG["reentrada_mesma_direcao_dias"]
     delta = CONFIG["reentrada_direcao_oposta_delta_score"]
 
-    mesmos = [r for r in registros if r.get("tipo") == tipo_sinal]
+    mesmos = [r for r in registros_copia if r.get("tipo") == tipo_sinal]
     if mesmos and (agora - mesmos[-1]["ts"]).days < dias:
         return False
 
-    opostos = [r for r in registros
+    opostos = [r for r in registros_copia
                if r.get("tipo") is not None and r.get("tipo") != tipo_sinal]
     if opostos and (agora - opostos[-1]["ts"]).days < dias:
         if score < opostos[-1].get("score", 0) + delta:

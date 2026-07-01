@@ -26,6 +26,15 @@ _last_scan_sinais: list[dict] = []
 _last_scan_ts: str | None = None
 _scan_lock = threading.Lock()
 _alert_queues: list[asyncio.Queue] = []
+_alert_queues_lock = threading.Lock()
+
+_main_loop: asyncio.AbstractEventLoop | None = None
+_main_loop_lock = threading.Lock()
+
+def set_main_loop(loop: asyncio.AbstractEventLoop):
+    global _main_loop
+    with _main_loop_lock:
+        _main_loop = loop
 
 
 def last_scan_signals() -> list[dict]:
@@ -46,28 +55,48 @@ def update_last_scan(sinais: list[dict]):
 
 # ── Fila de alertas (SSE proativo) ──────────────────────────────────────────────
 def register_alert_queue() -> asyncio.Queue:
-    q: asyncio.Queue = asyncio.Queue()
-    _alert_queues.append(q)
+    q: asyncio.Queue = asyncio.Queue(maxsize=100)
+    with _alert_queues_lock:
+        _alert_queues.append(q)
     return q
 
 
 def unregister_alert_queue(q: asyncio.Queue):
-    if q in _alert_queues:
-        _alert_queues.remove(q)
+    with _alert_queues_lock:
+        if q in _alert_queues:
+            _alert_queues.remove(q)
 
 
 async def broadcast_alert(sinal: dict):
-    for q in _alert_queues:
-        await q.put(sinal)
+    with _alert_queues_lock:
+        queues_copy = list(_alert_queues)
+    for q in queues_copy:
+        try:
+            q.put_nowait(sinal)
+        except asyncio.QueueFull:
+            try:
+                q.get_nowait()  # descarta o mais antigo
+                q.put_nowait(sinal)
+            except Exception:
+                pass
 
 
 def _maybe_broadcast(sinal: dict):
-    """Agenda o broadcast do sinal se houver event loop rodando (rotas async)."""
-    try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(broadcast_alert(sinal))
-    except RuntimeError:
-        pass
+    """Agenda o broadcast do sinal se houver event loop rodando."""
+    global _main_loop
+    with _main_loop_lock:
+        loop = _main_loop
+    if loop is not None:
+        try:
+            asyncio.run_coroutine_threadsafe(broadcast_alert(sinal), loop)
+        except Exception as e:
+            logger.error(f"Erro ao agendar broadcast SSE: {e}")
+    else:
+        try:
+            running_loop = asyncio.get_running_loop()
+            running_loop.create_task(broadcast_alert(sinal))
+        except RuntimeError:
+            pass
 
 
 # ── Persistência ────────────────────────────────────────────────────────────────
@@ -155,7 +184,7 @@ def cleanup_old_signals(days: int = 30):
 def rebuild_historico_sinais():
     """B2-fix: reconstrói _historico_sinais a partir do Supabase para evitar
     bypass da regra de reentrada após restart do processo."""
-    from backend.core.config import _historico_sinais
+    from backend.core.config import _historico_sinais, _historico_sinais_lock
     supabase = get_supabase()
     if not supabase:
         return
@@ -166,21 +195,23 @@ def rebuild_historico_sinais():
                .gte("timestamp", cutoff)
                .order("timestamp")
                .execute())
-        for row in res.data:
-            ticker = row.get("ticker", "")
-            ts_str = row.get("timestamp", "")
-            if not ticker or not ts_str:
-                continue
-            try:
-                ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00")).replace(tzinfo=None)
-                score = row.get("score_tecnico")
-                if score is None:
-                    score = row.get("score", 0)
-                _historico_sinais.setdefault(ticker, []).append(
-                    {"ts": ts, "tipo": row.get("tipo_sinal"), "score": int(score or 0)}
-                )
-            except Exception:
-                pass
+        with _historico_sinais_lock:
+            _historico_sinais.clear()
+            for row in res.data:
+                ticker = row.get("ticker", "")
+                ts_str = row.get("timestamp", "")
+                if not ticker or not ts_str:
+                    continue
+                try:
+                    ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00")).replace(tzinfo=None)
+                    score = row.get("score_tecnico")
+                    if score is None:
+                        score = row.get("score", 0)
+                    _historico_sinais.setdefault(ticker, []).append(
+                        {"ts": ts, "tipo": row.get("tipo_sinal"), "score": int(score or 0)}
+                    )
+                except Exception:
+                    pass
         logger.info(f"historico_sinais reconstituído: {len(_historico_sinais)} tickers com sinal recente")
     except Exception as e:
         logger.warning(f"Erro ao reconstituir historico_sinais: {e}")

@@ -14,6 +14,7 @@ from backend.core.config import (
     is_reentrada_valida,
     registrar_sinal,
     score_horario,
+    get_ticker_lock,
 )
 from backend.domain.greeks import calculate_greeks, implied_volatility
 from backend.domain.indicators import (
@@ -261,7 +262,8 @@ def _avaliar_gatilhos(df: pd.DataFrame, ultimo, penult, preco: float,
 
 
 def _montar_estrutura_opcao(ticker_base: str, preco: float, tipo_sinal: str,
-                            df: pd.DataFrame, interval: str, verbose: bool) -> dict | None:
+                            df: pd.DataFrame, interval: str, verbose: bool,
+                            is_backtest: bool = False) -> dict | None:
     """Monta a estrutura da opção (strike, vencimento, IV, prêmio, opção real,
     greeks, entradas/alvos/stop, R/R). Retorna o dict da estrutura ou None se
     rejeitado pelos filtros de delta ou R/R."""
@@ -270,12 +272,24 @@ def _montar_estrutura_opcao(ticker_base: str, preco: float, tipo_sinal: str,
         preco * (1 - dist_otm) if tipo_sinal == "PUT" else preco * (1 + dist_otm), 2
     )
 
-    mes_v, ano_v, dte = mes_vencimento_ideal()
+    if is_backtest:
+        # No backtest, calcula vencimento a partir da data do próprio sinal
+        data_ref = df.index[-1].to_pydatetime().date() if hasattr(df.index[-1], "to_pydatetime") else df.index[-1]
+        if hasattr(data_ref, "date"):
+            data_ref = data_ref.date()
+        mes_v, ano_v, dte = mes_vencimento_ideal(hoje=data_ref)
+    else:
+        mes_v, ano_v, dte = mes_vencimento_ideal()
+
     hv_20d       = estimar_iv_historica(df, interval=interval)
     premio_est   = estimar_premio_otm(preco, strike_ref, dte, hv_20d, tipo_sinal)
 
     # --- INTEGRAÇÃO COM DADOS REAIS (opcoes.net.br) ---
-    opcao_real = get_real_options_from_opcoes_net(ticker_base, tipo_sinal, strike_ref)
+    if is_backtest:
+        opcao_real = None
+    else:
+        opcao_real = get_real_options_from_opcoes_net(ticker_base, tipo_sinal, strike_ref)
+
     if opcao_real:
         strike_ref = opcao_real["strike_real"]
         preco_tela = opcao_real["preco_tela"]
@@ -413,6 +427,7 @@ def _montar_sinal(ticker_base: str, nome: str, tipo_sinal: str, direcao_label: s
         "stoch_k":      stoch_k,
         "rsi":          rsi,
         "vol_ratio":    vol_ratio,
+        "vol_media_20": float(ultimo.get("vol_media_20", 0)),
         "gatilhos":     gatilhos,
         "gatilhos_ids": estrutura.get("gatilhos_ids", []),
         "familias_ativas": estrutura.get("familias_ativas"),
@@ -481,60 +496,64 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
             emoji         = "🔴"
 
         # ── REENTRADA por (ticker, direção, score) — só em produção ──────
-        em_cooldown = df_provided is None and not is_reentrada_valida(ticker_base, tipo_sinal, score)
-        if em_cooldown and not incluir_em_cooldown:
-            if verbose:
-                logger.info(f"↩ {ticker_base}: reentrada bloqueada ({tipo_sinal}, score {score})")
-            return None
-
-        # ── ESTRUTURA DA OPÇÃO ────────────────────────────────────────────
-        estrutura = _montar_estrutura_opcao(ticker_base, preco, tipo_sinal, df, interval, verbose)
-        if estrutura is None:
-            return None
-
-        # ── FILTRO DE VOLATILIDADE (Camada 1.3 — shadow mode por padrão) ──
-        rank_info = obter_iv_rank(ticker_base)
-        filtro = avaliar_filtro_iv(rank_info["iv_rank"], rank_info["iv_premium"],
-                                   rank_info["confiavel"], score)
-        estrutura["iv_rank"] = rank_info["iv_rank"]
-        estrutura["iv_premium"] = rank_info["iv_premium"]
-        estrutura["iv_filter_decisao"] = filtro["decisao"]
-
-        if CONFIG.get("iv_filter_mode") == "ativo":
-            if filtro["decisao"] == "bloquear":
+        ticker_lock = get_ticker_lock(ticker_base)
+        with ticker_lock:
+            em_cooldown = df_provided is None and not is_reentrada_valida(ticker_base, tipo_sinal, score)
+            if em_cooldown and not incluir_em_cooldown:
                 if verbose:
-                    logger.info(f"🚫 {ticker_base}: filtro IV bloqueou emissão ({filtro['motivo']})")
+                    logger.info(f"↩ {ticker_base}: reentrada bloqueada ({tipo_sinal}, score {score})")
                 return None
-            if filtro["decisao"] == "exige_score_7" and score < 7:
-                if verbose:
-                    logger.info(f"🚫 {ticker_base}: filtro IV exige score>=7, atual={score} ({filtro['motivo']})")
+
+            # ── ESTRUTURA DA OPÇÃO ────────────────────────────────────────────
+            estrutura = _montar_estrutura_opcao(
+                ticker_base, preco, tipo_sinal, df, interval, verbose, is_backtest=(df_provided is not None)
+            )
+            if estrutura is None:
                 return None
-        elif filtro["decisao"] != "normal" and verbose:
-            logger.info(f"ℹ {ticker_base}: filtro IV (shadow) indicaria '{filtro['decisao']}' — {filtro['motivo']}")
 
-        # ── FAMÍLIAS / CONSENSO / SETUP (Camada 2.1-2.2 — shadow) ─────────
-        gatilhos_ids = gat["ids_alta"] if tipo_sinal == "CALL" else gat["ids_baixa"]
-        familias = calcular_familias(gatilhos_ids)
-        consenso_decisao = ("passaria" if (score >= MIN_SCORE and familias["familias_ativas"] >= 2)
-                            else "bloquearia")
-        setup = classificar_setup(familias["breakdown"])
-        estrutura["gatilhos_ids"] = gatilhos_ids
-        estrutura["familias_ativas"] = familias["familias_ativas"]
-        estrutura["score_familias_capped"] = familias["score_capped"]
-        estrutura["consenso_decisao"] = consenso_decisao
-        estrutura["setup"] = setup
-        estrutura["setup_params_shadow"] = parametros_setup_shadow(setup)
+            # ── FILTRO DE VOLATILIDADE (Camada 1.3 — shadow mode por padrão) ──
+            rank_info = obter_iv_rank(ticker_base)
+            filtro = avaliar_filtro_iv(rank_info["iv_rank"], rank_info["iv_premium"],
+                                       rank_info["confiavel"], score)
+            estrutura["iv_rank"] = rank_info["iv_rank"]
+            estrutura["iv_premium"] = rank_info["iv_premium"]
+            estrutura["iv_filter_decisao"] = filtro["decisao"]
 
-        # Sinal em cooldown não re-registra (não estende a janela de reentrada).
-        if df_provided is None and not em_cooldown:
-            registrar_sinal(ticker_base, tipo_sinal, score)
+            if CONFIG.get("iv_filter_mode") == "ativo":
+                if filtro["decisao"] == "bloquear":
+                    if verbose:
+                        logger.info(f"🚫 {ticker_base}: filtro IV bloqueou emissão ({filtro['motivo']})")
+                    return None
+                if filtro["decisao"] == "exige_score_7" and score < 7:
+                    if verbose:
+                        logger.info(f"🚫 {ticker_base}: filtro IV exige score>=7, atual={score} ({filtro['motivo']})")
+                    return None
+            elif filtro["decisao"] != "normal" and verbose:
+                logger.info(f"ℹ {ticker_base}: filtro IV (shadow) indicaria '{filtro['decisao']}' — {filtro['motivo']}")
 
-        sinal = _montar_sinal(ticker_base, nome, tipo_sinal, direcao_label, emoji, score,
-                              gatilhos, preco, ultimo, penult, stoch_k, rsi, vol_ratio,
-                              estrutura, verbose, bonus_sessao=bonus_sessao)
-        if sinal is not None:
-            sinal["em_cooldown"] = em_cooldown
-        return sinal
+            # ── FAMÍLIAS / CONSENSO / SETUP (Camada 2.1-2.2 — shadow) ─────────
+            gatilhos_ids = gat["ids_alta"] if tipo_sinal == "CALL" else gat["ids_baixa"]
+            familias = calcular_familias(gatilhos_ids)
+            consenso_decisao = ("passaria" if (score >= MIN_SCORE and familias["familias_ativas"] >= 2)
+                                else "bloquearia")
+            setup = classificar_setup(familias["breakdown"])
+            estrutura["gatilhos_ids"] = gatilhos_ids
+            estrutura["familias_ativas"] = familias["familias_ativas"]
+            estrutura["score_familias_capped"] = familias["score_capped"]
+            estrutura["consenso_decisao"] = consenso_decisao
+            estrutura["setup"] = setup
+            estrutura["setup_params_shadow"] = parametros_setup_shadow(setup)
+
+            # Sinal em cooldown não re-registra (não estende a janela de reentrada).
+            if df_provided is None and not em_cooldown:
+                registrar_sinal(ticker_base, tipo_sinal, score)
+
+            sinal = _montar_sinal(ticker_base, nome, tipo_sinal, direcao_label, emoji, score,
+                                  gatilhos, preco, ultimo, penult, stoch_k, rsi, vol_ratio,
+                                  estrutura, verbose, bonus_sessao=bonus_sessao)
+            if sinal is not None:
+                sinal["em_cooldown"] = em_cooldown
+            return sinal
 
     except Exception as e:
         if verbose:
