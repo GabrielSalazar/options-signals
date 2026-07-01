@@ -35,7 +35,7 @@ def _make_df(seed: int, n: int = 90, drop: float = 1.6) -> pd.DataFrame:
 def _relax_and_mock(monkeypatch):
     monkeypatch.setitem(core_engine.CONFIG, "delta_min", 0.0)
     monkeypatch.setitem(core_engine.CONFIG, "delta_max", 1.0)
-    monkeypatch.setattr(core_engine, "mes_vencimento_ideal", lambda: (6, 2026, 30))
+    monkeypatch.setattr(core_engine, "mes_vencimento_ideal", lambda *a, **k: (6, 2026, 30))
     monkeypatch.setattr(core_engine, "score_horario", lambda *a, **k: 0)
     monkeypatch.setattr(core_engine, "get_real_options_from_opcoes_net", lambda *a, **k: None)
 

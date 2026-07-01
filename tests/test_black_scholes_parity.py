@@ -17,47 +17,9 @@ import pytest
 from backend.domain.greeks import bs_call_price, bs_put_price
 
 CASOS = [
-    pytest.param(
-        {"s": 100.0, "k": 105.0, "t": 0.5, "r": 0.1065, "sigma": 0.30, "type": "call"},
-        marks=pytest.mark.xfail(
-            reason=(
-                "DIVERGENCIA REAL encontrada: Python (scipy.stats.norm.cdf, exato) "
-                "retorna preco=8.65255935705681 (N(d1)=0.550565, N(d2)=0.466114); "
-                "TypeScript (normalCDF via aproximacao Abramowitz-Stegun) retorna "
-                "preco=11.60884377334358 (N(d1)=0.567843, N(d2)=0.453773) para os "
-                "mesmos d1=0.12708988490313766, d2=-0.0850421494528266. A diferenca "
-                "esta na aproximacao normalCDF do lado TS, nao em erro de execucao "
-                "do script ou em diferenca de formula de d1/d2 (que sao identicos "
-                "nos dois lados). Fora de escopo desta task corrigir qualquer um "
-                "dos lados."
-            ),
-            strict=True,
-        ),
-    ),
-    pytest.param(
-        {"s": 100.0, "k": 95.0, "t": 0.25, "r": 0.1065, "sigma": 0.45, "type": "put"},
-        marks=pytest.mark.xfail(
-            reason=(
-                "DIVERGENCIA REAL encontrada: Python retorna preco=5.382977265108998; "
-                "TypeScript retorna preco=6.530315774834115. Mesma causa raiz do caso0 "
-                "(aproximacao normalCDF do lado TS diverge da scipy.stats.norm.cdf exata "
-                "do lado Python). Fora de escopo desta task corrigir qualquer um dos lados."
-            ),
-            strict=True,
-        ),
-    ),
-    pytest.param(
-        {"s": 50.0, "k": 50.0, "t": 0.0833, "r": 0.1065, "sigma": 0.60, "type": "call"},
-        marks=pytest.mark.xfail(
-            reason=(
-                "DIVERGENCIA REAL encontrada: Python retorna preco=3.660004136403785; "
-                "TypeScript retorna preco=4.855606473968578. Mesma causa raiz do caso0 "
-                "(aproximacao normalCDF do lado TS diverge da scipy.stats.norm.cdf exata "
-                "do lado Python). Fora de escopo desta task corrigir qualquer um dos lados."
-            ),
-            strict=True,
-        ),
-    ),
+    {"s": 100.0, "k": 105.0, "t": 0.5, "r": 0.1065, "sigma": 0.30, "type": "call"},
+    {"s": 100.0, "k": 95.0, "t": 0.25, "r": 0.1065, "sigma": 0.45, "type": "put"},
+    {"s": 50.0, "k": 50.0, "t": 0.0833, "r": 0.1065, "sigma": 0.60, "type": "call"},
 ]
 
 
