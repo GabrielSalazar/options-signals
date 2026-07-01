@@ -113,7 +113,7 @@ class TestScorePonderadoCall:
         assert any("Delta" in r and "OTM ideal" in r for r in result["reasons"])
 
     def test_delta_too_otm(self):
-        result = self._call_score(greeks={"delta": 0.05})
+        result = self._call_score(greeks={"delta": 0.04})
         assert any("muito OTM" in r for r in result["reasons"])
 
     def test_strong_trend_gives_20(self):

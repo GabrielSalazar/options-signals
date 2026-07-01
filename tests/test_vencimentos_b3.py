@@ -20,9 +20,9 @@ def test_mes_vencimento_ideal_retorna_terceira_sexta_se_no_range():
     assert CONFIG["dte_minimo"] <= dte <= CONFIG["dte_maximo"]
 
 
-def test_dte_minimo_1_permite_vencimentos_proximos():
-    """Com dte_minimo=1, sextas próximas (semanais) são aceitas."""
-    assert CONFIG["dte_minimo"] == 1
+def test_dte_minimo_permite_vencimentos_proximos():
+    """Com dte_minimo=5, vencimentos com pelo menos 5 dias úteis são aceitos."""
+    assert CONFIG["dte_minimo"] == 5
     _, _, dte, _ = _proximo_vencimento_b3()
-    # Próxima sexta deve ter DTE dentro do range [1, 45]
-    assert 1 <= dte <= 45 or dte == 0  # 0 = fallback (nenhum encontrado)
+    # Próxima opção válida deve ter DTE dentro do range [5, 45]
+    assert 5 <= dte <= 45 or dte == 0  # 0 = fallback (nenhum encontrado)
