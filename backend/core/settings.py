@@ -35,13 +35,13 @@ class MotorSettings(BaseSettings):
     familia_cap_estrutura: int = 3
     familia_cap_divergencia: int = 3
     familia_cap_liquidez: int = 4
-    delta_min: float = 0.15
-    delta_max: float = 0.45
+    delta_min: float = 0.05
+    delta_max: float = 0.55
     option_price_min: float = 0.10
     option_price_max: float = 3.00
     min_negocios_opcao: int = 10
     # ── DTE ──
-    dte_minimo: int = 1
+    dte_minimo: int = 5
     dte_maximo: int = 45
     # ── Reentrada ──
     reentrada_min_dias: int = 3

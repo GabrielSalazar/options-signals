@@ -48,9 +48,10 @@ logger = logging.getLogger("b3_scanner")
 
 def _baixar_yfinance(ticker: str, period: str, interval: str, verbose: bool) -> pd.DataFrame | None:
     """Baixa OHLCV via yfinance com 3 tentativas e backoff exponencial (1s, 2s, 4s)."""
+    yf_ticker = ticker if ticker.endswith(".SA") else f"{ticker}.SA"
     for tentativa in range(3):
         try:
-            df = yf.download(ticker, period=period, interval=interval, auto_adjust=True, progress=False)
+            df = yf.download(yf_ticker, period=period, interval=interval, auto_adjust=True, progress=False)
             if df is not None and not df.empty:
                 return df
             return None
