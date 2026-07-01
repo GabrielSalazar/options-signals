@@ -59,14 +59,42 @@ def _persistir_trigger_outcomes(supabase, sinal: dict, resultado: dict) -> None:
 
 def _precos_desde(ticker_sa: str, desde: datetime) -> list:
     """Closes diários da ação a partir de `desde` (inclusive), via provider (cacheado)."""
-    df = _baixar_ohlcv(ticker_sa, "6mo", "1d", verbose=False)
+    now_utc = datetime.now(timezone.utc)
+    desde_aware = desde if desde.tzinfo is not None else desde.replace(tzinfo=timezone.utc)
+    days_ago = (now_utc - desde_aware).days
+
+    needed_days = days_ago + 30  # margem de segurança
+    if needed_days <= 180:
+        period = "6mo"
+    elif needed_days <= 365:
+        period = "1y"
+    elif needed_days <= 730:
+        period = "2y"
+    else:
+        period = "5y"
+
+    df = _baixar_ohlcv(ticker_sa, period, "1d", verbose=False)
     if df is None or df.empty:
         return []
     df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
     if "Close" not in df.columns:
         return []
+
+    # Certifica-se de que a primeira data do df é anterior ou igual à data do sinal
+    primeira_data = df.index[0].to_pydatetime() if hasattr(df.index[0], "to_pydatetime") else df.index[0]
+    if primeira_data.tzinfo is None and desde_aware.tzinfo is not None:
+        primeira_data = primeira_data.replace(tzinfo=timezone.utc)
+
+    if primeira_data > desde_aware:
+        logger.warning(
+            f"Histórico de preços para {ticker_sa} começa em {primeira_data}, "
+            f"que é posterior à data do sinal {desde_aware}. Pulando sinal."
+        )
+        return []
+
     serie = df["Close"].dropna()
-    serie = serie[serie.index >= pd.Timestamp(desde.date())]
+    target_ts = pd.Timestamp(desde_aware.date())
+    serie = serie[serie.index >= target_ts]
     return [float(x) for x in serie.tolist()]
 
 

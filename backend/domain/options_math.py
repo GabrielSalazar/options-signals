@@ -1,6 +1,6 @@
 import calendar
 import math
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -61,16 +61,17 @@ def decodificar_opcao_b3(codigo: str) -> dict:
         "strike":     round(strike, 2),
     }
 
-def _proximo_vencimento_b3() -> tuple:
+def _proximo_vencimento_b3(hoje: date | None = None) -> tuple:
     """Retorna (mes, ano, dte, tipo_venc) do próximo vencimento B3 no range [dte_min, dte_max].
     Busca sextas semanais (toda sexta-feira, exceto 3ª sexta) e mensais (3ª sexta).
     Retorna primeiro match dentro do range. Se hoje é sexta, pula para próxima sexta."""
-    hoje = datetime.now(timezone.utc).date()
+    if hoje is None:
+        hoje = datetime.now(timezone.utc).date()
     dte_min = CONFIG["dte_minimo"]
     dte_max = CONFIG["dte_maximo"]
 
     # Se hoje é sexta, começa a procurar a partir de amanhã; senão, a partir de hoje
-    dias_adiante_inicio = 1 if hoje.weekday() == 4 else 1
+    dias_adiante_inicio = 1 if hoje.weekday() == 4 else 0
 
     # Procura próximas 12 sextas (3 meses de cobertura)
     for dias_adiante in range(dias_adiante_inicio, 365):
@@ -95,9 +96,9 @@ def _proximo_vencimento_b3() -> tuple:
     # Fallback: não encontrou nada no range
     return hoje.month, hoje.year, 0, "nenhum"
 
-def mes_vencimento_ideal() -> tuple:
+def mes_vencimento_ideal(hoje: date | None = None) -> tuple:
     """Retorna (mes, ano, dte) do próximo vencimento B3 no range [dte_min, dte_max]."""
-    mes, ano, dte, _ = _proximo_vencimento_b3()
+    mes, ano, dte, _ = _proximo_vencimento_b3(hoje=hoje)
     return mes, ano, dte
 
 def estimar_iv_historica(df: pd.DataFrame, janela: int = 20, interval: str = "1d") -> float:
