@@ -146,6 +146,18 @@ export default function ScannerPage() {
         });
     };
 
+    const isMatchesFilters = (signal: Signal): boolean => {
+        if (signal.score < minConfidence / 10) return false;
+        if (minVolume > 0 && signal.vol_media_20 !== undefined) {
+            const volInThousands = signal.vol_media_20 / 1000;
+            if (volInThousands < minVolume) return false;
+        }
+        if (signal.dte < minDTE || signal.dte > maxDTE) return false;
+        const deltaAbs = Math.abs(signal.greeks?.delta ?? 0);
+        if (deltaAbs < minDelta || deltaAbs > maxDelta) return false;
+        return true;
+    };
+
     const handleScan = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         if (backendStatus !== 'online') return;
@@ -175,7 +187,7 @@ export default function ScannerPage() {
                     const data = JSON.parse(event.data);
                     if (data.type === 'progress') {
                         setSseProgress({ completed: data.completed, total: data.total, lastTicker: data.ticker });
-                        if (data.has_signal && data.signal) {
+                        if (data.has_signal && data.signal && isMatchesFilters(data.signal)) {
                             accumulated.push(data.signal);
                             setResults([...accumulated]);
                         }
@@ -207,13 +219,17 @@ export default function ScannerPage() {
                     min_dte: minDTE, max_dte: maxDTE, min_delta: minDelta, max_delta: maxDelta,
                 });
                 const signal = data.sinal;
-                if (signal) {
+                if (signal && isMatchesFilters(signal)) {
                     setResults([signal]);
                     setSearchedTicker(ticker.trim().toUpperCase());
                 } else {
                     setResults([]);
                     setSearchedTicker(ticker.trim().toUpperCase());
-                    setError(`Nenhum sinal encontrado para ${ticker.trim().toUpperCase()} com as estratégias atuais.`);
+                    if (!signal) {
+                        setError(`Nenhum sinal encontrado para ${ticker.trim().toUpperCase()} com as estratégias atuais.`);
+                    } else {
+                        setError(`O sinal para ${ticker.trim().toUpperCase()} foi filtrado pelas regras selecionadas.`);
+                    }
                 }
             } catch (err) {
                 const e = err as { response?: { data?: { detail?: string } }; message?: string };

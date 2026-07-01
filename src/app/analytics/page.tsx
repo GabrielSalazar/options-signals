@@ -261,30 +261,42 @@ export default function AnalyticsPage() {
             Zonas de suporte e resistência magnéticas geradas pelo delta hedge dos formadores de mercado.
           </p>
           {signals.length > 0 ? (
-            <div className="flex flex-col gap-3">
-              {[
-                {
-                  label: 'Zero Gamma Level',
-                  value: `R$ ${(signals.reduce((a, s) => a + s.preco_acao, 0) / signals.length).toFixed(2)}`,
-                  color: 'var(--dw-ink-mid)',
-                },
-                {
-                  label: 'Max Call GEX Strike',
-                  value: `R$ ${Math.max(...signals.filter(s => s.tipo_sinal === 'CALL').map(s => s.strike_ref)).toFixed(2)}`,
-                  color: 'var(--dw-green)',
-                },
-                {
-                  label: 'Max Put GEX Strike',
-                  value: `R$ ${Math.min(...signals.filter(s => s.tipo_sinal === 'PUT').map(s => s.strike_ref)).toFixed(2)}`,
-                  color: 'var(--dw-red)',
-                },
-              ].map(({ label, value, color }) => (
-                <div key={label} className="rounded-lg p-3" style={{ background: 'var(--dw-bg-soft)', border: '1px solid var(--dw-rule)' }}>
-                  <span className="text-xs block mb-1" style={{ color: 'var(--dw-ink-muted)' }}>{label}</span>
-                  <span className="text-xl font-mono font-bold" style={{ color }}>{value}</span>
+            (() => {
+              const calls = signals.filter(s => s.tipo_sinal === 'CALL');
+              const puts = signals.filter(s => s.tipo_sinal === 'PUT');
+              const maxCallGEX = calls.length > 0
+                ? `R$ ${Math.max(...calls.map(s => s.strike_ref)).toFixed(2)}`
+                : '—';
+              const maxPutGEX = puts.length > 0
+                ? `R$ ${Math.min(...puts.map(s => s.strike_ref)).toFixed(2)}`
+                : '—';
+              return (
+                <div className="flex flex-col gap-3">
+                  {[
+                    {
+                      label: 'Zero Gamma Level',
+                      value: `R$ ${(signals.reduce((a, s) => a + s.preco_acao, 0) / signals.length).toFixed(2)}`,
+                      color: 'var(--dw-ink-mid)',
+                    },
+                    {
+                      label: 'Max Call GEX Strike',
+                      value: maxCallGEX,
+                      color: 'var(--dw-green)',
+                    },
+                    {
+                      label: 'Max Put GEX Strike',
+                      value: maxPutGEX,
+                      color: 'var(--dw-red)',
+                    },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className="rounded-lg p-3" style={{ background: 'var(--dw-bg-soft)', border: '1px solid var(--dw-rule)' }}>
+                      <span className="text-xs block mb-1" style={{ color: 'var(--dw-ink-muted)' }}>{label}</span>
+                      <span className="text-xl font-mono font-bold" style={{ color }}>{value}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              );
+            })()
           ) : (
             <div className="flex flex-col gap-3">
               {[

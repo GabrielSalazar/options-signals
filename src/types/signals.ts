@@ -27,6 +27,7 @@ export interface Signal {
   stoch_k: number
   rsi: number
   vol_ratio: number
+  vol_media_20?: number
   gatilhos: string[]
   // v4.0: Greeks (Black-Scholes) + book + score ponderado
   book_until?: string

@@ -24,31 +24,46 @@ const FALLBACK: TickerItem[] = [
     { name: "DI Jan26", price: "14,87%", change: "+0,02pp", positive: false },
 ]
 
-function buildFromSignals(signals: { ticker?: string; price?: number; change_pct?: number }[]): TickerItem[] {
-    if (!signals?.length) return []
-    return signals.slice(0, 10).map((s) => {
-        const chg = s.change_pct ?? 0
-        return {
-            name: s.ticker ?? "—",
-            price: s.price?.toFixed(2) ?? "—",
-            change: `${chg >= 0 ? "+" : ""}${chg.toFixed(2)}%`,
-            positive: chg >= 0,
-        }
-    })
-}
-
 export default function TickerBar() {
     const [items, setItems] = useState<TickerItem[]>(FALLBACK)
+    const [isFallback, setIsFallback] = useState(true)
 
     useEffect(() => {
         const controller = new AbortController()
-        const timer = setTimeout(() => controller.abort(), 3000)
+        const timer = setTimeout(() => controller.abort(), 8000)
 
-        fetch(`${BACKEND_URL}/signals`, { signal: controller.signal })
+        fetch(`${BACKEND_URL}/market`, { signal: controller.signal })
             .then((r) => r.json())
             .then((data) => {
-                const built = buildFromSignals(Array.isArray(data) ? data : data?.signals ?? [])
-                if (built.length > 0) setItems(built)
+                const list: TickerItem[] = []
+                if (data.indices) {
+                    data.indices.forEach((ind: any) => {
+                        list.push({
+                            name: ind.ticker,
+                            price: typeof ind.price === "number" 
+                                ? ind.price.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                : ind.price,
+                            change: `${ind.chg_pct >= 0 ? "+" : ""}${ind.chg_pct.toFixed(2)}%`,
+                            positive: ind.chg_pct >= 0,
+                        })
+                    })
+                }
+                if (data.acoes) {
+                    data.acoes.forEach((ac: any) => {
+                        list.push({
+                            name: ac.ticker,
+                            price: typeof ac.price === "number"
+                                ? ac.price.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                : ac.price,
+                            change: `${ac.chg_pct >= 0 ? "+" : ""}${ac.chg_pct.toFixed(2)}%`,
+                            positive: ac.chg_pct >= 0,
+                        })
+                    })
+                }
+                if (list.length > 0) {
+                    setItems(list)
+                    setIsFallback(false)
+                }
             })
             .catch(() => {})
             .finally(() => clearTimeout(timer))
@@ -58,7 +73,9 @@ export default function TickerBar() {
 
     return (
         <div className="ticker-bar" aria-label="Dados de mercado">
-            <span className="ticker-bar-label">Mercado</span>
+            <span className="ticker-bar-label">
+                Mercado {isFallback && <span style={{ fontSize: "10px", opacity: 0.6, marginLeft: "4px", fontWeight: "normal" }}>(Simulado)</span>}
+            </span>
             <div className="ticker-track-wrap">
                 <div className="ticker-track">
                     {doubled.map((item, i) => (
