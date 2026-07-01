@@ -31,6 +31,10 @@ logger = logging.getLogger("b3_api")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    import asyncio
+    main_loop = asyncio.get_running_loop()
+    signal_service.set_main_loop(main_loop)
+
     load_telegram_config()
     signal_service.rebuild_historico_sinais()
 
