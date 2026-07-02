@@ -721,7 +721,13 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
                 logger.info(f"ℹ {ticker_base}: filtro IV (shadow) indicaria '{filtro['decisao']}' — {filtro['motivo']}")
 
             # ── LIQUIDEZ / EXECUTABILIDADE (Fase 3 Matriz v2 — shadow) ────────
-            liquidity_info = obter_option_liquidity(ticker_base, datetime.now(timezone.utc).date())
+            # Em backtest (df_provided) NÃO consultamos dados de hoje: option_liquidity
+            # e calendar_events refletem o presente e contaminariam sinais históricos
+            # com look-ahead. Campos ficam None ("desconhecido" — não penaliza).
+            is_backtest = df_provided is not None
+            liquidity_info = None if is_backtest else obter_option_liquidity(
+                ticker_base, datetime.now(timezone.utc).date()
+            )
             estrutura["oi"] = liquidity_info.get("oi") if liquidity_info else None
             estrutura["bid"] = liquidity_info.get("bid") if liquidity_info else None
             estrutura["ask"] = liquidity_info.get("ask") if liquidity_info else None
@@ -731,7 +737,7 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
 
             # Fallback: sem evento em option_liquidity, consulta calendar_events
             # ANTES do veto shadow, para que o evento entre na decisão (fail-safe).
-            if estrutura["evento_label"] is None:
+            if estrutura["evento_label"] is None and not is_backtest:
                 estrutura["evento_label"] = obter_evento_na_data(datetime.now(timezone.utc).date())
 
             filtro_liq = avaliar_filtro_liquidez_shadow(
