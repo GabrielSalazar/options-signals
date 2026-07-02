@@ -32,10 +32,14 @@ from backend.domain.options_math import (
 )
 from backend.domain.scoring import (
     avaliar_filtro_iv,
+    avaliar_vetos_tecnicos,
+    calcular_classe_v2,
     calcular_familias,
     classificar_setup,
+    divergencia_premio_pct,
     parametros_setup_shadow,
     score_ponderado,
+    sizing_sugerido_pct,
 )
 from backend.services.data_providers import (
     fetch_brapi_historical,
@@ -160,7 +164,8 @@ def _avaliar_gatilhos(df: pd.DataFrame, ultimo, penult, preco: float,
         ids_alta.append("G2")
         score_alta += 2
 
-    if preco <= sup20 + atr:
+    tol_sr = atr * CONFIG.get("sr_tolerancia_atr", 1.5)
+    if preco <= sup20 + tol_sr:
         sinais_alta.append(f"📈 Preço em suporte 20D: R${sup20:.2f}")
         ids_alta.append("G3")
         score_alta += 2
@@ -219,7 +224,7 @@ def _avaliar_gatilhos(df: pd.DataFrame, ultimo, penult, preco: float,
         ids_baixa.append("B2")
         score_baixa += 2
 
-    if preco >= res20 - atr:
+    if preco >= res20 - tol_sr:
         sinais_baixa.append(f"📉 Preço em resistência 20D: R${res20:.2f}")
         ids_baixa.append("B3")
         score_baixa += 2
@@ -268,11 +273,130 @@ def _avaliar_gatilhos(df: pd.DataFrame, ultimo, penult, preco: float,
         ids_baixa.append("B11")
         score_baixa += 1
 
+    # ── GATILHOS MATRIZ v2 (G12-G19/B12-B19) + REDUTORES ────────────────
+    # Em modo "shadow" (default) só reportam nos campos *_v2; em "ativo"
+    # somam/subtraem no score e os IDs entram nas listas principais.
+    v2 = _avaliar_gatilhos_v2(df, ultimo, stoch_k, rsi, preco)
+
+    if CONFIG.get("matriz_v2_gatilhos_mode") == "ativo":
+        sinais_alta.extend(v2["sinais_alta_v2"]);   ids_alta.extend(v2["ids_alta_v2"])
+        sinais_baixa.extend(v2["sinais_baixa_v2"]); ids_baixa.extend(v2["ids_baixa_v2"])
+        # Redutores por direção; o score nunca fica negativo (spec §3)
+        score_alta  = max(0, score_alta + v2["score_alta_v2"] - v2["redutores_alta_total"])
+        score_baixa = max(0, score_baixa + v2["score_baixa_v2"] - v2["redutores_baixa_total"])
+
     return {
         "score_alta": score_alta, "score_baixa": score_baixa,
         "sinais_alta": sinais_alta, "sinais_baixa": sinais_baixa,
         "ids_alta": ids_alta, "ids_baixa": ids_baixa,
         "stoch_k": stoch_k, "rsi": rsi, "vol_ratio": vol_ratio,
+        "v2": v2,
+    }
+
+
+def _avaliar_gatilhos_v2(df: pd.DataFrame, ultimo, stoch_k: float, rsi: float,
+                         preco: float) -> dict:
+    """Gatilhos novos da matriz v2 (spec 2026-07-01 §3) e redutores.
+    Sempre avaliados (para telemetria shadow); quem decide se somam no score
+    é o chamador, conforme CONFIG['matriz_v2_gatilhos_mode'].
+    Indicador ausente/NaN nunca dispara — fail-safe para dfs antigos/testes."""
+    def _val(key):
+        x = ultimo.get(key)
+        if x is None:
+            return None
+        x = float(x)
+        return None if x != x else x  # NaN -> None
+
+    ids_alta, ids_baixa = [], []
+    sinais_alta, sinais_baixa = [], []
+    score_alta = score_baixa = 0
+
+    def _fire(lado: str, gid: str, texto: str, pontos: int):
+        nonlocal score_alta, score_baixa
+        if lado == "alta":
+            ids_alta.append(gid); sinais_alta.append(texto); score_alta += pontos
+        else:
+            ids_baixa.append(gid); sinais_baixa.append(texto); score_baixa += pontos
+
+    cci = _val("cci")
+    extremo = CONFIG.get("cci_extremo", 100.0)
+    if cci is not None:
+        if cci < -extremo:
+            _fire("alta", "G12", f"📈 CCI em zona extrema: {cci:.0f}", 2)
+        elif cci > extremo:
+            _fire("baixa", "B12", f"📉 CCI em zona extrema: {cci:.0f}", 2)
+
+    mfi = _val("mfi")
+    if mfi is not None:
+        if mfi <= CONFIG.get("mfi_oversold", 30.0):
+            _fire("alta", "G13", f"📈 MFI sobrevendido: {mfi:.0f}", 2)
+        elif mfi >= CONFIG.get("mfi_overbought", 70.0):
+            _fire("baixa", "B13", f"📉 MFI sobrecomprado: {mfi:.0f}", 2)
+
+    # OBV: slope de regressão simples sobre os últimos 5 candles
+    obv_slope = None
+    if "obv" in df.columns and len(df) >= 5:
+        obv_tail = df["obv"].tail(5).values.astype(float)
+        if not any(x != x for x in obv_tail):
+            obv_slope = float(pd.Series(obv_tail).diff().mean())
+            if obv_slope > 0:
+                _fire("alta", "G14", "📈 OBV subindo (fluxo comprador)", 1)
+            elif obv_slope < 0:
+                _fire("baixa", "B14", "📉 OBV caindo (fluxo vendedor)", 1)
+
+    cmf = _val("cmf")
+    if cmf is not None:
+        if cmf > 0:
+            _fire("alta", "G15", f"📈 CMF positivo: {cmf:.2f}", 1)
+        elif cmf < 0:
+            _fire("baixa", "B15", f"📉 CMF negativo: {cmf:.2f}", 1)
+
+    st = _val("supertrend_dir")
+    if st is not None:
+        if int(st) == 1:
+            _fire("alta", "G16", "📈 SuperTrend bullish", 1)
+        else:
+            _fire("baixa", "B16", "📉 SuperTrend bearish", 1)
+
+    ema21_v = _val("ema21")
+    if ema21_v is not None:
+        if preco > ema21_v:
+            _fire("alta", "G17", "📈 Preço acima da EMA21", 1)
+        elif preco < ema21_v:
+            _fire("baixa", "B17", "📉 Preço abaixo da EMA21", 1)
+
+    adx = _val("adx")
+    if adx is not None and adx >= CONFIG.get("adx_gatilho_min", 25.0):
+        _fire("alta", "G18", f"📈 ADX forte: {adx:.0f}", 2)
+        _fire("baixa", "B18", f"📉 ADX forte: {adx:.0f}", 2)
+
+    bw = _val("bb_width")
+    if bw is not None and bw < CONFIG.get("bw_compressao_max", 0.10):
+        if stoch_k < CONFIG["stoch_oversold"] or rsi < CONFIG["rsi_oversold"]:
+            _fire("alta", "G19", f"📈 Compressão Bollinger (BW {bw*100:.0f}%) + oscilador extremo", 2)
+        if stoch_k > CONFIG["stoch_overbought"] or rsi > CONFIG["rsi_overbought"]:
+            _fire("baixa", "B19", f"📉 Compressão Bollinger (BW {bw*100:.0f}%) + oscilador extremo", 2)
+
+    # Redutores (spec §3): fluxo contra o sinal e ADX fraco
+    redutores_alta, redutores_baixa = [], []
+    fluxo_contra_alta = (obv_slope is not None and obv_slope < 0) or (cmf is not None and cmf < 0)
+    fluxo_contra_baixa = (obv_slope is not None and obv_slope > 0) or (cmf is not None and cmf > 0)
+    if fluxo_contra_alta:
+        redutores_alta.append({"id": "RED_FLUXO", "pontos": 2, "motivo": "OBV/CMF contra a compra"})
+    if fluxo_contra_baixa:
+        redutores_baixa.append({"id": "RED_FLUXO", "pontos": 2, "motivo": "OBV/CMF contra a venda"})
+    if adx is not None and adx < CONFIG.get("adx_redutor_min", 20.0):
+        red_adx = {"id": "RED_ADX", "pontos": 2, "motivo": f"ADX fraco ({adx:.0f})"}
+        redutores_alta.append(red_adx)
+        redutores_baixa.append(red_adx)
+
+    return {
+        "ids_alta_v2": ids_alta, "ids_baixa_v2": ids_baixa,
+        "sinais_alta_v2": sinais_alta, "sinais_baixa_v2": sinais_baixa,
+        "score_alta_v2": score_alta, "score_baixa_v2": score_baixa,
+        "redutores_alta": redutores_alta, "redutores_baixa": redutores_baixa,
+        "redutores_alta_total": sum(r["pontos"] for r in redutores_alta),
+        "redutores_baixa_total": sum(r["pontos"] for r in redutores_baixa),
     }
 
 
@@ -452,6 +576,14 @@ def _montar_sinal(ticker_base: str, nome: str, tipo_sinal: str, direcao_label: s
         "consenso_decisao": estrutura.get("consenso_decisao"),
         "setup":        estrutura.get("setup"),
         "setup_params_shadow": estrutura.get("setup_params_shadow"),
+        "gatilhos_v2_ids": estrutura.get("gatilhos_v2_ids", []),
+        "score_v2_extra":  estrutura.get("score_v2_extra", 0),
+        "redutores_v2":    estrutura.get("redutores_v2", []),
+        "vetos_v2":        estrutura.get("vetos_v2", []),
+        "classe_v2":       estrutura.get("classe_v2"),
+        "razoes_downgrade_classe": estrutura.get("razoes_downgrade_classe", []),
+        "divergencia_premio_pct": estrutura.get("divergencia_premio_pct"),
+        "sizing_sugerido_pct": estrutura.get("sizing_sugerido_pct"),
     }
 
 
@@ -519,6 +651,15 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
             direcao_label = "COMPRA DE PUT"
             emoji         = "🔴"
 
+        # ── VETOS TÉCNICOS (matriz v2 §4 — shadow por padrão) ────────────
+        vetos_v2 = avaliar_vetos_tecnicos(ultimo, tipo_sinal, score)
+        vetos_ativos = [v for v in vetos_v2 if v["modo"] == "ativo"]
+        if vetos_ativos:
+            if verbose:
+                motivos = "; ".join(v["motivo"] for v in vetos_ativos)
+                logger.info(f"🚫 {ticker_base}: veto técnico bloqueou emissão ({motivos})")
+            return None
+
         # ── REENTRADA por (ticker, direção, score) — só em produção ──────
         ticker_lock = get_ticker_lock(ticker_base)
         with ticker_lock:
@@ -567,6 +708,40 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
             estrutura["consenso_decisao"] = consenso_decisao
             estrutura["setup"] = setup
             estrutura["setup_params_shadow"] = parametros_setup_shadow(setup)
+
+            # ── TELEMETRIA MATRIZ v2 — Fase 1 (shadow) ────────────────────────
+            v2 = gat.get("v2", {})
+            if tipo_sinal == "CALL":
+                gatilhos_v2_ids = v2.get("ids_alta_v2", [])
+                score_v2_extra = v2.get("score_alta_v2", 0)
+                redutores_v2 = v2.get("redutores_alta", [])
+            else:
+                gatilhos_v2_ids = v2.get("ids_baixa_v2", [])
+                score_v2_extra = v2.get("score_baixa_v2", 0)
+                redutores_v2 = v2.get("redutores_baixa", [])
+            estrutura["gatilhos_v2_ids"] = gatilhos_v2_ids
+            estrutura["score_v2_extra"] = score_v2_extra
+            estrutura["redutores_v2"] = redutores_v2
+            estrutura["vetos_v2"] = vetos_v2
+
+            # ── CLASSE v2 E CAMPOS INFORMATIVOS (matriz v2 Fase 2) ──────────────
+            classe_v2, razoes_downgrade = calcular_classe_v2(
+                score + score_v2_extra - sum(r["pontos"] for r in redutores_v2),
+                familias["breakdown"],
+                score
+            )
+            estrutura["classe_v2"] = classe_v2
+            estrutura["razoes_downgrade_classe"] = razoes_downgrade
+
+            # Divergência prêmio real vs. modelado (Bloco 1 item 3 da matriz)
+            premio_real = estrutura.get("preco_opcao", 0.0)
+            premio_bs = estrutura.get("premio_bs", 0.0)
+            div_premio = divergencia_premio_pct(premio_real, premio_bs)
+            estrutura["divergencia_premio_pct"] = div_premio
+
+            # Position sizing sugestivo (checklist §6.33 da matriz)
+            sizing_sugerido = sizing_sugerido_pct(preco, ultimo.get("atr", 0.0), risco_pct=1.0)
+            estrutura["sizing_sugerido_pct"] = sizing_sugerido
 
             # Sinal em cooldown não re-registra (não estende a janela de reentrada).
             if df_provided is None and not em_cooldown:

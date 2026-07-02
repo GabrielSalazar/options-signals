@@ -53,10 +53,47 @@ class TestCalcularIndicadores:
             "trend_up", "trend_down",
             "vol_media_20", "suporte_20", "resistencia_20",
             "var_pct", "is_fundo_local", "is_topo_local",
-            "kc_upper", "kc_lower", "kc_mid", "vwap"
+            "kc_upper", "kc_lower", "kc_mid", "vwap",
+            "mfi", "obv", "cmf", "supertrend_dir",  # matriz v2 Fase 1
         ]
         for col in expected_cols:
             assert col in result.columns, f"Coluna {col} ausente"
+
+    def test_mfi_bounded(self):
+        df = calcular_indicadores(_make_ohlcv(100)).dropna()
+        assert df["mfi"].min() >= 0
+        assert df["mfi"].max() <= 100
+
+    def test_cmf_bounded(self):
+        df = calcular_indicadores(_make_ohlcv(100)).dropna()
+        assert df["cmf"].min() >= -1
+        assert df["cmf"].max() <= 1
+
+    def test_supertrend_dir_apenas_mais_um_ou_menos_um(self):
+        df = calcular_indicadores(_make_ohlcv(100)).dropna()
+        assert set(df["supertrend_dir"].unique()).issubset({1, -1})
+
+    def test_supertrend_bullish_em_tendencia_de_alta_forte(self):
+        n = 100
+        idx = pd.date_range("2024-01-01", periods=n, freq="B")
+        close = pd.Series(np.linspace(50, 150, n), index=idx)
+        df = pd.DataFrame({
+            "Open": close, "High": close * 1.01, "Low": close * 0.99,
+            "Close": close, "Volume": 2_000_000.0,
+        }, index=idx)
+        df = calcular_indicadores(df)
+        assert int(df["supertrend_dir"].iloc[-1]) == 1
+
+    def test_supertrend_bearish_em_tendencia_de_baixa_forte(self):
+        n = 100
+        idx = pd.date_range("2024-01-01", periods=n, freq="B")
+        close = pd.Series(np.linspace(150, 50, n), index=idx)
+        df = pd.DataFrame({
+            "Open": close, "High": close * 1.01, "Low": close * 0.99,
+            "Close": close, "Volume": 2_000_000.0,
+        }, index=idx)
+        df = calcular_indicadores(df)
+        assert int(df["supertrend_dir"].iloc[-1]) == -1
 
     def test_rsi_bounded(self):
         """RSI deve estar entre 0 e 100."""

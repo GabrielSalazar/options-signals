@@ -699,6 +699,91 @@ def test_gatilho_b11_preco_na_bollinger_superior():
     assert "B11" in g["ids_baixa"]
 
 
+# ── Matriz v2 Fase 1: gatilhos G12-G19/B12-B19, redutores e vetos ──────────
+
+def test_gatilhos_v2_shadow_nao_altera_score_principal():
+    """Em modo shadow (default), gatilhos v2 são reportados em 'v2' mas não
+    somam no score nem entram nas listas principais de IDs."""
+    df = _df_neutro(list(np.linspace(99.5, 100.5, 30)))
+    g = _run_gatilhos(df, ultimo_over={"cci": -150.0, "mfi": 20.0, "cmf": 0.5})
+    assert "G12" in g["v2"]["ids_alta_v2"]
+    assert "G13" in g["v2"]["ids_alta_v2"]
+    assert "G15" in g["v2"]["ids_alta_v2"]
+    assert "G12" not in g["ids_alta"]
+    assert g["v2"]["score_alta_v2"] == 5  # 2+2+1
+
+
+def test_gatilhos_v2_ativo_soma_no_score_e_mescla_ids(monkeypatch):
+    monkeypatch.setitem(core_engine.CONFIG, "matriz_v2_gatilhos_mode", "ativo")
+    df = _df_neutro(list(np.linspace(99.5, 100.5, 30)))
+    g_shadow_base = _run_gatilhos(df)
+    g = _run_gatilhos(df, ultimo_over={"cci": -150.0, "mfi": 20.0})
+    assert "G12" in g["ids_alta"]
+    assert "G13" in g["ids_alta"]
+    assert g["score_alta"] >= g_shadow_base["score_alta"] + 4
+
+
+def test_gatilhos_v2_espelhos_de_baixa():
+    df = _df_neutro(list(np.linspace(100.5, 99.5, 30)))
+    g = _run_gatilhos(df, ultimo_over={"cci": 150.0, "mfi": 80.0, "cmf": -0.4,
+                                       "supertrend_dir": -1, "ema21": 105.0, "adx": 30.0})
+    v2 = g["v2"]
+    for esperado in ("B12", "B13", "B15", "B16", "B17", "B18"):
+        assert esperado in v2["ids_baixa_v2"], f"{esperado} não disparou"
+    assert "B18" in v2["ids_baixa_v2"] and "G18" in v2["ids_alta_v2"]  # ADX é bidirecional
+
+
+def test_gatilho_v2_g19_compressao_bollinger_com_oscilador_extremo():
+    df = _df_neutro(list(np.linspace(99.5, 100.5, 30)))
+    g = _run_gatilhos(df, ultimo_over={"bb_width": 0.05, "stoch_k": 20.0, "stoch_d": 30.0})
+    assert "G19" in g["v2"]["ids_alta_v2"]
+
+
+def test_gatilho_v2_g14_obv_subindo():
+    df = _df_neutro(list(np.linspace(99.5, 100.5, 30)))
+    df["obv"] = np.linspace(0, 1_000_000, 30)
+    g = _run_gatilhos(df)
+    assert "G14" in g["v2"]["ids_alta_v2"]
+
+
+def test_redutores_v2_fluxo_contra_e_adx_fraco():
+    df = _df_neutro(list(np.linspace(99.5, 100.5, 30)))
+    g = _run_gatilhos(df, ultimo_over={"cmf": -0.3, "adx": 12.0})
+    ids_red = [r["id"] for r in g["v2"]["redutores_alta"]]
+    assert "RED_FLUXO" in ids_red   # CMF negativo contra a compra
+    assert "RED_ADX" in ids_red
+    assert g["v2"]["redutores_alta_total"] == 4
+
+
+def test_gatilhos_v2_indicadores_ausentes_nao_disparam():
+    """df/ultimo sem colunas novas (fluxo antigo, testes legados) → v2 vazio."""
+    df = _df_neutro(list(np.linspace(99.5, 100.5, 30)))
+    g = _run_gatilhos(df)
+    assert g["v2"]["ids_alta_v2"] == []
+    assert g["v2"]["redutores_alta"] == []
+
+
+def test_veto_tecnico_shadow_reporta_sem_bloquear(monkeypatch):
+    """Vetos em shadow aparecem em vetos_v2 do sinal, que ainda é emitido."""
+    from backend.domain.scoring import avaliar_vetos_tecnicos
+    _relax_and_mock(monkeypatch)
+    df = _make_df(0)
+    ultimo = df.iloc[-1]
+    s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=df, indicators_calculated=True)
+    assert s is not None
+    vetos_diretos = avaliar_vetos_tecnicos(ultimo, s["tipo_sinal"], s["score"])
+    assert [v["id"] for v in s["vetos_v2"]] == [v["id"] for v in vetos_diretos]
+
+
+def test_veto_adx_ativo_bloqueia_emissao(monkeypatch):
+    _relax_and_mock(monkeypatch)
+    monkeypatch.setitem(core_engine.CONFIG, "veto_adx_mode", "ativo")
+    monkeypatch.setitem(core_engine.CONFIG, "adx_veto_min", 999.0)  # força o veto
+    df = _make_df(0)
+    s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=df, indicators_calculated=True)
+    assert s is None
+
+
 # ── _montar_estrutura_opcao: fallback de IV via strikes vizinhos ───────────
 
 def test_montar_estrutura_usa_iv_implicita_de_vizinhos_quando_sem_tela_direta(monkeypatch):

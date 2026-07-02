@@ -87,6 +87,11 @@ def calcular_indicadores(df: pd.DataFrame) -> pd.DataFrame:
         # VWAP (ta.volume)
         vwap              = ta.volume.VolumeWeightedAveragePrice(h, l, c, v, window=20, fillna=False)
         df["vwap"]        = vwap.volume_weighted_average_price()
+
+        # Fluxo de capital (matriz v2 §2.2)
+        df["mfi"]         = ta.volume.MFIIndicator(h, l, c, v, window=14).money_flow_index()
+        df["obv"]         = ta.volume.OnBalanceVolumeIndicator(c, v).on_balance_volume()
+        df["cmf"]         = ta.volume.ChaikinMoneyFlowIndicator(h, l, c, v, window=20).chaikin_money_flow()
     else:
         df["stoch_k"]     = _stoch_manual(h, l, c, CONFIG["stoch_k_period"])
         df["rsi"]         = _rsi_manual(c, CONFIG["rsi_period"])
@@ -117,6 +122,14 @@ def calcular_indicadores(df: pd.DataFrame) -> pd.DataFrame:
         # VWAP (Rolling 20 periods for Daily charts)
         vwap_vol_sum      = v.rolling(20).sum()
         df["vwap"]        = (tp * v).rolling(20).sum() / (vwap_vol_sum + 1e-9)
+
+        # Fluxo de capital (matriz v2 §2.2) — fallbacks manuais
+        df["mfi"]         = _mfi_manual(h, l, c, v, 14)
+        df["obv"]         = _obv_manual(c, v)
+        df["cmf"]         = _cmf_manual(h, l, c, v, 20)
+
+    # SuperTrend (matriz v2 §2.3) — não existe na lib ta; sempre manual
+    df["supertrend_dir"] = _supertrend_dir(h, l, c, df["atr"], mult=3.0)
 
     # Derivados úteis para o score ponderado (independentes da lib ta)
     df["bb_pct"]   = (c - df["bb_lower"]) / (df["bb_upper"] - df["bb_lower"] + 1e-9)
@@ -166,6 +179,67 @@ def _adx_manual(high, low, close, period=14):
     minus_di = 100 * minus_dm.rolling(period).mean() / (atr + 1e-9)
     dx = (abs(plus_di - minus_di) / (plus_di + minus_di + 1e-9)) * 100
     return dx.rolling(period).mean()
+
+def _mfi_manual(high, low, close, volume, period=14):
+    """Money Flow Index — RSI ponderado por volume (0-100)."""
+    tp = (high + low + close) / 3
+    fluxo = tp * volume
+    delta_tp = tp.diff()
+    fluxo_pos = fluxo.where(delta_tp > 0, 0.0).rolling(period).sum()
+    fluxo_neg = fluxo.where(delta_tp < 0, 0.0).rolling(period).sum()
+    razao = fluxo_pos / fluxo_neg.replace(0, np.nan)
+    return 100 - (100 / (1 + razao))
+
+
+def _obv_manual(close, volume):
+    """On-Balance Volume — volume acumulado com sinal da variação do fechamento."""
+    direcao = np.sign(close.diff()).fillna(0.0)
+    return (direcao * volume).cumsum()
+
+
+def _cmf_manual(high, low, close, volume, period=20):
+    """Chaikin Money Flow — fluxo de capital acumulado normalizado (-1 a 1)."""
+    rng = (high - low).replace(0, np.nan)
+    mfm = ((close - low) - (high - close)) / rng
+    mfv = mfm * volume
+    return mfv.rolling(period).sum() / (volume.rolling(period).sum() + 1e-9)
+
+
+def _supertrend_dir(high, low, close, atr, mult: float = 3.0) -> pd.Series:
+    """Direção do SuperTrend: +1 (bullish) / -1 (bearish).
+
+    Implementação clássica com bandas básicas ((H+L)/2 ± mult*ATR) e bandas
+    finais "grudadas" (a banda só se move a favor da tendência enquanto o
+    preço não a rompe). Loop necessário — a banda final depende do estado
+    anterior. NaN de ATR no warm-up produz direção +1 neutra inicial.
+    """
+    hl2 = (high + low) / 2
+    upper_basic = (hl2 + mult * atr).values
+    lower_basic = (hl2 - mult * atr).values
+    c = close.values
+    n = len(c)
+    upper = np.copy(upper_basic)
+    lower = np.copy(lower_basic)
+    dir_ = np.ones(n, dtype=int)
+    for i in range(1, n):
+        if np.isnan(upper_basic[i]) or np.isnan(lower_basic[i]):
+            dir_[i] = dir_[i - 1]
+            continue
+        if np.isnan(upper[i - 1]) or np.isnan(lower[i - 1]):
+            # warm-up do ATR: primeira banda válida parte da básica
+            upper[i], lower[i] = upper_basic[i], lower_basic[i]
+            dir_[i] = dir_[i - 1]
+            continue
+        upper[i] = (upper_basic[i] if upper_basic[i] < upper[i - 1] or c[i - 1] > upper[i - 1]
+                    else upper[i - 1])
+        lower[i] = (lower_basic[i] if lower_basic[i] > lower[i - 1] or c[i - 1] < lower[i - 1]
+                    else lower[i - 1])
+        if dir_[i - 1] == 1:
+            dir_[i] = -1 if c[i] < lower[i] else 1
+        else:
+            dir_[i] = 1 if c[i] > upper[i] else -1
+    return pd.Series(dir_, index=close.index)
+
 
 def detectar_divergencia(df: pd.DataFrame, janela: int = 5, ordem: int | None = None) -> tuple:
     """Divergência entre PIVÔS CONFIRMADOS (não ponta-a-ponta da janela).

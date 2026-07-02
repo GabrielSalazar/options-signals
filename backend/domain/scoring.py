@@ -176,16 +176,27 @@ def score_ponderado(last, prev, option_price: float, dte: int,
 def avaliar_filtro_iv(iv_rank: float | None, iv_premium: float | None,
                        iv_rank_confiavel: bool, score_tecnico: int) -> dict:
     """
-    Decide o filtro de volatilidade da Camada 1.3. Os limites usam comparação
-    estrita (>), então o valor exato do limite cai sempre na faixa "abaixo":
-      IV Rank <= 50 (ou premium <= 1.2)            -> normal
-      IV Rank > 50 e <= 75 (ou premium > 1.2 e <= 1.5) -> exige score_tecnico >= 7
-      IV Rank > 75 (ou premium > 1.5)               -> bloquear
+    Decide o filtro de volatilidade da Camada 1.3, recalibrado pela matriz v2
+    (§2.5: banda operável 10-70, veto acima de 80). Os limites usam comparação
+    estrita (>/<), então o valor exato do limite cai sempre na faixa "interna":
+      IV Rank em [piso, atencao]                    -> normal
+      IV Rank > atencao e <= bloqueio               -> exige score_tecnico >= 7
+      IV Rank > bloqueio                            -> bloquear (IV cara, risco de IV crush)
+      IV Rank < piso                                -> exige score_tecnico >= 7 (movimento lento)
+    Defaults: bloqueio=80, atencao=70, piso=10 (CONFIG). O proxy iv_premium
+    (sem histórico confiável) mantém os limites 1.2/1.5 e não tem piso — HV
+    baixa demais já é penalizada pelo prêmio ínfimo da opção.
     Usa iv_rank quando confiável (>=60 du de histórico); senão cai no proxy iv_premium.
     Retorna {"decisao": str, "motivo": str}.
     """
     if iv_rank_confiavel and iv_rank is not None:
-        cara, media = iv_rank > 75, iv_rank > 50
+        if iv_rank < CONFIG.get("iv_rank_piso", 10):
+            if score_tecnico >= 7:
+                return {"decisao": "normal", "motivo": "IV muito baixa, mas score tecnico compensa"}
+            return {"decisao": "exige_score_7",
+                    "motivo": "IV muito baixa — movimento tende a ser lento, exige score tecnico >= 7"}
+        cara = iv_rank > CONFIG.get("iv_rank_bloqueio", 80)
+        media = iv_rank > CONFIG.get("iv_rank_atencao", 70)
     elif iv_premium is not None:
         cara, media = iv_premium > 1.5, iv_premium > 1.2
     else:
@@ -202,6 +213,10 @@ def avaliar_filtro_iv(iv_rank: float | None, iv_premium: float | None,
 
 # ── Camada 2.1 — famílias de gatilhos e teto de contribuição ──────────────
 
+# Taxonomia de famílias alinhada à matriz v2 (§5): OSCILADOR, MOMENTUM,
+# TENDENCIA, ESTRUTURA, LIQUIDEZ. A antiga DIVERGENCIA foi absorvida por
+# MOMENTUM (divergência RSI é sinal de momentum interno), junto com o MACD;
+# MFI/OBV/CMF entrarão em MOMENTUM na Fase 1 da matriz.
 GATILHOS: dict[str, dict] = {
     # Gatilhos de alta (G1-G11, docs/ESTRATEGIAS_OPCOES_B3.md)
     "G1":  {"familia": "OSCILADOR",   "pontos": 3},
@@ -209,24 +224,42 @@ GATILHOS: dict[str, dict] = {
     "G3":  {"familia": "ESTRUTURA",   "pontos": 2},
     "G4":  {"familia": "TENDENCIA",   "pontos": 2},
     "G5":  {"familia": "LIQUIDEZ",    "pontos": 1},
-    "G6":  {"familia": "OSCILADOR",   "pontos": 2},
+    "G6":  {"familia": "MOMENTUM",    "pontos": 2},
     "G7":  {"familia": "TENDENCIA",   "pontos": 2},
     "G8":  {"familia": "ESTRUTURA",   "pontos": 1},
-    "G9":  {"familia": "DIVERGENCIA", "pontos": 3},
+    "G9":  {"familia": "MOMENTUM",    "pontos": 3},
     "G10": {"familia": "LIQUIDEZ",    "pontos": 3},
     "G11": {"familia": "TENDENCIA",   "pontos": 2},
-    # Gatilhos de baixa (B1-B9)
+    # Gatilhos de baixa (B1-B11)
     "B1": {"familia": "OSCILADOR",   "pontos": 3},
     "B2": {"familia": "OSCILADOR",   "pontos": 2},
     "B3": {"familia": "ESTRUTURA",   "pontos": 2},
     "B4": {"familia": "TENDENCIA",   "pontos": 2},
     "B5": {"familia": "TENDENCIA",   "pontos": 2},
-    "B6": {"familia": "OSCILADOR",   "pontos": 2},
-    "B7": {"familia": "DIVERGENCIA", "pontos": 3},
+    "B6": {"familia": "MOMENTUM",    "pontos": 2},
+    "B7": {"familia": "MOMENTUM",    "pontos": 3},
     "B8": {"familia": "LIQUIDEZ",    "pontos": 3},
     "B9": {"familia": "TENDENCIA",   "pontos": 2},
     "B10": {"familia": "LIQUIDEZ",   "pontos": 1},
     "B11": {"familia": "ESTRUTURA",  "pontos": 1},
+    # Matriz v2 Fase 1 (spec 2026-07-01 §3) — gatilhos novos, espelhados G/B.
+    # Pesos máx. 2: os pesos 3 são reservados aos âncora (G1/B1, G9/B7, G10/B8).
+    "G12": {"familia": "OSCILADOR", "pontos": 2},   # CCI < -100
+    "G13": {"familia": "MOMENTUM",  "pontos": 2},   # MFI <= 30
+    "G14": {"familia": "MOMENTUM",  "pontos": 1},   # OBV subindo (5 candles)
+    "G15": {"familia": "MOMENTUM",  "pontos": 1},   # CMF > 0
+    "G16": {"familia": "TENDENCIA", "pontos": 1},   # SuperTrend bullish
+    "G17": {"familia": "TENDENCIA", "pontos": 1},   # Close > EMA21
+    "G18": {"familia": "TENDENCIA", "pontos": 2},   # ADX >= 25
+    "G19": {"familia": "ESTRUTURA", "pontos": 2},   # BW < 10% + oscilador extremo
+    "B12": {"familia": "OSCILADOR", "pontos": 2},   # CCI > +100
+    "B13": {"familia": "MOMENTUM",  "pontos": 2},   # MFI >= 70
+    "B14": {"familia": "MOMENTUM",  "pontos": 1},   # OBV caindo (5 candles)
+    "B15": {"familia": "MOMENTUM",  "pontos": 1},   # CMF < 0
+    "B16": {"familia": "TENDENCIA", "pontos": 1},   # SuperTrend bearish
+    "B17": {"familia": "TENDENCIA", "pontos": 1},   # Close < EMA21
+    "B18": {"familia": "TENDENCIA", "pontos": 2},   # ADX >= 25
+    "B19": {"familia": "ESTRUTURA", "pontos": 2},   # BW < 10% + oscilador extremo
 }
 
 
@@ -242,10 +275,10 @@ def calcular_familias(gatilhos_ids: list[str]) -> dict:
     """
     caps = {
         "OSCILADOR":   CONFIG.get("familia_cap_oscilador", 4),
+        "MOMENTUM":    CONFIG.get("familia_cap_momentum", 4),
         "TENDENCIA":   CONFIG.get("familia_cap_tendencia", 4),
-        "ESTRUTURA":   CONFIG.get("familia_cap_estrutura", 3),
-        "DIVERGENCIA": CONFIG.get("familia_cap_divergencia", 3),
-        "LIQUIDEZ":    CONFIG.get("familia_cap_liquidez", 4),
+        "ESTRUTURA":   CONFIG.get("familia_cap_estrutura", 4),
+        "LIQUIDEZ":    CONFIG.get("familia_cap_liquidez", 3),
     }
     bruto: dict[str, int] = {}
     for gid in gatilhos_ids:
@@ -265,13 +298,16 @@ def calcular_familias(gatilhos_ids: list[str]) -> dict:
 def classificar_setup(breakdown: dict) -> str:
     """
     Classifica o sinal por família dominante (Camada 2.2):
-      REVERSAO    se OSCILADOR+DIVERGENCIA+ESTRUTURA > TENDENCIA
-      CONTINUACAO se TENDENCIA > OSCILADOR+DIVERGENCIA+ESTRUTURA
+      REVERSAO    se OSCILADOR+MOMENTUM+ESTRUTURA > TENDENCIA
+      CONTINUACAO se TENDENCIA > OSCILADOR+MOMENTUM+ESTRUTURA
       HIBRIDO     em caso de empate (inclusive 0 a 0)
+    MOMENTUM substitui a antiga DIVERGENCIA no lado de reversão — MACD e
+    divergência já contavam nesse lado antes do remapeamento (via OSCILADOR
+    e DIVERGENCIA respectivamente), então o comportamento é preservado.
     `breakdown` é o dict {familia: pontos} retornado por `calcular_familias`
     (já com os tetos aplicados).
     """
-    reversao = (breakdown.get("OSCILADOR", 0) + breakdown.get("DIVERGENCIA", 0)
+    reversao = (breakdown.get("OSCILADOR", 0) + breakdown.get("MOMENTUM", 0)
                 + breakdown.get("ESTRUTURA", 0))
     continuacao = breakdown.get("TENDENCIA", 0)
     if reversao > continuacao:
@@ -279,6 +315,121 @@ def classificar_setup(breakdown: dict) -> str:
     if continuacao > reversao:
         return "CONTINUACAO"
     return "HIBRIDO"
+
+
+def avaliar_vetos_tecnicos(ultimo, tipo_sinal: str, score_tecnico: int) -> list[dict]:
+    """
+    Vetos técnicos da matriz v2 (§4), avaliados sobre a última linha de
+    indicadores. Retorna a lista de vetos DISPARADOS, cada um com o modo
+    vigente ("shadow" reporta, "ativo" bloqueia — o chamador decide):
+      VETO_ADX        — ADX < adx_veto_min (lateralidade; reversão vira chute)
+      VETO_SUPERTREND — SuperTrend contra a direção do sinal
+      VETO_BW         — Bollinger aberto (BW > bw_aberto_min) com preço no
+                        meio das bandas (0,35 < %B < 0,65): errático
+      EMA200_CONTRA   — não veta: exige score_tecnico >= min_score + 2
+    Indicador ausente (NaN/None) nunca dispara veto — fail-safe.
+    """
+    up = tipo_sinal.upper() == "CALL"
+    vetos: list[dict] = []
+
+    adx = ultimo.get("adx")
+    if adx is not None and not _isnan(adx) and float(adx) < CONFIG.get("adx_veto_min", 15.0):
+        vetos.append({"id": "VETO_ADX", "modo": CONFIG.get("veto_adx_mode", "shadow"),
+                      "motivo": f"ADX {float(adx):.0f} < {CONFIG.get('adx_veto_min', 15.0):.0f} — mercado lateral"})
+
+    st = ultimo.get("supertrend_dir")
+    if st is not None and not _isnan(st):
+        contra = (int(st) == -1) if up else (int(st) == 1)
+        if contra:
+            vetos.append({"id": "VETO_SUPERTREND", "modo": CONFIG.get("veto_supertrend_mode", "shadow"),
+                          "motivo": f"SuperTrend {'bearish' if up else 'bullish'} contra o sinal"})
+
+    bw = ultimo.get("bb_width")
+    bb_pct = ultimo.get("bb_pct")
+    if (bw is not None and bb_pct is not None and not _isnan(bw) and not _isnan(bb_pct)
+            and float(bw) > CONFIG.get("bw_aberto_min", 0.25) and 0.35 < float(bb_pct) < 0.65):
+        vetos.append({"id": "VETO_BW", "modo": CONFIG.get("veto_bw_mode", "shadow"),
+                      "motivo": f"Bandas abertas (BW {float(bw)*100:.0f}%) com preço no meio — sem direção"})
+
+    ema200 = ultimo.get("ema200")
+    close = ultimo.get("Close")
+    if ema200 is not None and close is not None and not _isnan(ema200) and not _isnan(close):
+        contra_200 = (float(close) < float(ema200)) if up else (float(close) > float(ema200))
+        if contra_200 and score_tecnico < CONFIG.get("min_score", 5) + 2:
+            vetos.append({"id": "EMA200_CONTRA", "modo": CONFIG.get("veto_ema200_mode", "shadow"),
+                          "motivo": "Sinal contra a EMA200 exige score minimo +2"})
+
+    return vetos
+
+
+def _isnan(x) -> bool:
+    try:
+        return x != x  # NaN é o único valor diferente de si mesmo
+    except Exception:
+        return False
+
+
+def calcular_classe_v2(score: int, familias_breakdown: dict,
+                       score_tecnico: int) -> tuple[str, list[str]]:
+    """Classifica o sinal em classe A/B/C conforme a matriz v2 (spec §4).
+
+    Retorna: (classe, [razoes_downgrade])
+
+    Regra dos 60%: se uma família responde por >60% do score total, rebaixa
+    uma classe (A→B, B→C). Desempate A/B via bônus horário é responsabilidade
+    do chamador (não aplicado aqui).
+    """
+    razoes_downgrade = []
+
+    # Thresholds de score para cada classe (antes de redutores/bônus)
+    if score >= 12 and len([f for f in familias_breakdown.values() if f > 0]) >= 5:
+        classe_base = "A"
+    elif score >= 8 and len([f for f in familias_breakdown.values() if f > 0]) >= 4:
+        classe_base = "B"
+    else:
+        return ("C", ["score ou famílias insuficientes"])
+
+    # Regra dos 60%: nenhuma família pode responder por >60% do total (estrito)
+    score_total = sum(familias_breakdown.values())
+    if score_total > 0:
+        for familia, pontos in familias_breakdown.items():
+            pct = (pontos / score_total) * 100
+            if pct >= 60.1:  # margem para 60.0% = OK, 60.1% = downgrade
+                razoes_downgrade.append(f"{familia} responde por {pct:.0f}% (>60%)")
+                # Downgrade: A→B, B→C
+                classe_base = "B" if classe_base == "A" else "C"
+                break
+
+    # Se classe for A, verificar critério extra: score_tecnico deve estar
+    # em zona "focada" (RSI 30–70, oscilador relevante). Próxima versão pode
+    # refinar isso com dados em tempo real; por enquanto, apenas registra.
+    if classe_base == "A" and (score_tecnico < 3 or score_tecnico > 8):
+        razoes_downgrade.append(f"score_tecnico {score_tecnico} fora da zona ideal para classe A")
+
+    return (classe_base, razoes_downgrade)
+
+
+def divergencia_premio_pct(premio_real: float, premio_modelado: float) -> float | None:
+    """Divergência entre prêmio real vs. modelado (spec 2026-07-01 §5).
+    Bloco 1 item 3 da matriz: prêmio real vs. modelado <15% (informativo shadow).
+    Retorna percentual positivo (real-modelado)/modelado ou None se modelado ≤0."""
+    if premio_modelado <= 0:
+        return None
+    return ((premio_real - premio_modelado) / premio_modelado) * 100
+
+
+def sizing_sugerido_pct(preco: float, atr: float, risco_pct: float = 1.0) -> float:
+    """Position sizing sugestivo conforme checklist §6.33 da matriz v2.
+    Fórmula: risco_pct / (atr / preco), i.e., quanto do capital arriscar
+    se o stop está a ATR de distância.
+    Ex: preco=100, atr=2 (2% de stop), risco=1% → 1%/2% = 0.5% do capital.
+    Retorna percentual recomendado."""
+    if preco <= 0 or atr <= 0:
+        return 0.0
+    atr_pct = (atr / preco) * 100
+    if atr_pct == 0:
+        return 0.0
+    return min(risco_pct / atr_pct, 5.0)  # cap a 5% para segurança
 
 
 def parametros_setup_shadow(setup: str) -> dict:

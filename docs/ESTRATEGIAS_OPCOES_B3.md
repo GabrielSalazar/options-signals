@@ -185,13 +185,15 @@ Resultado real: +26% Alvo 1 ✅
 
 Os 22 gatilhos (11 de alta + 11 de baixa, simétricos desde jul/2026) são agrupados em 5 famílias (Camada 2.1 — `backend/domain/scoring.py::GATILHOS`):
 
-| Família | Gatilhos de alta | Gatilhos de baixa |
-|---|---|---|
-| OSCILADOR | G1, G2, G6 | B1, B2, B6 |
-| TENDENCIA | G4, G7, G11 | B4, B5, B9 |
-| ESTRUTURA | G3, G8 | B3, B11 |
-| DIVERGENCIA | G9 | B7 |
-| LIQUIDEZ | G5, G10 | B8, B10 |
+| Família | Gatilhos de alta | Gatilhos de baixa | Cap |
+|---|---|---|---|
+| OSCILADOR | G1, G2 | B1, B2 | 4 |
+| MOMENTUM | G6, G9 | B6, B7 | 4 |
+| TENDENCIA | G4, G7, G11 | B4, B5, B9 | 4 |
+| ESTRUTURA | G3, G8 | B3, B11 | 4 |
+| LIQUIDEZ | G5, G10 | B8, B10 | 3 |
+
+> Taxonomia alinhada à matriz v2 (jul/2026): a antiga família DIVERGENCIA foi absorvida por MOMENTUM (junto com o MACD, que saiu de OSCILADOR); MFI/OBV/CMF entrarão em MOMENTUM na Fase 1 da matriz.
 
 O lado de alta tem 11 gatilhos (máx. 23 pts); o de baixa tem 9 (máx. 21 pts). Isso é uma
 **decisão atual, não uma lacuna não examinada**: faltam dois gatilhos espelho do lado

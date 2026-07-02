@@ -30,13 +30,39 @@ class MotorSettings(BaseSettings):
     scoring_mode: str = Field(default="classico", pattern="^(classico|ponderado)$")
     min_score_ponderado: int = 60
     iv_filter_mode: str = Field(default="shadow", pattern="^(shadow|ativo)$")
+    # Thresholds do filtro de IV (matriz v2 §2.5: banda operável 10-70, veto >80)
+    iv_rank_bloqueio: int = 80
+    iv_rank_atencao: int = 70
+    iv_rank_piso: int = 10
+    # Caps por família (matriz v2 §5: oscilador/momentum/tendencia/estrutura 4, liquidez 3).
+    # MOMENTUM (MACD + divergência RSI; futuramente MFI/OBV/CMF) substitui a antiga DIVERGENCIA.
     familia_cap_oscilador: int = 4
+    familia_cap_momentum: int = 4
     familia_cap_tendencia: int = 4
-    familia_cap_estrutura: int = 3
-    familia_cap_divergencia: int = 3
-    familia_cap_liquidez: int = 4
-    delta_min: float = 0.05
-    delta_max: float = 0.55
+    familia_cap_estrutura: int = 4
+    familia_cap_liquidez: int = 3
+    # Tolerância de distância a suporte/resistência 20D em múltiplos de ATR (matriz v2 §2.4)
+    sr_tolerancia_atr: float = 1.5
+    # ── Matriz v2 — Fase 1 (gatilhos novos, redutores e vetos técnicos) ──
+    # "shadow": avalia e reporta nos campos *_v2 do sinal, sem afetar score/emissão.
+    # "ativo": gatilhos novos somam no score, redutores subtraem e vetos bloqueiam.
+    matriz_v2_gatilhos_mode: str = Field(default="shadow", pattern="^(shadow|ativo)$")
+    veto_adx_mode: str = Field(default="shadow", pattern="^(shadow|ativo)$")
+    veto_supertrend_mode: str = Field(default="shadow", pattern="^(shadow|ativo)$")
+    veto_bw_mode: str = Field(default="shadow", pattern="^(shadow|ativo)$")
+    veto_ema200_mode: str = Field(default="shadow", pattern="^(shadow|ativo)$")
+    adx_veto_min: float = 15.0      # ADX abaixo disso = lateralidade (veto)
+    adx_redutor_min: float = 20.0   # ADX abaixo disso = redutor -2
+    adx_gatilho_min: float = 25.0   # ADX acima disso = gatilho G18/B18
+    bw_compressao_max: float = 0.10  # BW abaixo disso = compressão (G19/B19)
+    bw_aberto_min: float = 0.25      # BW acima disso + preço no meio = veto
+    mfi_oversold: float = 30.0
+    mfi_overbought: float = 70.0
+    cci_extremo: float = 100.0
+    # Banda de delta = veto absoluto da matriz v2 §4 (a faixa ideal 0,15-0,45 é
+    # critério de classe, não de emissão)
+    delta_min: float = 0.10
+    delta_max: float = 0.50
     option_price_min: float = 0.10
     option_price_max: float = 3.00
     min_negocios_opcao: int = 10

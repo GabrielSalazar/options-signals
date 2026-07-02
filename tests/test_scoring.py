@@ -14,10 +14,13 @@ import re
 from backend.domain.scoring import (
     GATILHOS,
     avaliar_filtro_iv,
+    calcular_classe_v2,
     calcular_familias,
     classificar_setup,
+    divergencia_premio_pct,
     parametros_setup_shadow,
     score_ponderado,
+    sizing_sugerido_pct,
 )
 from backend.services import core_engine
 
@@ -237,24 +240,37 @@ class TestScoreSignalThreshold:
         assert result["signal"] is False, f"Score={result['score']} não deveria passar"
 
 
-def test_avaliar_filtro_iv_normal_com_rank_baixo():
+def test_avaliar_filtro_iv_normal_com_rank_na_banda_operavel():
     r = avaliar_filtro_iv(iv_rank=30, iv_premium=None, iv_rank_confiavel=True, score_tecnico=5)
     assert r["decisao"] == "normal"
 
 
 def test_avaliar_filtro_iv_exige_score_alto_na_faixa_media():
-    r = avaliar_filtro_iv(iv_rank=60, iv_premium=None, iv_rank_confiavel=True, score_tecnico=5)
+    """Faixa de atenção da matriz v2: rank > 70 (era > 50)."""
+    r = avaliar_filtro_iv(iv_rank=75, iv_premium=None, iv_rank_confiavel=True, score_tecnico=5)
     assert r["decisao"] == "exige_score_7"
 
 
 def test_avaliar_filtro_iv_normal_na_faixa_media_se_score_compensa():
-    r = avaliar_filtro_iv(iv_rank=60, iv_premium=None, iv_rank_confiavel=True, score_tecnico=8)
+    r = avaliar_filtro_iv(iv_rank=75, iv_premium=None, iv_rank_confiavel=True, score_tecnico=8)
     assert r["decisao"] == "normal"
 
 
 def test_avaliar_filtro_iv_bloqueia_rank_alto():
-    r = avaliar_filtro_iv(iv_rank=80, iv_premium=None, iv_rank_confiavel=True, score_tecnico=9)
+    """Veto da matriz v2: rank > 80 (era > 75)."""
+    r = avaliar_filtro_iv(iv_rank=85, iv_premium=None, iv_rank_confiavel=True, score_tecnico=9)
     assert r["decisao"] == "bloquear"
+
+
+def test_avaliar_filtro_iv_piso_rank_muito_baixo_exige_score_7():
+    """Matriz v2 §2.5: rank < 10 = movimento tende a ser lento demais."""
+    r = avaliar_filtro_iv(iv_rank=5, iv_premium=None, iv_rank_confiavel=True, score_tecnico=5)
+    assert r["decisao"] == "exige_score_7"
+
+
+def test_avaliar_filtro_iv_piso_compensado_por_score_alto():
+    r = avaliar_filtro_iv(iv_rank=5, iv_premium=None, iv_rank_confiavel=True, score_tecnico=8)
+    assert r["decisao"] == "normal"
 
 
 def test_avaliar_filtro_iv_usa_proxy_premium_sem_rank_confiavel():
@@ -267,14 +283,22 @@ def test_avaliar_filtro_iv_normal_sem_nenhum_dado():
     assert r["decisao"] == "normal"
 
 
-def test_avaliar_filtro_iv_rank_exatamente_50_e_normal():
-    r = avaliar_filtro_iv(iv_rank=50, iv_premium=None, iv_rank_confiavel=True, score_tecnico=5)
+def test_avaliar_filtro_iv_rank_exatamente_70_e_normal():
+    """Limite de atenção usa > estrito: o valor exato (70) ainda é normal."""
+    r = avaliar_filtro_iv(iv_rank=70, iv_premium=None, iv_rank_confiavel=True, score_tecnico=5)
     assert r["decisao"] == "normal"
 
 
-def test_avaliar_filtro_iv_rank_exatamente_75_exige_score_7():
-    r = avaliar_filtro_iv(iv_rank=75, iv_premium=None, iv_rank_confiavel=True, score_tecnico=5)
+def test_avaliar_filtro_iv_rank_exatamente_80_exige_score_7():
+    """Limite de bloqueio usa > estrito: o valor exato (80) cai na faixa de atenção."""
+    r = avaliar_filtro_iv(iv_rank=80, iv_premium=None, iv_rank_confiavel=True, score_tecnico=5)
     assert r["decisao"] == "exige_score_7"
+
+
+def test_avaliar_filtro_iv_rank_exatamente_10_e_normal():
+    """Piso usa < estrito: o valor exato (10) já está na banda operável."""
+    r = avaliar_filtro_iv(iv_rank=10, iv_premium=None, iv_rank_confiavel=True, score_tecnico=5)
+    assert r["decisao"] == "normal"
 
 
 def test_avaliar_filtro_iv_premium_exatamente_1_2_e_normal():
@@ -288,20 +312,75 @@ def test_avaliar_filtro_iv_premium_exatamente_1_5_exige_score_7():
 
 
 def test_avaliar_filtro_iv_score_tecnico_exatamente_7_compensa_faixa_media():
-    r = avaliar_filtro_iv(iv_rank=60, iv_premium=None, iv_rank_confiavel=True, score_tecnico=7)
+    r = avaliar_filtro_iv(iv_rank=75, iv_premium=None, iv_rank_confiavel=True, score_tecnico=7)
     assert r["decisao"] == "normal"
 
 
-def test_gatilhos_alta_somam_23_pontos():
+def test_gatilhos_alta_somam_35_pontos():
+    """23 clássicos + 12 da matriz v2 (G12-G19: 2+2+1+1+1+1+2+2)."""
     soma = sum(v["pontos"] for k, v in GATILHOS.items() if k.startswith("G"))
-    assert soma == 23
+    assert soma == 35
 
 
-def test_gatilhos_baixa_somam_23_pontos():
-    """B10 (volume) e B11 (Bollinger superior) foram adicionados para
-    espelhar G5/G8, que só existiam do lado de alta (assimetria CALL×PUT)."""
+def test_gatilhos_baixa_somam_35_pontos():
+    """Simetria CALL×PUT preservada também nos gatilhos da matriz v2."""
     soma = sum(v["pontos"] for k, v in GATILHOS.items() if k.startswith("B"))
-    assert soma == 23
+    assert soma == 35
+
+
+def test_gatilhos_v2_sao_simetricos_em_familia_e_pontos():
+    """Cada Gxx novo tem o Bxx espelho com mesma família e pontos."""
+    for n in range(12, 20):
+        g, b = GATILHOS[f"G{n}"], GATILHOS[f"B{n}"]
+        assert g == b, f"G{n} e B{n} divergem: {g} vs {b}"
+
+
+def test_classe_v2_a_requer_score_12_e_5_familias():
+    classe, razoes = calcular_classe_v2(12, {"OSCILADOR": 2, "MOMENTUM": 2, "TENDENCIA": 3,
+                                              "ESTRUTURA": 3, "LIQUIDEZ": 2}, 6)
+    assert classe == "A"
+    assert razoes == []
+
+
+def test_classe_v2_b_requer_score_8_e_4_familias():
+    classe, razoes = calcular_classe_v2(8, {"OSCILADOR": 2, "MOMENTUM": 2,
+                                            "TENDENCIA": 3, "ESTRUTURA": 1}, 5)
+    assert classe == "B"
+    assert razoes == []
+
+
+def test_classe_v2_c_se_score_baixo():
+    classe, razoes = calcular_classe_v2(4, {"OSCILADOR": 2, "TENDENCIA": 2}, 3)
+    assert classe == "C"
+    assert "score" in razoes[0].lower()
+
+
+def test_classe_v2_downgrade_por_regra_60_pct():
+    # Score 12, 5 famílias, mas OSCILADOR com 13 pts em 20 = 65% (>60%)
+    classe, razoes = calcular_classe_v2(
+        12,
+        {"OSCILADOR": 13, "MOMENTUM": 2, "TENDENCIA": 2, "ESTRUTURA": 1, "LIQUIDEZ": 2},
+        6
+    )
+    assert classe == "B"  # A→B downgrade por regra 60%
+    assert "60" in razoes[0]
+
+
+def test_divergencia_premio_pct_normal():
+    # Prêmio real 5% acima do modelado
+    pct = divergencia_premio_pct(1.05, 1.00)
+    assert abs(pct - 5.0) < 0.1
+
+
+def test_divergencia_premio_pct_modelado_zero():
+    pct = divergencia_premio_pct(1.0, 0.0)
+    assert pct is None
+
+
+def test_sizing_sugerido_pct_calcula_corretamente():
+    # ATR 2 em preço 100 = 2% de stop; risco 1% → 1%/2% = 0.5% do capital
+    pct = sizing_sugerido_pct(100.0, 2.0, risco_pct=1.0)
+    assert abs(pct - 0.5) < 0.01
 
 
 def test_calcular_familias_sem_teto_quando_dentro_do_cap():
