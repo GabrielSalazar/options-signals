@@ -59,6 +59,21 @@ class MotorSettings(BaseSettings):
     mfi_oversold: float = 30.0
     mfi_overbought: float = 70.0
     cci_extremo: float = 100.0
+    # ── Camada PUCK (HC institucional, fluxo normalizado, breakout) ──
+    # "shadow": gatilhos G20/B20/G21/B21 reportam com 0 pontos; modificadores
+    # de classe só registram razões. "ativo": pontos reais e classe alterada.
+    puck_gatilhos_mode: str = Field(default="shadow", pattern="^(shadow|ativo)$")
+    absorcao_classe_mode: str = Field(default="shadow", pattern="^(shadow|ativo)$")
+    fluxo_upgrade_mode: str = Field(default="shadow", pattern="^(shadow|ativo)$")
+    hc_fator_volume: float = 1.5        # HC exige volume > fator × média20 (institucional)
+    cmf_z_periodo: int = 21             # janela do z-score do CMF (PUCK v4.4 §5)
+    cmf_z_gatilho: float = 1.0          # z mínimo p/ G20/B20 (1.0=padrão, 1.5=seletivo)
+    absorcao_clv_max: float = 0.1       # |CLV| abaixo disso = fluxo neutro (absorção)
+    fluxo_persistencia_clv: float = 0.3 # CLV direcional mínimo p/ contar persistência
+    fluxo_persistencia_min: int = 3     # dias consecutivos p/ candidato a upgrade C→B
+    atr_mult_stop: float = 1.5          # stop no ativo = entrada ∓ mult × ATR
+    atr_mult_tp1: float = 1.5           # TP1 (realizar 50%)
+    atr_mult_tp2: float = 3.0           # TP2 (R:R 2:1)
     # Banda de delta = veto absoluto da matriz v2 §4 (a faixa ideal 0,15-0,45 é
     # critério de classe, não de emissão)
     delta_min: float = 0.10
