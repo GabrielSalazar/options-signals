@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import pandas as pd
 
@@ -348,3 +349,41 @@ def detectar_canal_linear(df: pd.DataFrame, janela: int = 20, r2_minimo: float =
         return canal_altista, canal_baixista, slope_medio
     except Exception:
         return False, False, 0.0
+
+
+def obter_vxbr_diaria() -> float | None:
+    """Coleta VXBR (índice de volatilidade da B3) do dia atual.
+
+    Tenta via API brapi.dev (gratuita, sem auth). Fallback: retorna None.
+    VXBR é um índice, não há "série" — valor único por dia.
+
+    API esperada: GET https://api.brapi.dev/api/v2/ibov-indices
+    Resposta:
+    ```json
+    {
+        "results": [
+            {"name": "IBOV", "close": 120000.5},
+            {"name": "VXBR", "close": 18.5},
+            ...
+        ]
+    }
+    ```
+
+    Returns:
+        float: Valor de fechamento do VXBR (ex: 18.5)
+        None: Se API indisponível, timeout, ou VXBR não encontrado na resposta.
+              Falhas não criam exceção, apenas loga warning (job gracefully degraded).
+    """
+    import requests
+    try:
+        resp = requests.get("https://api.brapi.dev/api/v2/ibov-indices", timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        # Resposta esperada: {"results": [{"name": "VXBR", "close": 18.5}, ...]}
+        for item in data.get("results", []):
+            if item.get("name") == "VXBR":
+                return float(item.get("close", 0.0))
+    except Exception as e:
+        logger = logging.getLogger("b3_api")
+        logger.warning(f"Erro ao coletar VXBR: {e}")
+    return None
