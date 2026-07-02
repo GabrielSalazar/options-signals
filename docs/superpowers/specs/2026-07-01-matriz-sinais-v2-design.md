@@ -87,11 +87,18 @@ Regra geral: cada gatilho novo vale no máximo 2; os pesos 3 ficam reservados ao
   - `sizing_sugerido_pct(preco, atr, risco_pct)` — fórmula risco_pct / (atr/preco), retorna % do capital sugerido com stop a ATR, capped a 5%.
   - Telemetria adicionada ao payload: `classe_v2`, `razoes_downgrade_classe`, `divergencia_premio_pct`, `sizing_sugerido_pct` (todos ainda em shadow, não decidem emissão).
   - 662 testes verdes (15 novos para classe/60%/informacionals).
-- **Fase 3 — dados externos** (~1–2 semanas): OI + bid/ask via **arquivos públicos B3, validados em 2026-07-01 (gratuitos, sem auth)**:
+- **Fase 3 — dados externos** (~1–2 semanas): ✅ **CONCLUÍDA (2026-07-02)** — OI + bid/ask via **arquivos públicos B3, validados em 2026-07-01 (gratuitos, sem auth)**:
   - **OI por série**: `https://www.b3.com.br/pesquisapregao/download?filelist=PRAAMMDD.zip` — zip aninhado com XMLs BVBG.086.01 (PriceReport); tag `<OpnIntrst>` por `<TckrSymb>` (~175 mil instrumentos, ~11 MB, publicado pós-fechamento). Validado: PETRG360 OI=518.200 em 30/06/2026. Obs.: `SIAAMMDD.zip` retorna zip vazio; `INAAMMDD.zip` é BVBG.028 (cadastro, sem OI).
   - **Bid/ask de fechamento**: `https://bvmf.bmfbovespa.com.br/InstDados/SerHist/COTAHIST_DDDMMAAAA.ZIP` — campos posicionais PREOFC (82:95) / PREOFV (95:108), TPMERC 070/080 = call/put. Validado: PETRG42 bid 1,43/ask 1,55 (spread 8,4%). Limitação aceita: spread do fechamento D-1, não intraday (a API `cotacao.b3.com.br/mds/api/v1/instrumentQuotation/{ticker}` funciona para opções mas não expõe book).
   - Design: job diário pós-fechamento (padrão `iv_history_service`, ~18h BRT) baixa PR+COTAHIST, extrai séries dos ativos monitorados e persiste em `option_liquidity`; vetos de executabilidade consultam de lá, com `null` = "desconhecido" (não veta).
   - VXBR (coleta diária) e calendário de eventos (Copom hardcode + resultados via brapi) → veto "evento dentro do DTE".
+  - **Entregue (2026-07-02):**
+    - **OI**: `liquidity_service.py::_parse_pr_zip()` baixa/descompacta PR, extrai `<OpnIntrst>` por `<TckrSymb>`, agrega por ticker base e persiste em `option_liquidity` (migração `013`); job diário 18h BRT no scheduler (`coletar_liquidity_diaria()`).
+    - **Bid/ask**: `liquidity_service.py::_parse_cotahist_zip()` extrai PREOFC/PREOFV (TPMERC 070/080), agrega melhor bid/pior ask e calcula spread_pct.
+    - **VXBR**: `indicators.py::obter_vxbr_diaria()` via brapi (fail-safe).
+    - **Eventos**: `event_service.py::registrar_copom_datas()` cadastra Copom 2026 no boot (tabela `calendar_events`, migração `014`); `obter_evento_na_data()` consulta no ato como fallback em `core_engine.py`.
+    - **Vetos shadow**: `scoring.py::avaliar_filtro_liquidez_shadow()` (normal/atencao/bloquear), wired em `core_engine.py::analisar_ativo()` sem bloquear emissão; telemetria (`oi`, `bid`, `ask`, `spread_pct`, `vxbr`, `evento_label`, `filtro_liquidez_decisao/motivo`) persistida em `signals` (migração `015`, `signal_service.py`).
+    - **Testes**: `tests/test_liquidity_service.py`, `tests/test_core_engine_liquidity.py`, `tests/test_event_service.py` — suíte total 681 verdes.
 - **Fase 4 — validação e ativação** (~1 semana; é a Camada 5 do roadmap): medir em shadow taxa de emissão por classe e hit-rate dos vetados vs. aprovados (backtest + histórico real); ativar por etapas — 1º executabilidade (OI/spread), 2º vetos técnicos, 3º thresholds 8/12. Cada etapa reversível por flag; reverter se derrubar expectância.
 
 ## 7. Riscos aceitos e mitigações

@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 ## [Não lançado]
 
+### Added (Matriz v2 — Fase 3: Dados Externos)
+- **Coleta diária de OI via PriceReport (PR) da B3**
+  (`https://www.b3.com.br/pesquisapregao/download?filelist=PRAAMMDD.zip`, formato AAMMDD):
+  ZIP aninhado com XMLs BVBG.086.01; tag `<OpnIntrst>` extraída por `<TckrSymb>` e agregada
+  por ticker base. Job diário (18h BRT, via scheduler) em `coletar_liquidity_diaria()`
+  ([backend/services/liquidity_service.py](../backend/services/liquidity_service.py)),
+  persistindo em `option_liquidity(ticker, data, oi, bid, ask, spread_pct, vxbr, evento_label)`
+  (migração `013`).
+- **Bid/ask de fechamento via COTAHIST diário**: arquivo posicional da B3; campos
+  PREOFC/PREOFV extraídos dos registros de opções (TPMERC 070/080), agregados por
+  ticker base (melhor bid, pior ask); spread calculado como `(ask-bid)/mid*100`.
+- **VXBR diário**: `obter_vxbr_diaria()` ([backend/domain/indicators.py](../backend/domain/indicators.py))
+  consulta a API brapi; fail-safe (`None` se indisponível, não bloqueia a coleta de OI/bid-ask).
+- **Calendário de eventos (Copom 2026)**: tabela `calendar_events(data, label, descricao)`
+  (migração `014`) com as datas Copom hardcoded; boot registra via `registrar_copom_datas()`
+  (idempotente) e a emissão consulta `obter_evento_na_data()` como fallback
+  ([backend/services/event_service.py](../backend/services/event_service.py)).
+- **Veto shadow de executabilidade**: `avaliar_filtro_liquidez_shadow(oi, spread_pct, vxbr,
+  evento_label, score)` ([backend/domain/scoring.py](../backend/domain/scoring.py)) —
+  critérios: OI<500 (atenção), spread>10% (atenção), spread>15% (bloquear), VXBR>30
+  (atenção), evento no DTE (atenção). Wired em `analisar_ativo()`
+  ([backend/services/core_engine.py](../backend/services/core_engine.py)) **sem bloquear
+  emissão** (ativação na Fase 4).
+- **Telemetria no payload/persistência**: sinais carregam `oi`, `bid`, `ask`, `spread_pct`,
+  `vxbr`, `evento_label`, `filtro_liquidez_decisao`, `filtro_liquidez_motivo` (todos `null`
+  se dados indisponíveis), persistidos no Supabase (migração `015`).
+
+> **Pendências da Fase 3:** aplicar as migrações `013`/`014`/`015` no Supabase (SQL Editor)
+> antes do deploy; medir em shadow o impacto na taxa de emissão vs. aprovadas por classe.
+
 ### Fixed
 - **Look-ahead bias eliminado nos pivots locais (Camada 0.1):** `is_fundo_local`/
   `is_topo_local` passam a usar janela simétrica confirmada (`pivots_confirmados`,
