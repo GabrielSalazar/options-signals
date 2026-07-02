@@ -1,5 +1,5 @@
 """Testes do event_service (calendário Copom — Fase 3 Matriz v2)."""
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import MagicMock
 
 import backend.services.event_service as es
@@ -77,3 +77,15 @@ def test_obter_evento_na_data_erro_supabase(monkeypatch):
     monkeypatch.setattr(es, "get_supabase", lambda: mock_supabase)
 
     assert obter_evento_na_data(date(2026, 7, 2)) is None
+
+
+def test_verificar_exaustao_calendario_avisa_quando_perto_do_fim():
+    """A menos de 90 dias da última data conhecida → True (warning)."""
+    from backend.services.event_service import (
+        COPOM_DATAS_POR_ANO,
+        verificar_exaustao_calendario,
+    )
+    ultima = max(d for ds in COPOM_DATAS_POR_ANO.values() for d in ds)
+
+    assert verificar_exaustao_calendario(hoje=ultima) is True
+    assert verificar_exaustao_calendario(hoje=ultima - timedelta(days=200)) is False
