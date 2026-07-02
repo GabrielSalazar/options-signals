@@ -47,6 +47,7 @@ from backend.services.data_providers import (
     get_real_options_from_opcoes_net,
     obter_opcoes_vizinhas,
 )
+from backend.services.event_service import obter_evento_na_data
 from backend.services.iv_history_service import iv_rank as obter_iv_rank
 from backend.services.supabase_client import get_supabase
 
@@ -727,6 +728,11 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
             estrutura["spread_pct"] = liquidity_info.get("spread_pct") if liquidity_info else None
             estrutura["vxbr"] = liquidity_info.get("vxbr") if liquidity_info else None
             estrutura["evento_label"] = liquidity_info.get("evento_label") if liquidity_info else None
+
+            # Fallback: sem evento em option_liquidity, consulta calendar_events
+            # ANTES do veto shadow, para que o evento entre na decisão (fail-safe).
+            if estrutura["evento_label"] is None:
+                estrutura["evento_label"] = obter_evento_na_data(datetime.now(timezone.utc).date())
 
             filtro_liq = avaliar_filtro_liquidez_shadow(
                 estrutura["oi"],

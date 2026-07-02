@@ -21,6 +21,7 @@ from backend.api.routers import backtest, config, health, market, scan, signals
 from backend.core.cache import redis_status
 from backend.core.logging_config import configure_logging
 from backend.services import scheduler, signal_service
+from backend.services.event_service import registrar_copom_datas
 from backend.services.telegram_service import load_telegram_config
 
 load_dotenv()
@@ -37,6 +38,12 @@ async def lifespan(_app: FastAPI):
 
     load_telegram_config()
     signal_service.rebuild_historico_sinais()
+
+    # Fase 3: cadastra calendário Copom (fail-safe — não pode derrubar o boot)
+    try:
+        registrar_copom_datas(ano=2026)
+    except Exception as e:
+        logger.warning(f"Falha ao registrar calendário Copom no boot: {e}")
 
     # Valida e loga estado do Redis logo no boot para facilitar diagnóstico
     rs = redis_status()
