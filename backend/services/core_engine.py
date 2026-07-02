@@ -329,9 +329,11 @@ def _montar_estrutura_opcao(ticker_base: str, preco: float, tipo_sinal: str,
     # O preço de tela vira a nossa entrada principal, se existir
     preco_base_calculo = preco_tela if preco_tela else premio_est
 
-    band = CONFIG.get("buy_band_pct", 0.035)
-    entrada_min  = round(preco_base_calculo * (1 - band), 2)
-    entrada_max  = round(preco_base_calculo * (1 + band), 2)
+    # Calcula o spread da banda de entrada (ex: 3.5%, mas com mínimo de R$ 0.02 para cada lado)
+    band_pct = CONFIG.get("buy_band_pct", 0.035)
+    margem = max(preco_base_calculo * band_pct, 0.02)
+    entrada_min  = max(0.01, round(preco_base_calculo - margem, 2))
+    entrada_max  = round(preco_base_calculo + margem, 2)
     alvo1        = round(preco_base_calculo * (1 + CONFIG["alvo1_pct"]),     2)
     alvo2        = round(preco_base_calculo * (1 + CONFIG["alvo2_pct"]),     2)
     alvo_final   = round(preco_base_calculo * (1 + CONFIG["alvo_final_pct"]),2)

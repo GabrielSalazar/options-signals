@@ -56,12 +56,12 @@ def test_analisar_ativo_sinal_call_caracterizacao(monkeypatch):
     assert s["strike_ref"] == 13.27
     assert s["dist_otm_pct"] == 8.0
     assert (s["dte"], s["mes_venc"], s["ano_venc"]) == (30, 6, 2026)
-    assert s["premio_est"] == 0.1
+    assert s["premio_est"] == 0.01
     assert s["preco_tela"] is None
     assert s["ticker_opcao"] == "N/A (S/ Liquidez)"
-    assert (s["entrada_min"], s["entrada_max"]) == (0.1, 0.1)
-    assert (s["alvo1"], s["alvo2"], s["alvo_final"], s["stop"]) == (0.12, 0.35, 0.8, 0.06)
-    assert (s["rr_alvo1"], s["rr_alvo2"], s["rr_final"]) == (0.5, 6.25, 17.5)
+    assert (s["entrada_min"], s["entrada_max"]) == (0.01, 0.03)
+    assert (s["alvo1"], s["alvo2"], s["alvo_final"], s["stop"]) == (0.01, 0.04, 0.08, 0.01)
+    assert (s["rr_alvo1"], s["rr_alvo2"], s["rr_final"]) == (0, 0, 0)
     assert len(s["gatilhos"]) == 4
     assert set(s["greeks"]) == {"delta", "gamma", "theta", "vega", "rho", "prob_profit"}
     # Valor recalibrado: sem preço de tela, resolver_iv usa o fallback hv_proxy
@@ -230,10 +230,10 @@ def test_montar_estrutura_opcao_seed0(monkeypatch):
     est = core_engine._montar_estrutura_opcao("TESTE3", preco, "CALL", df, "1d", False)
     assert est is not None
     assert est["strike_ref"] == 13.27
-    assert est["premio_est"] == 0.1
+    assert est["premio_est"] == 0.01
     assert est["dte"] == 30
-    assert (est["alvo1"], est["alvo2"], est["alvo_final"], est["stop"]) == (0.12, 0.35, 0.8, 0.06)
-    assert (est["rr_alvo1"], est["rr_alvo2"], est["rr_final"]) == (0.5, 6.25, 17.5)
+    assert (est["alvo1"], est["alvo2"], est["alvo_final"], est["stop"]) == (0.01, 0.04, 0.08, 0.01)
+    assert (est["rr_alvo1"], est["rr_alvo2"], est["rr_final"]) == (0, 0, 0)
     assert "greeks" in est and "preco_base_calculo" in est
 
 
@@ -390,7 +390,7 @@ def test_analisar_ativo_persiste_campos_shadow_da_camada_2(monkeypatch):
     assert s["setup_params_shadow"] == {"otm_mult": 0.7, "dte_min": 10, "dte_max": 25,
                                          "alvo2_pct": 1.50, "stop_pct": -0.35}
     # Campos shadow não alteram a estrutura real (regressão — mesmos valores da Camada 1)
-    assert (s["alvo1"], s["alvo2"], s["alvo_final"], s["stop"]) == (0.12, 0.35, 0.8, 0.06)
+    assert (s["alvo1"], s["alvo2"], s["alvo_final"], s["stop"]) == (0.01, 0.04, 0.08, 0.01)
 
 
 # ── _baixar_yfinance: retries com backoff e esgotamento de tentativas ────────

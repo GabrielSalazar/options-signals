@@ -119,7 +119,7 @@ def estimar_iv_historica(df: pd.DataFrame, janela: int = 20, interval: str = "1d
 def estimar_premio_otm(preco: float, strike: float, dte_du: int,
                        iv: float, tipo: str = "PUT") -> float:
     if dte_du <= 0 or iv <= 0:
-        return max(0.10, round(preco * 0.015, 2))
+        return max(0.01, round(preco * 0.015, 2))
     t = dte_du / 252
     try:
         d1 = (math.log(preco / strike) + 0.5 * iv**2 * t) / (iv * math.sqrt(t))
@@ -129,10 +129,10 @@ def estimar_premio_otm(preco: float, strike: float, dte_du: int,
             premio = strike * norm.cdf(-d2) - preco * norm.cdf(-d1)
         else:
             premio = preco * norm.cdf(d1) - strike * norm.cdf(d2)
-        return max(0.10, round(float(premio), 2))
+        return max(0.01, round(float(premio), 2))
     except Exception:
         fator_otm = abs(preco - strike) / preco
-        return max(0.10, round(preco * iv * math.sqrt(t) * max(0.1, 1 - fator_otm * 5), 2))
+        return max(0.01, round(preco * iv * math.sqrt(t) * max(0.1, 1 - fator_otm * 5), 2))
 
 def resolver_iv(preco_tela: float | None, S: float, K: float, T: float, tipo: str,
                  hv_20d: float, ivs_strikes_vizinhos: list[float] | None = None) -> tuple[float, str]:
