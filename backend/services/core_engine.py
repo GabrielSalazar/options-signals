@@ -1,7 +1,7 @@
 import logging
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import yfinance as yf
@@ -32,6 +32,7 @@ from backend.domain.options_math import (
 )
 from backend.domain.scoring import (
     avaliar_filtro_iv,
+    avaliar_filtro_liquidez_shadow,
     avaliar_vetos_tecnicos,
     calcular_classe_v2,
     calcular_familias,
@@ -47,8 +48,30 @@ from backend.services.data_providers import (
     obter_opcoes_vizinhas,
 )
 from backend.services.iv_history_service import iv_rank as obter_iv_rank
+from backend.services.supabase_client import get_supabase
 
 logger = logging.getLogger("b3_scanner")
+
+
+def obter_option_liquidity(ticker_base: str, data) -> dict | None:
+    """Consulta option_liquidity para um ticker em uma data específica (Fase 3).
+
+    Fail-safe: Supabase indisponível, linha inexistente ou qualquer exceção
+    retornam None — a emissão de sinais nunca depende desses dados (shadow).
+    """
+    try:
+        supabase = get_supabase()
+        if not supabase:
+            return None
+        res = (supabase.table("option_liquidity")
+               .select("oi, bid, ask, spread_pct, vxbr, evento_label")
+               .eq("ticker", ticker_base)
+               .eq("data", data.isoformat())
+               .single()
+               .execute())
+        return res.data
+    except Exception:
+        return None
 
 def _baixar_yfinance(ticker: str, period: str, interval: str, verbose: bool) -> pd.DataFrame | None:
     """Baixa OHLCV via yfinance com 3 tentativas e backoff exponencial (1s, 2s, 4s)."""
@@ -695,6 +718,28 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
                     return None
             elif filtro["decisao"] != "normal" and verbose:
                 logger.info(f"ℹ {ticker_base}: filtro IV (shadow) indicaria '{filtro['decisao']}' — {filtro['motivo']}")
+
+            # ── LIQUIDEZ / EXECUTABILIDADE (Fase 3 Matriz v2 — shadow) ────────
+            liquidity_info = obter_option_liquidity(ticker_base, datetime.now(timezone.utc).date())
+            estrutura["oi"] = liquidity_info.get("oi") if liquidity_info else None
+            estrutura["bid"] = liquidity_info.get("bid") if liquidity_info else None
+            estrutura["ask"] = liquidity_info.get("ask") if liquidity_info else None
+            estrutura["spread_pct"] = liquidity_info.get("spread_pct") if liquidity_info else None
+            estrutura["vxbr"] = liquidity_info.get("vxbr") if liquidity_info else None
+            estrutura["evento_label"] = liquidity_info.get("evento_label") if liquidity_info else None
+
+            filtro_liq = avaliar_filtro_liquidez_shadow(
+                estrutura["oi"],
+                estrutura["spread_pct"],
+                estrutura["vxbr"],
+                estrutura["evento_label"],
+                score,
+            )
+            estrutura["filtro_liquidez_decisao"] = filtro_liq["decisao"]
+            estrutura["filtro_liquidez_motivo"] = filtro_liq["motivo"]
+            # Shadow: NÃO bloqueia emissão — apenas telemetria (ativação na Fase 4)
+            if filtro_liq["decisao"] != "normal" and verbose:
+                logger.info(f"ℹ {ticker_base}: filtro liquidez (shadow) indicaria '{filtro_liq['decisao']}' — {filtro_liq['motivo']}")
 
             # ── FAMÍLIAS / CONSENSO / SETUP (Camada 2.1-2.2 — shadow) ─────────
             gatilhos_ids = gat["ids_alta"] if tipo_sinal == "CALL" else gat["ids_baixa"]

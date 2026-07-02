@@ -72,6 +72,9 @@ def _parse_pr_zip(content: bytes, tickers_universo: set) -> dict:
         no arquivo, ele não aparece no dict (e será None em persistência).
     """
     oi_por_ticker = {}
+    # Ordena uma única vez (match mais longo primeiro); o arquivo real tem
+    # ~175 mil instrumentos — ordenar dentro do loop seria O(n·m·log m).
+    tickers_ordenados = sorted(tickers_universo, key=len, reverse=True)
     try:
         with ZipFile(io.BytesIO(content)) as zf:
             for file_info in zf.filelist:
@@ -92,8 +95,7 @@ def _parse_pr_zip(content: bytes, tickers_universo: set) -> dict:
                                 # ticker do universo que prefixa o código (match mais longo
                                 # primeiro, para não confundir p.ex. "PBR" com "PBRX")
                                 base = next(
-                                    (t for t in sorted(tickers_universo, key=len, reverse=True)
-                                     if tckr.startswith(t)),
+                                    (t for t in tickers_ordenados if tckr.startswith(t)),
                                     None,
                                 )
                                 if base:

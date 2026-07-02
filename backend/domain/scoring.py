@@ -432,6 +432,71 @@ def sizing_sugerido_pct(preco: float, atr: float, risco_pct: float = 1.0) -> flo
     return min(risco_pct / atr_pct, 5.0)  # cap a 5% para segurança
 
 
+def avaliar_filtro_liquidez_shadow(oi: int | None, spread_pct: float | None,
+                                   vxbr: float | None, evento_label: str | None,
+                                   score: int) -> dict:
+    """
+    Avalia vetos de executabilidade (Fase 3 Matriz v2, §4 — shadow).
+
+    Vetos (não bloqueiam até Fase 4):
+    - OI < 500: atenção
+    - Spread > 10%: atenção
+    - Spread > 15%: bloqueia (spread inviável)
+    - VXBR > 30: atenção (mercado muito nervoso)
+    - Evento no DTE (ex: COPOM): atenção
+
+    Dados None = desconhecidos = não penalizam.
+
+    `score` não é consultado nesta fase; reservado para a Fase 4, quando
+    "atencao" deve passar a exigir score mínimo (mesmo padrão do filtro IV).
+
+    Retorna {"decisao": "normal" | "atencao" | "bloquear", "motivo": str, "modo": "shadow"}.
+
+    `decisao`:
+    - "normal": sem restrição
+    - "atencao": registra em telemetria mas não bloqueia (mesmo em modo ativo)
+    - "bloquear": bloquearia em modo ativo; registra em shadow
+    """
+    motivos = []
+    decisao_maior = "normal"
+
+    # Veto: Spread inviável
+    if spread_pct is not None and spread_pct > 15:
+        motivos.append(f"spread inviável {spread_pct:.1f}%")
+        decisao_maior = "bloquear"
+
+    # Atenção: OI baixo
+    if oi is not None and oi < 500:
+        motivos.append(f"OI baixo {oi}")
+        if decisao_maior != "bloquear":
+            decisao_maior = "atencao"
+
+    # Atenção: Spread alto
+    if spread_pct is not None and spread_pct > 10:
+        motivos.append(f"spread alto {spread_pct:.1f}%")
+        if decisao_maior != "bloquear":
+            decisao_maior = "atencao"
+
+    # Atenção: VXBR elevado
+    if vxbr is not None and vxbr > 30:
+        motivos.append(f"VXBR elevado {vxbr:.1f}")
+        if decisao_maior != "bloquear":
+            decisao_maior = "atencao"
+
+    # Atenção: Evento no DTE
+    if evento_label:
+        motivos.append(f"evento {evento_label} no DTE")
+        if decisao_maior != "bloquear":
+            decisao_maior = "atencao"
+
+    motivo = "; ".join(motivos) if motivos else "execução viável"
+    return {
+        "decisao": decisao_maior,
+        "motivo": motivo,
+        "modo": "shadow",
+    }
+
+
 def parametros_setup_shadow(setup: str) -> dict:
     """
     Parâmetros de estrutura de opção que SERIAM usados por setup (Camada 2.2).
