@@ -1,8 +1,8 @@
 """Coleta de liquidez diária: OI via PR (PriceReport da B3), bid/ask via COTAHIST."""
-import logging
 import io
+import logging
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from zipfile import ZipFile
 
 import requests
@@ -193,28 +193,61 @@ def _parse_cotahist_zip(content: bytes, tickers_universo: set) -> dict:
     return bid_ask_por_ticker
 
 
-def coletar_liquidity_diaria(tickers: dict | None = None, vxbr: float | None = None) -> int:
+def _dia_util_anterior(d: date) -> date:
+    """Retorna o dia útil anterior a `d` (pula sábado/domingo; feriados são
+    tratados pelo retrocesso da coleta — arquivo inexistente → recua mais um)."""
+    anterior = d - timedelta(days=1)
+    while anterior.weekday() >= 5:  # 5=sábado, 6=domingo
+        anterior -= timedelta(days=1)
+    return anterior
+
+
+def _ja_coletado(supabase, data_pregao: date) -> bool:
+    """True se option_liquidity já tem linhas para a data (evita re-download ~11 MB)."""
+    try:
+        res = (supabase.table("option_liquidity")
+               .select("id")
+               .eq("data", data_pregao.isoformat())
+               .limit(1)
+               .execute())
+        return bool(res.data)
+    except Exception as e:
+        logger.warning(f"Erro ao checar coleta existente de {data_pregao}: {e}")
+        return False
+
+
+def coletar_liquidity_diaria(tickers: dict | None = None, vxbr: float | None = None,
+                             max_retrocesso_dias: int = 5) -> int:
     """Job diário (pós-fechamento): persiste OI, bid/ask, VXBR para o universo líquido.
 
-    Este é um job idempotente: rodar 2x no mesmo dia sobrescreve a entrada anterior
-    (via upsert em on_conflict="ticker,data"). Falha parcial (um ticker) não derruba
-    o job — cada ticker é encapsulado em try/except, e o job retorna o nº de
-    tickers com sucesso. Se Supabase estiver indisponível, retorna 0.
+    Tratamento diário dos arquivos B3 (PR/BVBG.086 e COTAHIST):
+    1. Candidatos de data: hoje, depois dias úteis anteriores (até
+       `max_retrocesso_dias`) — cobre feriado (sem arquivo no dia) e publicação
+       atrasada (job das 18h antes do arquivo sair; a retry das 21h30 completa).
+    2. Skip-if-exists: se a data candidata já tem linhas em option_liquidity,
+       nada é baixado (o pregão mais recente já está coletado) — a retry vira no-op.
+    3. Persistência sob a DATA DO PREGÃO do arquivo obtido (não "hoje"): a linha
+       reflete o fechamento daquele pregão; a leitura (core_engine) busca a mais
+       recente ≤ hoje.
+
+    Job idempotente: rodar 2x sobre a mesma data sobrescreve via upsert
+    (on_conflict="ticker,data"). Falha parcial (um ticker) não derruba o job.
+    Se Supabase estiver indisponível, retorna 0.
 
     Dados parciais são persistidos como NULL:
     - Se PR falhar, oi = NULL para todos os tickers
     - Se COTAHIST falhar, bid/ask/spread_pct = NULL para todos
     - Se brapi falhar (VXBR), vxbr = NULL para todos
-    - eventos_label preenchido em Task posterior (job de eventos)
+    - evento_label é preenchido pelo calendário de eventos, não aqui
 
     Args:
         tickers: dict {ticker_with_SA: nome} (ex: {"PETR4.SA": "Petrobras"})
                  Se None, carrega universo via carregar_tickers_b3()
-        vxbr: float VXBR do dia. Se None, tenta obter via obter_vxbr_diaria() (Task 3)
+        vxbr: float VXBR do dia. Se None, tenta obter via obter_vxbr_diaria()
+        max_retrocesso_dias: nº máx. de dias úteis a recuar procurando arquivo
 
     Returns:
-        int: Número de tickers persistidos com sucesso. (Falhas parciais contam como sucesso
-             da persistência, mesmo que bid/ask/oi sejam NULL.)
+        int: Número de tickers persistidos com sucesso (0 se nada novo a coletar).
     """
     supabase = get_supabase()
     if not supabase:
@@ -225,7 +258,34 @@ def coletar_liquidity_diaria(tickers: dict | None = None, vxbr: float | None = N
         tickers = carregar_tickers_b3()
     tickers_universo = set(ticker.replace(".SA", "") for ticker in tickers.keys())
 
-    # Se VXBR não foi fornecido, tenta API (importado do final desta tarefa)
+    # ── Resolve a data do pregão: hoje ou o dia útil anterior mais recente
+    #    com arquivo publicado (feriado/atraso de publicação) ────────────────
+    candidata = datetime.now(timezone.utc).date()
+    if candidata.weekday() >= 5:  # job só roda seg-sex, mas execução manual em fds cai aqui
+        candidata = _dia_util_anterior(candidata)
+
+    pr_content = None
+    cotahist_content = None
+    data_pregao = None
+    for _ in range(max_retrocesso_dias + 1):
+        if _ja_coletado(supabase, candidata):
+            logger.info(f"Liquidez de {candidata} já coletada — nada a fazer")
+            return 0
+        url_pr = PR_BASE_URL.format(date_b3=candidata.strftime("%y%m%d"))  # AAMMDD
+        url_cotahist = COTAHIST_BASE_URL.format(date_cotahist=candidata.strftime("%d%m%Y"))  # DDMMYYYY
+        pr_content = _baixar_arquivo_b3(url_pr, f"PriceReport {candidata}")
+        cotahist_content = _baixar_arquivo_b3(url_cotahist, f"COTAHIST {candidata}")
+        if pr_content or cotahist_content:
+            data_pregao = candidata
+            break
+        logger.info(f"Sem arquivos B3 para {candidata} — tentando dia útil anterior")
+        candidata = _dia_util_anterior(candidata)
+
+    if data_pregao is None:
+        logger.warning(f"Nenhum arquivo B3 encontrado nos últimos {max_retrocesso_dias} dias úteis")
+        return 0
+
+    # Se VXBR não foi fornecido, tenta API
     if vxbr is None:
         from backend.domain.indicators import obter_vxbr_diaria
         try:
@@ -234,25 +294,19 @@ def coletar_liquidity_diaria(tickers: dict | None = None, vxbr: float | None = N
             logger.warning(f"VXBR indisponível: {e}")
             vxbr = None
 
-    hoje = datetime.now(timezone.utc).date()
-    data_b3 = hoje.strftime("%y%m%d")  # formato AAMMDD (ex: 260702) — nome real do arquivo PR na B3
-    data_cotahist = hoje.strftime("%d%m%Y")  # formato DDMMYYYY para COTAHIST
-
-    # Baixa arquivos públicos B3
-    url_pr = PR_BASE_URL.format(date_b3=data_b3)
-    url_cotahist = COTAHIST_BASE_URL.format(date_cotahist=data_cotahist)
-
-    pr_content = _baixar_arquivo_b3(url_pr, "PriceReport")
-    cotahist_content = _baixar_arquivo_b3(url_cotahist, "COTAHIST")
-
-    oi_por_ticker = _parse_pr_zip(pr_content, tickers_universo) if pr_content else {}
-    bid_ask_por_ticker = _parse_cotahist_zip(cotahist_content, tickers_universo) if cotahist_content else {}
+    # As séries de opção usam a RAIZ de 4 letras do papel (PETR4 → PETRG360),
+    # então os parsers recebem raízes, não tickers. Dois papéis da mesma raiz
+    # (PETR3/PETR4) compartilham a mesma cadeia de opções — recebem o mesmo dado.
+    raizes = {t[:4] for t in tickers_universo}
+    oi_por_raiz = _parse_pr_zip(pr_content, raizes) if pr_content else {}
+    bid_ask_por_raiz = _parse_cotahist_zip(cotahist_content, raizes) if cotahist_content else {}
 
     persistidos = 0
     for ticker_base in tickers_universo:
         try:
-            oi = oi_por_ticker.get(ticker_base)
-            bid_ask = bid_ask_por_ticker.get(ticker_base, {})
+            raiz = ticker_base[:4]
+            oi = oi_por_raiz.get(raiz)
+            bid_ask = bid_ask_por_raiz.get(raiz, {})
             bid = bid_ask.get("bid")
             ask = bid_ask.get("ask")
             spread_pct = bid_ask.get("spread_pct")
@@ -260,7 +314,7 @@ def coletar_liquidity_diaria(tickers: dict | None = None, vxbr: float | None = N
             # Persiste mesmo com dados parciais (oi=None, bid=None, etc.)
             supabase.table("option_liquidity").upsert({
                 "ticker": ticker_base,
-                "data": hoje.isoformat(),
+                "data": data_pregao.isoformat(),
                 "oi": oi,
                 "bid": bid,
                 "ask": ask,
@@ -272,5 +326,5 @@ def coletar_liquidity_diaria(tickers: dict | None = None, vxbr: float | None = N
         except Exception as e:
             logger.warning(f"Erro ao persistir liquidez de {ticker_base}: {e}")
 
-    logger.info(f"Liquidez coletada — {persistidos}/{len(tickers_universo)} tickers (OI: {len(oi_por_ticker)}, bid/ask: {len(bid_ask_por_ticker)})")
+    logger.info(f"Liquidez coletada — {persistidos}/{len(tickers_universo)} tickers (OI: {len(oi_por_raiz)}, bid/ask: {len(bid_ask_por_raiz)} raízes)")
     return persistidos

@@ -3,21 +3,29 @@ from datetime import date
 from unittest.mock import MagicMock
 
 import backend.services.core_engine as ce
-from backend.services.core_engine import obter_option_liquidity
 from backend.domain.scoring import avaliar_filtro_liquidez_shadow
+from backend.services.core_engine import obter_option_liquidity
 
 
-def test_obter_option_liquidity_sucesso(monkeypatch):
-    """Consulta option_liquidity retorna dados."""
+def _mock_supabase_liquidity(rows):
+    """Mock da cadeia select/eq/lte/gte/order/limit/execute de option_liquidity."""
     mock_supabase = MagicMock()
     (mock_supabase.table.return_value
      .select.return_value
      .eq.return_value
-     .eq.return_value
-     .single.return_value
-     .execute.return_value) = MagicMock(
-        data={"oi": 5000, "bid": 1.43, "ask": 1.55, "spread_pct": 8.4,
-              "vxbr": 18.5, "evento_label": None}
+     .lte.return_value
+     .gte.return_value
+     .order.return_value
+     .limit.return_value
+     .execute.return_value) = MagicMock(data=rows)
+    return mock_supabase
+
+
+def test_obter_option_liquidity_sucesso(monkeypatch):
+    """Consulta retorna a linha mais recente <= data (dado do pregão anterior)."""
+    mock_supabase = _mock_supabase_liquidity(
+        [{"oi": 5000, "bid": 1.43, "ask": 1.55, "spread_pct": 8.4,
+          "vxbr": 18.5, "evento_label": None}]
     )
     monkeypatch.setattr(ce, "get_supabase", lambda: mock_supabase)
 
@@ -28,15 +36,18 @@ def test_obter_option_liquidity_sucesso(monkeypatch):
     assert resultado["vxbr"] == 18.5
 
 
+def test_obter_option_liquidity_sem_linhas_retorna_none(monkeypatch):
+    """Sem linha na janela de max_idade_dias retorna None (desconhecido)."""
+    mock_supabase = _mock_supabase_liquidity([])
+    monkeypatch.setattr(ce, "get_supabase", lambda: mock_supabase)
+
+    assert obter_option_liquidity("PETR", date(2026, 7, 2)) is None
+
+
 def test_obter_option_liquidity_indisponivel(monkeypatch):
-    """Consulta com erro (linha inexistente / Supabase fora) retorna None."""
+    """Consulta com erro (Supabase fora) retorna None."""
     mock_supabase = MagicMock()
-    (mock_supabase.table.return_value
-     .select.return_value
-     .eq.return_value
-     .eq.return_value
-     .single.return_value
-     .execute.side_effect) = Exception("Not found")
+    mock_supabase.table.side_effect = Exception("Not found")
     monkeypatch.setattr(ce, "get_supabase", lambda: mock_supabase)
 
     assert obter_option_liquidity("PETR", date(2026, 7, 2)) is None

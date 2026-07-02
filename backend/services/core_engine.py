@@ -54,8 +54,13 @@ from backend.services.supabase_client import get_supabase
 logger = logging.getLogger("b3_scanner")
 
 
-def obter_option_liquidity(ticker_base: str, data) -> dict | None:
-    """Consulta option_liquidity para um ticker em uma data específica (Fase 3).
+def obter_option_liquidity(ticker_base: str, data, max_idade_dias: int = 7) -> dict | None:
+    """Consulta a linha mais recente de option_liquidity com data <= `data` (Fase 3).
+
+    Os arquivos B3 (PR/COTAHIST) refletem o FECHAMENTO do pregão: o scan do dia D
+    usa o dado do pregão D-1 (ou o mais recente disponível). `max_idade_dias`
+    limita o quão velho o dado pode ser — além disso, é tratado como inexistente
+    (None = "desconhecido", não penaliza).
 
     Fail-safe: Supabase indisponível, linha inexistente ou qualquer exceção
     retornam None — a emissão de sinais nunca depende desses dados (shadow).
@@ -64,13 +69,16 @@ def obter_option_liquidity(ticker_base: str, data) -> dict | None:
         supabase = get_supabase()
         if not supabase:
             return None
+        limite = data - timedelta(days=max_idade_dias)
         res = (supabase.table("option_liquidity")
                .select("oi, bid, ask, spread_pct, vxbr, evento_label")
                .eq("ticker", ticker_base)
-               .eq("data", data.isoformat())
-               .single()
+               .lte("data", data.isoformat())
+               .gte("data", limite.isoformat())
+               .order("data", desc=True)
+               .limit(1)
                .execute())
-        return res.data
+        return res.data[0] if res.data else None
     except Exception:
         return None
 

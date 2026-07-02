@@ -1,8 +1,16 @@
-"""Testes de coleta de liquidez: OI (PR), bid/ask (COTAHIST)."""
+"""Testes de coleta de liquidez: OI (PR), bid/ask (COTAHIST) e tratamento diário."""
+from datetime import date, datetime, timezone
 from io import BytesIO
+from unittest.mock import MagicMock
 from zipfile import ZipFile
 
-from backend.services.liquidity_service import _parse_pr_zip, _parse_cotahist_zip
+import backend.services.liquidity_service as ls
+from backend.services.liquidity_service import (
+    _dia_util_anterior,
+    _parse_cotahist_zip,
+    _parse_pr_zip,
+    coletar_liquidity_diaria,
+)
 
 
 def _criar_pr_zip_mock(oi_dados: dict) -> bytes:
@@ -139,3 +147,77 @@ def test_parse_cotahist_zip_agregacao_melhor_bid_pior_ask():
     # spread recalculado sobre bid/ask agregados
     esperado = ((1.50 - 1.44) / ((1.50 + 1.44) / 2)) * 100
     assert abs(resultado["PETR"]["spread_pct"] - esperado) < 0.01
+
+
+# ── Tratamento diário: retrocesso de dias úteis, skip-if-exists ──────────────
+
+def test_dia_util_anterior_pula_fim_de_semana():
+    """De segunda-feira volta para sexta; de domingo volta para sexta."""
+    assert _dia_util_anterior(date(2026, 7, 6)) == date(2026, 7, 3)   # seg → sex
+    assert _dia_util_anterior(date(2026, 7, 5)) == date(2026, 7, 3)   # dom → sex
+    assert _dia_util_anterior(date(2026, 7, 2)) == date(2026, 7, 1)   # qui → qua
+
+
+def _mock_supabase_coleta(ja_coletado: bool):
+    """Mock do Supabase para coletar_liquidity_diaria (check + upsert)."""
+    mock = MagicMock()
+    (mock.table.return_value
+     .select.return_value
+     .eq.return_value
+     .limit.return_value
+     .execute.return_value) = MagicMock(data=[{"id": 1}] if ja_coletado else [])
+    return mock
+
+
+def test_coleta_skip_se_ja_coletado(monkeypatch):
+    """Se a data candidata já tem linhas, não baixa nada e retorna 0."""
+    mock_supabase = _mock_supabase_coleta(ja_coletado=True)
+    monkeypatch.setattr(ls, "get_supabase", lambda: mock_supabase)
+    downloads = []
+    monkeypatch.setattr(ls, "_baixar_arquivo_b3",
+                        lambda url, desc: downloads.append(url))
+
+    persistidos = coletar_liquidity_diaria(tickers={"PETR4.SA": "Petrobras"}, vxbr=20.0)
+
+    assert persistidos == 0
+    assert downloads == []  # nenhum download disparado
+
+
+def test_coleta_retrocede_ate_achar_arquivo(monkeypatch):
+    """Se o arquivo de hoje não existe (feriado/atraso), recua dias úteis e
+    persiste sob a data do pregão do arquivo encontrado."""
+    mock_supabase = _mock_supabase_coleta(ja_coletado=False)
+    monkeypatch.setattr(ls, "get_supabase", lambda: mock_supabase)
+
+    pr_ok = _criar_pr_zip_mock({"PETRG360": 1000})
+    chamadas = []
+
+    def fake_download(url, desc):
+        chamadas.append(url)
+        # falha nas 2 primeiras tentativas (hoje: PR e COTAHIST), acha na 3ª
+        return pr_ok if len(chamadas) >= 3 else None
+
+    monkeypatch.setattr(ls, "_baixar_arquivo_b3", fake_download)
+
+    persistidos = coletar_liquidity_diaria(tickers={"PETR4.SA": "Petrobras"}, vxbr=20.0)
+
+    assert persistidos == 1
+    upsert_payload = mock_supabase.table.return_value.upsert.call_args[0][0]
+    # persistido sob a data do pregão do arquivo (dia útil anterior), não hoje
+    hoje = datetime.now(timezone.utc).date()
+    data_esperada = _dia_util_anterior(hoje) if hoje.weekday() < 5 else _dia_util_anterior(_dia_util_anterior(hoje))
+    assert upsert_payload["data"] == data_esperada.isoformat()
+    assert upsert_payload["oi"] == 1000
+
+
+def test_coleta_sem_arquivo_em_nenhum_dia_retorna_zero(monkeypatch):
+    """Se nenhum candidato tem arquivo, retorna 0 sem persistir."""
+    mock_supabase = _mock_supabase_coleta(ja_coletado=False)
+    monkeypatch.setattr(ls, "get_supabase", lambda: mock_supabase)
+    monkeypatch.setattr(ls, "_baixar_arquivo_b3", lambda url, desc: None)
+
+    persistidos = coletar_liquidity_diaria(tickers={"PETR4.SA": "Petrobras"},
+                                           vxbr=20.0, max_retrocesso_dias=2)
+
+    assert persistidos == 0
+    mock_supabase.table.return_value.upsert.assert_not_called()

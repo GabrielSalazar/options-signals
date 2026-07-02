@@ -51,6 +51,17 @@ def start():
         replace_existing=True,
         max_instances=1,
     )
+    # Retry: o PR/BVBG do pregão pode ainda não estar publicado às 18h. Se a
+    # 1ª execução coletou o arquivo de D-1 (retrocesso) ou nada, esta pega o de
+    # hoje; se já coletou, o skip-if-exists torna a retry um no-op sem download.
+    scheduler.add_job(
+        coletar_liquidity_diaria,
+        trigger=CronTrigger(day_of_week="mon-fri", hour=21, minute=30, timezone="America/Sao_Paulo"),
+        id="liquidity_job_retry",
+        name="Retry da coleta de OI/bid-ask/VXBR (publicacao tardia do PR)",
+        replace_existing=True,
+        max_instances=1,
+    )
     scheduler.start()
     logger.info("Scheduler iniciado")
 

@@ -18,9 +18,23 @@ All notable changes to this project will be documented in this file.
 - **VXBR diário**: `obter_vxbr_diaria()` ([backend/domain/indicators.py](../backend/domain/indicators.py))
   consulta a API brapi; fail-safe (`None` se indisponível, não bloqueia a coleta de OI/bid-ask).
 - **Calendário de eventos (Copom 2026)**: tabela `calendar_events(data, label, descricao)`
-  (migração `014`) com as datas Copom hardcoded; boot registra via `registrar_copom_datas()`
-  (idempotente) e a emissão consulta `obter_evento_na_data()` como fallback
+  (migração `014`) com o calendário OFICIAL do BCB — 8 reuniões de 2 dias (27-28/jan,
+  17-18/mar, 28-29/abr, 16-17/jun, 4-5/ago, 15-16/set, 3-4/nov, 8-9/dez), ambos os dias
+  registrados; boot registra via `registrar_copom_datas()` (idempotente) e a emissão
+  consulta `obter_evento_na_data()` como fallback
   ([backend/services/event_service.py](../backend/services/event_service.py)).
+- **Tratamento diário dos arquivos B3 (PR/BVBG e COTAHIST)** em `coletar_liquidity_diaria()`:
+  (1) skip-if-exists — se a data candidata já tem linhas em `option_liquidity`, nada é
+  baixado (~11 MB poupados); (2) retrocesso por dias úteis (até 5) quando o arquivo do dia
+  não existe (feriado ou publicação atrasada), persistindo sob a **data do pregão do
+  arquivo**, não "hoje"; (3) job de retry às 21h30 BRT (`liquidity_job_retry`) para
+  capturar publicações tardias do PR — no-op se a coleta das 18h já pegou o dia;
+  (4) leitura tolerante em `obter_option_liquidity()`: linha mais recente `<= hoje`
+  (janela de 7 dias) — o scan do dia D usa o fechamento de D-1.
+- **Coleta por raiz de opção**: as séries usam a raiz de 4 letras do papel
+  (PETR4 → PETRG360), então os parsers casam por raiz e papéis da mesma raiz
+  (PETR3/PETR4) compartilham o dado da cadeia — antes o match era pelo ticker
+  completo e nunca casava (nenhum OI/bid-ask seria coletado).
 - **Veto shadow de executabilidade**: `avaliar_filtro_liquidez_shadow(oi, spread_pct, vxbr,
   evento_label, score)` ([backend/domain/scoring.py](../backend/domain/scoring.py)) —
   critérios: OI<500 (atenção), spread>10% (atenção), spread>15% (bloquear), VXBR>30

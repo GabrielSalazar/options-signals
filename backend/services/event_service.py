@@ -6,20 +6,18 @@ from backend.services.supabase_client import get_supabase
 
 logger = logging.getLogger("b3_api")
 
-# Datas COPOM conhecidas (2026) — hardcoded, sem fonte dinâmica ainda
+# Calendário oficial do Copom 2026 (BCB): 8 reuniões de 2 dias (ter+qua);
+# a decisão sai no 2º dia. Registramos AMBOS os dias — a IV fica elevada
+# durante toda a reunião, não só no anúncio.
 COPOM_DATAS_2026 = [
-    date(2026, 1, 14),
-    date(2026, 2, 25),
-    date(2026, 3, 25),
-    date(2026, 4, 22),
-    date(2026, 5, 13),
-    date(2026, 6, 17),
-    date(2026, 7, 15),
-    date(2026, 8, 19),
-    date(2026, 9, 16),
-    date(2026, 10, 14),
-    date(2026, 11, 18),
-    date(2026, 12, 16),
+    date(2026, 1, 27), date(2026, 1, 28),
+    date(2026, 3, 17), date(2026, 3, 18),
+    date(2026, 4, 28), date(2026, 4, 29),
+    date(2026, 6, 16), date(2026, 6, 17),
+    date(2026, 8, 4), date(2026, 8, 5),
+    date(2026, 9, 15), date(2026, 9, 16),
+    date(2026, 11, 3), date(2026, 11, 4),
+    date(2026, 12, 8), date(2026, 12, 9),
 ]
 
 
