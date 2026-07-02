@@ -87,14 +87,21 @@ def _parse_pr_zip(content: bytes, tickers_universo: set) -> dict:
                         if tckr_elem is not None and oi_elem is not None:
                             tckr = tckr_elem.text.strip() if tckr_elem.text else None
                             oi_str = oi_elem.text.strip() if oi_elem.text else "0"
-                            if tckr and tckr in tickers_universo:
-                                # tckr pode ser "PETRG360" (tipo+vencimento), extrair base
-                                base = tckr[:-3] if len(tckr) > 3 else tckr
-                                try:
-                                    oi = int(oi_str)
-                                    oi_por_ticker[base] = oi_por_ticker.get(base, 0) + oi
-                                except ValueError:
-                                    pass
+                            if tckr:
+                                # tckr é o código da série (ex: "PETRG360"); a base é o
+                                # ticker do universo que prefixa o código (match mais longo
+                                # primeiro, para não confundir p.ex. "PBR" com "PBRX")
+                                base = next(
+                                    (t for t in sorted(tickers_universo, key=len, reverse=True)
+                                     if tckr.startswith(t)),
+                                    None,
+                                )
+                                if base:
+                                    try:
+                                        oi = int(oi_str)
+                                        oi_por_ticker[base] = oi_por_ticker.get(base, 0) + oi
+                                    except ValueError:
+                                        pass
                 except Exception as e:
                     logger.warning(f"Erro ao parsear XML {file_info.filename}: {e}")
         logger.info(f"PR parseado: {len(oi_por_ticker)} tickers com OI")
