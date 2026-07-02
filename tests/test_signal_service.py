@@ -74,6 +74,11 @@ def test_persist_signals_propaga_campos_da_camada_2(monkeypatch):
         "gatilhos_ids": ["G2", "G3"], "familias_ativas": 2,
         "score_familias_capped": 4, "consenso_decisao": "passaria",
         "setup": "REVERSAO", "setup_params_shadow": {"otm_mult": 0.7},
+        # Fase 3: telemetria de liquidez/VXBR/evento (shadow)
+        "oi": 5000, "bid": 1.43, "ask": 1.55, "spread_pct": 8.4,
+        "vxbr": 18.5, "evento_label": "COPOM",
+        "filtro_liquidez_decisao": "atencao",
+        "filtro_liquidez_motivo": "evento COPOM no DTE",
     }
     ss.persist_signals([sinal])
 
@@ -84,6 +89,14 @@ def test_persist_signals_propaga_campos_da_camada_2(monkeypatch):
     assert row["consenso_decisao"] == "passaria"
     assert row["setup"] == "REVERSAO"
     assert row["setup_params_shadow"] == {"otm_mult": 0.7}
+    assert row["oi"] == 5000
+    assert row["bid"] == 1.43
+    assert row["ask"] == 1.55
+    assert row["spread_pct"] == 8.4
+    assert row["vxbr"] == 18.5
+    assert row["evento_label"] == "COPOM"
+    assert row["filtro_liquidez_decisao"] == "atencao"
+    assert row["filtro_liquidez_motivo"] == "evento COPOM no DTE"
 
 
 # ── Estado em memória ───────────────────────────────────────────────────────────

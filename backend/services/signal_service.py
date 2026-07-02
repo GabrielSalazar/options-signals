@@ -158,6 +158,14 @@ def persist_signals(sinais: list[dict]):
             "score_ponderado": s.get("score_ponderado"),
             "ponderado_passou": s.get("ponderado_passou"),
             "iv_mercado":    s.get("iv_mercado"),
+            "oi":            s.get("oi"),
+            "bid":           s.get("bid"),
+            "ask":           s.get("ask"),
+            "spread_pct":    s.get("spread_pct"),
+            "vxbr":          s.get("vxbr"),
+            "evento_label":  s.get("evento_label"),
+            "filtro_liquidez_decisao": s.get("filtro_liquidez_decisao"),
+            "filtro_liquidez_motivo":  s.get("filtro_liquidez_motivo"),
             "timestamp":     datetime.now(timezone.utc).isoformat(),
         })
 
