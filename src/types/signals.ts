@@ -42,6 +42,20 @@ export interface Signal {
   score_ponderado?: number | null
   ponderado_passou?: boolean | null
   ponderado_reasons?: string[]
+  // Matriz v2 — Fase 2 (classe shadow / sizing)
+  classe_v2?: 'A' | 'B' | 'C' | null
+  razoes_downgrade_classe?: string[] | null
+  divergencia_premio_pct?: number | null
+  sizing_sugerido_pct?: number | null
+  // Matriz v2 — Fase 3 (executabilidade, dados D-1 da B3)
+  oi?: number | null
+  bid?: number | null
+  ask?: number | null
+  spread_pct?: number | null
+  vxbr?: number | null
+  evento_label?: string | null
+  filtro_liquidez_decisao?: 'normal' | 'atencao' | 'bloquear' | null
+  filtro_liquidez_motivo?: string | null
   // From Supabase rows
   id?: string
   timestamp?: string

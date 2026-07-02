@@ -3,9 +3,30 @@
 import { useState } from 'react'
 import { Signal } from '@/types/signals'
 
+const fmtNum = (v: number | null | undefined, digits = 2): string =>
+    v != null && Number.isFinite(v) ? v.toFixed(digits) : '—'
+
+const LIQUIDEZ_BADGE: Record<'normal' | 'atencao' | 'bloquear', { label: string; bg: string; color: string }> = {
+    normal: { label: 'Liquidez normal', bg: 'var(--dw-green-soft)', color: 'var(--dw-green)' },
+    atencao: { label: 'Liquidez: atenção', bg: '#FFFBEB', color: 'var(--dw-yellow)' },
+    bloquear: { label: 'Liquidez: bloqueado (shadow)', bg: 'var(--dw-red-soft)', color: 'var(--dw-red)' },
+}
+
+const CLASSE_BADGE: Record<'A' | 'B' | 'C', { bg: string; color: string }> = {
+    A: { bg: 'var(--dw-green-soft)', color: 'var(--dw-green)' },
+    B: { bg: 'var(--dw-blue-soft)', color: 'var(--dw-blue)' },
+    C: { bg: 'var(--dw-bg-soft)', color: 'var(--dw-ink-muted)' },
+}
+
 export default function SignalCard({ signal }: { signal: Signal }) {
     const [expanded, setExpanded] = useState(false)
     const isCall = signal.tipo_sinal === 'CALL'
+    const liquidez = signal.filtro_liquidez_decisao ? LIQUIDEZ_BADGE[signal.filtro_liquidez_decisao] : null
+    const classe = signal.classe_v2 ? CLASSE_BADGE[signal.classe_v2] : null
+    const vxbrColor = signal.vxbr == null
+        ? 'var(--dw-ink-mid)'
+        : signal.vxbr > 30 ? 'var(--dw-red)' : signal.vxbr > 25 ? 'var(--dw-yellow)' : 'var(--dw-ink-mid)'
+    const divergAlta = signal.divergencia_premio_pct != null && signal.divergencia_premio_pct > 15
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
     
     // Fallback: se score_ponderado não existir, escala o score técnico antigo (que era de ~0 a 10)
@@ -42,6 +63,41 @@ export default function SignalCard({ signal }: { signal: Signal }) {
                     <div className="font-mono font-bold text-dw-ink text-lg">{confidenceScore}<span className="text-dw-ink-muted text-sm">/100</span></div>
                 </div>
             </div>
+
+            {/* Badges: evento, classe v2, filtro de liquidez (informativos) */}
+            {(signal.evento_label || classe || liquidez) && (
+                <div className="flex flex-wrap items-center gap-2">
+                    {signal.evento_label && (
+                        <span
+                            className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider"
+                            style={{ background: '#FFFBEB', color: '#92400E', border: '1px solid var(--dw-yellow)' }}
+                            title={`Evento no dia: ${signal.evento_label}`}
+                        >
+                            ⚠ {signal.evento_label}
+                        </span>
+                    )}
+                    {classe && signal.classe_v2 && (
+                        <span
+                            className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider"
+                            style={{ background: classe.bg, color: classe.color }}
+                            title={signal.razoes_downgrade_classe?.length
+                                ? `Downgrade: ${signal.razoes_downgrade_classe.join('; ')}`
+                                : 'Classe de emissão v2 (shadow)'}
+                        >
+                            Classe {signal.classe_v2}
+                        </span>
+                    )}
+                    {liquidez && (
+                        <span
+                            className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider"
+                            style={{ background: liquidez.bg, color: liquidez.color }}
+                            title={signal.filtro_liquidez_motivo ?? 'Filtro informativo (shadow) — não bloqueia o sinal'}
+                        >
+                            {liquidez.label}
+                        </span>
+                    )}
+                </div>
+            )}
 
             {/* Preços */}
             <div className="grid grid-cols-2 gap-3 pt-2 border-t border-dw-rule-soft">
@@ -95,6 +151,66 @@ export default function SignalCard({ signal }: { signal: Signal }) {
                     </div>
                 ))}
             </div>
+
+            {/* Executabilidade (dados D-1 da B3) */}
+            {(signal.oi != null || signal.bid != null || signal.ask != null || signal.spread_pct != null || signal.vxbr != null) && (
+                <div className="bg-dw-bg-soft rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                        <p className="label">Executabilidade</p>
+                        <span className="text-[10px] text-dw-ink-muted" title="Dados do fechamento do pregão anterior (D-1)">fech. anterior</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 text-xs">
+                        <div>
+                            <p className="label">OI</p>
+                            <p className="font-mono font-bold text-dw-ink-mid">
+                                {signal.oi != null ? signal.oi.toLocaleString('pt-BR') : '—'}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="label">Bid/Ask</p>
+                            <p className="font-mono font-bold text-dw-ink-mid">
+                                {signal.bid != null || signal.ask != null
+                                    ? `${fmtNum(signal.bid)} / ${fmtNum(signal.ask)}`
+                                    : '—'}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="label">Spread</p>
+                            <p className="font-mono font-bold text-dw-ink-mid">
+                                {signal.spread_pct != null ? `${fmtNum(signal.spread_pct, 1)}%` : '—'}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="label">VXBR</p>
+                            <p className="font-mono font-bold" style={{ color: vxbrColor }}>
+                                {fmtNum(signal.vxbr, 1)}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Sizing sugerido & divergência de prêmio (informativos) */}
+            {(signal.sizing_sugerido_pct != null || signal.divergencia_premio_pct != null) && (
+                <div className="text-xs space-y-1">
+                    {signal.sizing_sugerido_pct != null && (
+                        <p className="text-dw-ink-mid">
+                            Sizing sugerido: <span className="font-mono font-bold">{signal.sizing_sugerido_pct.toFixed(1)}% do capital</span>
+                            <span className="text-dw-ink-muted"> (informativo)</span>
+                        </p>
+                    )}
+                    {signal.divergencia_premio_pct != null && (
+                        <p
+                            className={divergAlta ? 'font-semibold' : 'text-dw-ink-mid'}
+                            style={divergAlta ? { color: 'var(--dw-yellow)' } : undefined}
+                            title="Divergência entre prêmio real (D-1) e prêmio modelado (Black-Scholes)"
+                        >
+                            Divergência de prêmio: <span className="font-mono font-bold">{signal.divergencia_premio_pct.toFixed(1)}%</span>
+                            {divergAlta && ' ⚠'}
+                        </p>
+                    )}
+                </div>
+            )}
 
             {/* DTE & Vencimento */}
             <div className="grid grid-cols-2 gap-2 text-xs">
