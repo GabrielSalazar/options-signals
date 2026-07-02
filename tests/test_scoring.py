@@ -297,9 +297,11 @@ def test_gatilhos_alta_somam_23_pontos():
     assert soma == 23
 
 
-def test_gatilhos_baixa_somam_21_pontos():
+def test_gatilhos_baixa_somam_23_pontos():
+    """B10 (volume) e B11 (Bollinger superior) foram adicionados para
+    espelhar G5/G8, que só existiam do lado de alta (assimetria CALL×PUT)."""
     soma = sum(v["pontos"] for k, v in GATILHOS.items() if k.startswith("B"))
-    assert soma == 21
+    assert soma == 23
 
 
 def test_calcular_familias_sem_teto_quando_dentro_do_cap():

@@ -225,6 +225,8 @@ GATILHOS: dict[str, dict] = {
     "B7": {"familia": "DIVERGENCIA", "pontos": 3},
     "B8": {"familia": "LIQUIDEZ",    "pontos": 3},
     "B9": {"familia": "TENDENCIA",   "pontos": 2},
+    "B10": {"familia": "LIQUIDEZ",   "pontos": 1},
+    "B11": {"familia": "ESTRUTURA",  "pontos": 1},
 }
 
 

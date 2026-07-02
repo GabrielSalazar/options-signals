@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from backend.domain.greeks import bs_call_price
+from backend.domain.greeks import bs_call_price, bs_put_price
 from backend.domain.options_math import (
     decodificar_opcao_b3,
     estimar_iv_historica,
@@ -228,4 +228,23 @@ def test_estimar_premio_otm_call_normal():
 def test_estimar_premio_otm_excecao_cai_para_fator_otm(monkeypatch):
     """Força exceção no bloco try (math.log com preco<=0) para exercitar o except (linha 130-132)."""
     premio = estimar_premio_otm(preco=-10.0, strike=95.0, dte_du=20, iv=0.3, tipo="PUT")
-    assert premio >= 0.10
+    assert premio >= 0.01
+
+
+# ---------------------------------------------------------------------------
+# estimar_premio_otm deve usar a mesma precificação BS (com taxa livre de
+# risco/desconto) usada pelos greeks — não uma fórmula sem juros à parte.
+# ---------------------------------------------------------------------------
+
+def test_estimar_premio_otm_call_bate_com_bs_call_price_com_selic():
+    preco, strike, dte_du, iv = 100.0, 105.0, 20, 0.30
+    premio = estimar_premio_otm(preco, strike, dte_du, iv, tipo="CALL")
+    esperado = bs_call_price(preco, strike, dte_du / 252, r=0.135, sigma=iv)
+    assert premio == pytest.approx(round(esperado, 2), abs=0.01)
+
+
+def test_estimar_premio_otm_put_bate_com_bs_put_price_com_selic():
+    preco, strike, dte_du, iv = 100.0, 95.0, 20, 0.30
+    premio = estimar_premio_otm(preco, strike, dte_du, iv, tipo="PUT")
+    esperado = bs_put_price(preco, strike, dte_du / 252, r=0.135, sigma=iv)
+    assert premio == pytest.approx(round(esperado, 2), abs=0.01)

@@ -138,8 +138,11 @@ def _avaliar_gatilhos(df: pd.DataFrame, ultimo, penult, preco: float,
     macd_d       = float(ultimo.get("macd_diff",    0))
     macd_d_prev  = float(penult.get("macd_diff",    0))
     atr          = float(ultimo.get("atr",  preco*0.02))
-    sup20        = float(ultimo.get("suporte_20",   preco))
-    res20        = float(ultimo.get("resistencia_20",preco))
+    # suporte_20/resistencia_20 são rolling(20).min/max() incluindo o candle
+    # ATUAL — usar `penult` evita que o próprio candle de hoje "grude" no
+    # nível e dispare G3/B3 quase sempre em movimentos rápidos.
+    sup20        = float(penult.get("suporte_20",   preco))
+    res20        = float(penult.get("resistencia_20",preco))
     vol_ratio    = volume / vol_med if vol_med > 0 else 1.0
     bb_lo        = float(ultimo.get("bb_lower",     0))
 
@@ -253,6 +256,17 @@ def _avaliar_gatilhos(df: pd.DataFrame, ultimo, penult, preco: float,
         sinais_baixa.append(f"📉 Canal baixista (slope={slope_bx:.3f})")
         ids_baixa.append("B9")
         score_baixa += 2
+
+    if vol_ratio >= CONFIG["volume_mult"]:
+        sinais_baixa.append(f"📉 Volume {vol_ratio:.1f}x acima da média")
+        ids_baixa.append("B10")
+        score_baixa += 1
+
+    bb_hi = float(ultimo.get("bb_upper", 0))
+    if bb_hi > 0 and preco >= bb_hi * 0.99:
+        sinais_baixa.append(f"📉 Preço na Bollinger superior: R${bb_hi:.2f}")
+        ids_baixa.append("B11")
+        score_baixa += 1
 
     return {
         "score_alta": score_alta, "score_baixa": score_baixa,
@@ -485,7 +499,14 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
         if score_alta < MIN_SCORE and score_baixa < MIN_SCORE:
             return None
 
-        if score_alta >= score_baixa:
+        # Empate exato = evidências de alta e baixa igualmente fortes — sinal
+        # ambíguo, não um viés a favor de CALL. Não emite.
+        if score_alta == score_baixa:
+            if verbose:
+                logger.info(f"⚖ {ticker_base}: empate alta×baixa (score={score_alta}) — sinal ambíguo, não emitido")
+            return None
+
+        if score_alta > score_baixa:
             tipo_sinal    = "CALL"
             score         = score_alta
             gatilhos      = sinais_alta

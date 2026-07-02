@@ -4,10 +4,9 @@ from datetime import date, datetime, timezone
 
 import numpy as np
 import pandas as pd
-from scipy.stats import norm
 
 from backend.core.config import CONFIG
-from backend.domain.greeks import implied_volatility
+from backend.domain.greeks import RISK_FREE_RATE_DEFAULT, bs_call_price, bs_put_price, implied_volatility
 from backend.domain.volatility import compute_log_returns
 
 MESES_CALL = {"A":1,"B":2,"C":3,"D":4,"E":5,"F":6,"G":7,"H":8,"I":9,"J":10,"K":11,"L":12}
@@ -118,17 +117,15 @@ def estimar_iv_historica(df: pd.DataFrame, janela: int = 20, interval: str = "1d
 
 def estimar_premio_otm(preco: float, strike: float, dte_du: int,
                        iv: float, tipo: str = "PUT") -> float:
+    """Precifica via Black-Scholes com taxa livre de risco (Selic), delegando
+    para os mesmos precificadores usados por `calculate_greeks` — antes desta
+    correção a fórmula local ignorava `r`/desconto e divergia dos greeks."""
     if dte_du <= 0 or iv <= 0:
         return max(0.01, round(preco * 0.015, 2))
     t = dte_du / 252
     try:
-        d1 = (math.log(preco / strike) + 0.5 * iv**2 * t) / (iv * math.sqrt(t))
-        d2 = d1 - iv * math.sqrt(t)
-
-        if tipo == "PUT":
-            premio = strike * norm.cdf(-d2) - preco * norm.cdf(-d1)
-        else:
-            premio = preco * norm.cdf(d1) - strike * norm.cdf(d2)
+        pricer = bs_put_price if tipo == "PUT" else bs_call_price
+        premio = pricer(preco, strike, t, r=RISK_FREE_RATE_DEFAULT, sigma=iv)
         return max(0.01, round(float(premio), 2))
     except Exception:
         fator_otm = abs(preco - strike) / preco

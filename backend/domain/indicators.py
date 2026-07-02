@@ -167,20 +167,48 @@ def _adx_manual(high, low, close, period=14):
     dx = (abs(plus_di - minus_di) / (plus_di + minus_di + 1e-9)) * 100
     return dx.rolling(period).mean()
 
-def detectar_divergencia(df: pd.DataFrame, janela: int = 5) -> tuple:
-    if len(df) < janela + 2:
+def detectar_divergencia(df: pd.DataFrame, janela: int = 5, ordem: int | None = None) -> tuple:
+    """Divergência entre PIVÔS CONFIRMADOS (não ponta-a-ponta da janela).
+
+    Divergência altista: o fundo confirmado mais recente tem preço MENOR e
+    RSI MAIOR que o fundo confirmado anterior (preço faz mínima mais baixa,
+    momentum não acompanha). Divergência baixista é o espelho com topos.
+    Requer ao menos 2 pivôs de cada tipo dentro de `janela` candles; sem
+    pivôs suficientes ou com `is_fundo_local`/`is_topo_local` ausentes,
+    retorna (False, False) — não há como avaliar ponta-a-ponta como fallback,
+    pois isso reintroduziria o falso-positivo que esta função corrige.
+    """
+    if "is_fundo_local" not in df.columns or "is_topo_local" not in df.columns:
         return False, False
-    precos = df["Close"].tail(janela).values
-    rsi    = df["rsi"].tail(janela).values
-    if np.any(np.isnan(rsi)):
-        return False, False
-    div_alta  = (precos[-1] < precos[0]) and (rsi[-1] > rsi[0])
-    div_baixa = (precos[-1] > precos[0]) and (rsi[-1] < rsi[0])
+    if ordem is None:
+        ordem = CONFIG["pivot_ordem"]
+
+    base = df.tail(janela)
+    fundos = base[base["is_fundo_local"]].dropna(subset=["rsi"])
+    topos  = base[base["is_topo_local"]].dropna(subset=["rsi"])
+
+    div_alta = False
+    if len(fundos) >= 2:
+        prev, last = fundos.iloc[-2], fundos.iloc[-1]
+        div_alta = bool(last["Low"] < prev["Low"] and last["rsi"] > prev["rsi"])
+
+    div_baixa = False
+    if len(topos) >= 2:
+        prev, last = topos.iloc[-2], topos.iloc[-1]
+        div_baixa = bool(last["High"] > prev["High"] and last["rsi"] < prev["rsi"])
+
     return div_alta, div_baixa
 
 def encontrar_zonas_demanda_oferta(df: pd.DataFrame, lookback: int = 60,
                                    tolerancia_atr: float = 1.0,
-                                   ordem: int | None = None) -> tuple:
+                                   ordem: int | None = None,
+                                   min_toques: int = 2) -> tuple:
+    """Zona de demanda/oferta: nível historicamente respeitado por ≥`min_toques`
+    pivôs confirmados dentro de `atr * tolerancia_atr` um do outro, olhando os
+    últimos `lookback` DIAS (não os últimos `lookback` pivôs — com poucos
+    pivôs no período, uma janela maior é buscada implicitamente, o que antes
+    inflava o lookback real muito além do documentado). Um único toque não
+    caracteriza zona — é ruído."""
     if len(df) < 10:
         return False, False
 
@@ -189,18 +217,41 @@ def encontrar_zonas_demanda_oferta(df: pd.DataFrame, lookback: int = 60,
 
     preco  = float(df["Close"].iloc[-1])
     atr    = float(df["atr"].iloc[-1]) if "atr" in df.columns else preco * 0.02
+    tol    = atr * tolerancia_atr
 
-    # Só pivots confirmados (exclui as últimas `ordem` linhas — sem look-ahead).
+    # Só pivots confirmados (exclui as últimas `ordem` linhas — sem look-ahead),
+    # e só dentro da janela de `lookback` dias corridos no df (não de pivôs).
     base = df.iloc[:len(df) - ordem] if len(df) > ordem else df.iloc[0:0]
-    fundos = base[base["is_fundo_local"]]["Low"].tail(lookback).values
-    topos  = base[base["is_topo_local"]]["High"].tail(lookback).values
+    base = base.tail(lookback)
+    fundos = base[base["is_fundo_local"]]["Low"].values
+    topos  = base[base["is_topo_local"]]["High"].values
 
-    zona_demanda = any(abs(preco - f) <= atr * tolerancia_atr for f in fundos)
-    zona_oferta  = any(abs(preco - t) <= atr * tolerancia_atr for t in topos)
+    def _tem_zona_com_toques_minimos(preco: float, niveis, tol: float, min_toques: int) -> bool:
+        for nivel in niveis:
+            toques = sum(1 for outro in niveis if abs(nivel - outro) <= tol)
+            if toques >= min_toques and abs(preco - nivel) <= tol:
+                return True
+        return False
+
+    zona_demanda = _tem_zona_com_toques_minimos(preco, fundos, tol, min_toques)
+    zona_oferta  = _tem_zona_com_toques_minimos(preco, topos, tol, min_toques)
 
     return zona_demanda, zona_oferta
 
-def detectar_canal_linear(df: pd.DataFrame, janela: int = 20) -> tuple:
+def _r_squared(idx: np.ndarray, y: np.ndarray, coef: np.ndarray) -> float:
+    pred = coef[0] * idx + coef[1]
+    ss_res = float(np.sum((y - pred) ** 2))
+    ss_tot = float(np.sum((y - y.mean()) ** 2))
+    if ss_tot <= 0:
+        return 1.0 if ss_res == 0 else 0.0
+    return 1.0 - ss_res / ss_tot
+
+
+def detectar_canal_linear(df: pd.DataFrame, janela: int = 20, r2_minimo: float = 0.6) -> tuple:
+    """Canal linear por regressão de topos/fundos, com exigência de qualidade
+    de ajuste (R² >= r2_minimo em AMBAS as retas). Sem esse filtro, qualquer
+    drift ruidoso com slope no sinal certo (mas ajuste ruim) era classificado
+    como canal — ver `_r_squared`."""
     if len(df) < janela:
         return False, False, 0.0
 
@@ -209,12 +260,17 @@ def detectar_canal_linear(df: pd.DataFrame, janela: int = 20) -> tuple:
     l   = df["Low"].tail(janela).values
 
     try:
-        slope_topos  = np.polyfit(idx, h, 1)[0]
-        slope_fundos = np.polyfit(idx, l, 1)[0]
+        coef_topos  = np.polyfit(idx, h, 1)
+        coef_fundos = np.polyfit(idx, l, 1)
+        slope_topos, slope_fundos = coef_topos[0], coef_fundos[0]
         slope_medio  = (slope_topos + slope_fundos) / 2
 
-        canal_altista  = (slope_topos > 0) and (slope_fundos > 0)
-        canal_baixista = (slope_topos < 0) and (slope_fundos < 0)
+        r2_topos  = _r_squared(idx, h, coef_topos)
+        r2_fundos = _r_squared(idx, l, coef_fundos)
+        ajuste_ok = (r2_topos >= r2_minimo) and (r2_fundos >= r2_minimo)
+
+        canal_altista  = ajuste_ok and (slope_topos > 0) and (slope_fundos > 0)
+        canal_baixista = ajuste_ok and (slope_topos < 0) and (slope_fundos < 0)
         return canal_altista, canal_baixista, slope_medio
     except Exception:
         return False, False, 0.0

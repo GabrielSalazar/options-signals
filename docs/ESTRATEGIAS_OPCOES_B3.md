@@ -104,11 +104,13 @@ O sistema procura cenários de **exaustão compradora**, **falha de rompimento**
 
 | ID | Critério | Score | Interpretação |
 |---|---|---|---|
-| **B8** | Preço em zona de oferta histórica (±1 ATR de swing high nos últimos 60D) | +3 | **Mapa institucional inverso.** Realização de lucros / short.  |
-| **B12** | **NOVO:** Institucional VWAP | +5 | Preço e tendência trabalhando abaixo da VWAP. |
-| **B13** | **NOVO:** Compressão TTM Squeeze | +8 | Bandas de Bollinger penetram no Canal de Keltner. Queda explosiva iminente. |
+| **B8** | Preço em zona de oferta histórica (±1 ATR, ≥2 toques confirmados, últimos 60D) | +3 | **Mapa institucional inverso.** Realização de lucros / short. |
+| **B10** | Volume ≥ 1,5× volume_média_20D | +1 | **Espelho de baixa do G5** (Camada 2, jul/2026 — antes só CALL tinha volume). |
+| **B11** | Preço ≥ Bollinger Superior × 0,99 | +1 | **Espelho de baixa do G8** (Camada 2, jul/2026 — antes só CALL tinha Bollinger). |
 
-**Interpretação:** Similar a G10 mas para vendedores. Zona de oferta = teto psicológico / técnico. O TTM Squeeze para o lado da baixa acelera a queda.
+**Interpretação:** Zona de oferta = teto psicológico/técnico, agora exigindo múltiplos toques (não 1 único pivô). B10/B11 corrigem a assimetria que antes dava 4 pontos a mais de teto para CALL do que para PUT.
+
+> **Nota (jul/2026):** G12/G13/B12/B13 (VWAP institucional, TTM Squeeze) descritos anteriormente neste documento não existem em `core_engine.py` — a tabela estava desatualizada antes desta revisão. `vwap`/`kc_upper`/`kc_lower` já são calculados em `indicators.py` e usados no score ponderado shadow (`scoring.py`), mas não no score clássico que decide a emissão. Reconciliação completa do documento é trabalho separado.
 
 ---
 
@@ -181,15 +183,15 @@ Resultado real: +26% Alvo 1 ✅
 
 ## Famílias de gatilhos e a assimetria CALL × PUT (Camada 2)
 
-Os 20 gatilhos são agrupados em 5 famílias (Camada 2.1 — `backend/domain/scoring.py::GATILHOS`):
+Os 22 gatilhos (11 de alta + 11 de baixa, simétricos desde jul/2026) são agrupados em 5 famílias (Camada 2.1 — `backend/domain/scoring.py::GATILHOS`):
 
 | Família | Gatilhos de alta | Gatilhos de baixa |
 |---|---|---|
 | OSCILADOR | G1, G2, G6 | B1, B2, B6 |
 | TENDENCIA | G4, G7, G11 | B4, B5, B9 |
-| ESTRUTURA | G3, G8 | B3 |
+| ESTRUTURA | G3, G8 | B3, B11 |
 | DIVERGENCIA | G9 | B7 |
-| LIQUIDEZ | G5, G10 | B8 |
+| LIQUIDEZ | G5, G10 | B8, B10 |
 
 O lado de alta tem 11 gatilhos (máx. 23 pts); o de baixa tem 9 (máx. 21 pts). Isso é uma
 **decisão atual, não uma lacuna não examinada**: faltam dois gatilhos espelho do lado

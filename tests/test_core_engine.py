@@ -118,6 +118,24 @@ def test_analisar_ativo_modo_ativo_bloqueia_no_ramo_exige_score_7_quando_score_b
     assert s is None
 
 
+def test_analisar_ativo_empate_alta_baixa_nao_emite(monkeypatch):
+    """Empate exato score_alta == score_baixa é ambíguo — não deve favorecer
+    CALL arbitrariamente; não emite sinal."""
+    _relax_and_mock(monkeypatch)
+    monkeypatch.setitem(core_engine.CONFIG, "min_score", 5)
+    monkeypatch.setattr(core_engine, "_avaliar_gatilhos", lambda *a, **k: {
+        "sinais_alta": ["alta1"], "sinais_baixa": ["baixa1"],
+        "ids_alta": ["G2"], "ids_baixa": ["B2"],
+        "score_alta": 7, "score_baixa": 7,
+        "stoch_k": 50.0, "rsi": 50.0, "vol_ratio": 1.0,
+    })
+    df = _make_df(0)
+
+    s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=df, indicators_calculated=True)
+
+    assert s is None
+
+
 def test_analisar_ativo_volume_baixo_retorna_none():
     df = _make_df(0)
     df["vol_media_20"] = 100  # abaixo de min_volume_acoes (1M) → rejeita no gate de volume
@@ -567,11 +585,15 @@ def test_gatilho_g8_preco_na_bollinger_inferior():
 
 
 def test_gatilho_g9_divergencia_altista_rsi():
+    """G9 exige dois FUNDOS confirmados (não ponta-a-ponta): o mais recente
+    com preço mais baixo e RSI mais alto que o fundo confirmado anterior."""
     close = list(np.linspace(99.5, 100.5, 30))
-    close[-5:] = [102, 101, 100.5, 100, 99.5]  # preço cai nos últimos 5
     rsi = [50.0] * 30
-    rsi[-5:] = [30, 35, 40, 45, 50]  # rsi sobe
-    df = _df_neutro(close, rsi=rsi)
+    rsi[25] = 25.0
+    rsi[28] = 40.0
+    df = _df_neutro(close, rsi=rsi, fundo_idx=[25, 28])
+    df.loc[df.index[25], "Low"] = 95.0
+    df.loc[df.index[28], "Low"] = 90.0  # mínima mais baixa, RSI mais alto
     g = _run_gatilhos(df)
     assert "G9" in g["ids_alta"]
 
@@ -633,19 +655,26 @@ def test_gatilho_b6_macd_cruza_zero_negativo():
 
 
 def test_gatilho_b7_divergencia_baixista_rsi():
+    """B7 exige dois TOPOS confirmados (não ponta-a-ponta): o mais recente
+    com preço mais alto e RSI mais baixo que o topo confirmado anterior."""
     close = list(np.linspace(100.5, 99.5, 30))
-    close[-5:] = [98, 98.5, 99, 99.5, 100]  # preço sobe nos últimos 5
     rsi = [50.0] * 30
-    rsi[-5:] = [70, 65, 60, 55, 50]  # rsi cai
-    df = _df_neutro(close, rsi=rsi)
+    rsi[25] = 75.0
+    rsi[28] = 60.0
+    df = _df_neutro(close, rsi=rsi, topo_idx=[25, 28])
+    df.loc[df.index[25], "High"] = 105.0
+    df.loc[df.index[28], "High"] = 110.0  # máxima mais alta, RSI mais baixo
     g = _run_gatilhos(df)
     assert "B7" in g["ids_baixa"]
 
 
 def test_gatilho_b8_zona_de_oferta_historica():
+    """B8 exige ≥2 toques confirmados na mesma região de preço — um único
+    topo não caracteriza zona (regressão do falso-positivo de 1 toque)."""
     close = list(np.linspace(100.5, 99.5, 30))
-    df = _df_neutro(close, topo_idx=[10])
+    df = _df_neutro(close, topo_idx=[10, 15])
     df.loc[df.index[10], "High"] = 100.0
+    df.loc[df.index[15], "High"] = 100.3
     g = _run_gatilhos(df, preco=99.5)
     assert "B8" in g["ids_baixa"]
 
@@ -654,6 +683,20 @@ def test_gatilho_b9_canal_baixista():
     df = _df_neutro(list(np.linspace(100.5, 99.5, 30)))
     g = _run_gatilhos(df)
     assert "B9" in g["ids_baixa"]
+
+
+def test_gatilho_b10_volume_acima_da_media():
+    """B10 é o espelho de baixa do G5 (volume) — antes só CALL tinha esse gatilho."""
+    df = _df_neutro(list(np.linspace(100.5, 99.5, 30)))
+    g = _run_gatilhos(df, vol=5_000_000, vol_med=3_000_000)
+    assert "B10" in g["ids_baixa"]
+
+
+def test_gatilho_b11_preco_na_bollinger_superior():
+    """B11 é o espelho de baixa do G8 (Bollinger) — antes só CALL tinha esse gatilho."""
+    df = _df_neutro(list(np.linspace(100.5, 99.5, 30)))
+    g = _run_gatilhos(df, ultimo_over={"bb_upper": 100.4}, preco=100.4)
+    assert "B11" in g["ids_baixa"]
 
 
 # ── _montar_estrutura_opcao: fallback de IV via strikes vizinhos ───────────

@@ -112,22 +112,33 @@ class TestDetectarDivergencia:
     """Testes para detectar_divergencia."""
 
     def test_bullish_divergence(self):
-        """Preço cai mas RSI sobe → divergência altista."""
+        """Divergência altista real: dois fundos confirmados, o mais recente
+        com preço menor e RSI maior que o fundo confirmado anterior."""
         df = _make_ohlcv(50)
         df = calcular_indicadores(df).dropna()
-        # Forçar divergência altista
-        df.iloc[-1, df.columns.get_loc("Close")] = df.iloc[-5, df.columns.get_loc("Close")] * 0.95
-        df.iloc[-1, df.columns.get_loc("rsi")] = df.iloc[-5, df.columns.get_loc("rsi")] + 10
-        alta, baixa = detectar_divergencia(df, janela=5)
+        fundo_idxs = df.index[df["is_fundo_local"]]
+        assert len(fundo_idxs) >= 2
+        i_prev, i_last = fundo_idxs[-2], fundo_idxs[-1]
+        df.loc[i_prev, "Low"] = 100.0
+        df.loc[i_last, "Low"] = 95.0  # mínima mais baixa
+        df.loc[i_prev, "rsi"] = 25.0
+        df.loc[i_last, "rsi"] = 40.0  # RSI mais alto — divergência
+        alta, baixa = detectar_divergencia(df, janela=len(df))
         assert bool(alta) is True
 
     def test_bearish_divergence(self):
-        """Preço sobe mas RSI cai → divergência baixista."""
+        """Divergência baixista real: dois topos confirmados, o mais recente
+        com preço maior e RSI menor que o topo confirmado anterior."""
         df = _make_ohlcv(50)
         df = calcular_indicadores(df).dropna()
-        df.iloc[-1, df.columns.get_loc("Close")] = df.iloc[-5, df.columns.get_loc("Close")] * 1.05
-        df.iloc[-1, df.columns.get_loc("rsi")] = df.iloc[-5, df.columns.get_loc("rsi")] - 10
-        alta, baixa = detectar_divergencia(df, janela=5)
+        topo_idxs = df.index[df["is_topo_local"]]
+        assert len(topo_idxs) >= 2
+        i_prev, i_last = topo_idxs[-2], topo_idxs[-1]
+        df.loc[i_prev, "High"] = 100.0
+        df.loc[i_last, "High"] = 105.0  # máxima mais alta
+        df.loc[i_prev, "rsi"] = 75.0
+        df.loc[i_last, "rsi"] = 60.0  # RSI mais baixo — divergência
+        alta, baixa = detectar_divergencia(df, janela=len(df))
         assert bool(baixa) is True
 
     def test_no_divergence(self):
@@ -154,6 +165,22 @@ class TestDetectarDivergencia:
         df["rsi"] = [50.0] * 15 + [np.nan] * 5
         alta, baixa = detectar_divergencia(df, janela=5)
         assert bool(alta) is False and bool(baixa) is False
+
+    def test_ponta_a_ponta_sem_pivots_nao_gera_divergencia_falsa(self):
+        """Regressão do bug de divergência ponta-a-ponta: um candle de ruído
+        isolado nas duas pontas da janela (sem pivô confirmado em nenhum dos
+        dois lados) não deve contar como divergência — precisa de fundos/topos
+        confirmados reais para comparar."""
+        df = _make_ohlcv(60)
+        df = calcular_indicadores(df).dropna()
+        # Mexe só no candle -1 e -5: preço cai, RSI sobe — mas nenhum dos dois
+        # é necessariamente um pivô confirmado (fundo/topo local).
+        df.iloc[-1, df.columns.get_loc("Close")] = df.iloc[-5, df.columns.get_loc("Close")] * 0.95
+        df.iloc[-1, df.columns.get_loc("rsi")] = df.iloc[-5, df.columns.get_loc("rsi")] + 10
+        df.iloc[-1, df.columns.get_loc("is_fundo_local")] = False
+        df.iloc[-5, df.columns.get_loc("is_fundo_local")] = False
+        alta, baixa = detectar_divergencia(df, janela=5)
+        assert bool(alta) is False
 
 
 class TestDetectarCanalLinear:
@@ -206,6 +233,40 @@ class TestDetectarCanalLinear:
             alt, bx, sl = detectar_canal_linear(df, janela=20)
         assert alt is False and bx is False and sl == 0.0
 
+    def test_drift_ruidoso_com_slope_positivo_mas_r2_baixo_nao_e_canal(self):
+        """Regressão: slope>0 nos topos e fundos não basta se o ajuste é
+        ruim (R² baixo) — ruído aleatório não deve ser classificado como
+        canal só porque a reta média sobe."""
+        n = 40
+        idx = pd.date_range("2024-01-01", periods=n, freq="B")
+        rng = np.random.default_rng(3)
+        slope = np.linspace(0, 3, n)  # drift fraco
+        ruido = rng.uniform(-15, 15, n)  # ruído dominante sobre o drift
+        df = pd.DataFrame({
+            "High": 105 + slope + ruido,
+            "Low": 95 + slope + ruido,
+            "Close": 100 + slope + ruido,
+        }, index=idx)
+        alt, bx, sl = detectar_canal_linear(df, janela=20)
+        assert bool(alt) is False
+        assert bool(bx) is False
+
+    def test_r2_minimo_configuravel_permite_relaxar_o_filtro(self):
+        """Com r2_minimo=0.0 o filtro de qualidade fica inerte — o slope
+        sozinho decide, preservando o comportamento pré-filtro sob demanda."""
+        n = 40
+        idx = pd.date_range("2024-01-01", periods=n, freq="B")
+        rng = np.random.default_rng(3)
+        slope = np.linspace(0, 3, n)
+        ruido = rng.uniform(-15, 15, n)
+        df = pd.DataFrame({
+            "High": 105 + slope + ruido,
+            "Low": 95 + slope + ruido,
+            "Close": 100 + slope + ruido,
+        }, index=idx)
+        alt, bx, sl = detectar_canal_linear(df, janela=20, r2_minimo=0.0)
+        assert bool(alt) is True
+
     def test_canal_lateral_sem_tendencia_clara(self):
         """Topos sobem mas fundos caem → sinais opostos, nem altista nem baixista."""
         n = 30
@@ -234,6 +295,39 @@ class TestEncontrarZonas:
         df = _make_ohlcv(5)
         dem, ofe = encontrar_zonas_demanda_oferta(df)
         assert dem is False and ofe is False
+
+    def _df_com_fundos(self, valores_low: dict, n: int = 30, preco: float = 100.0, atr: float = 1.0):
+        """DataFrame sintético com fundos confirmados nos índices/valores dados."""
+        idx = pd.date_range("2024-01-01", periods=n, freq="B")
+        low = [preco] * n
+        for i, v in valores_low.items():
+            low[i] = v
+        is_fundo = [False] * n
+        for i in valores_low:
+            is_fundo[i] = True
+        return pd.DataFrame({
+            "Close": [preco] * n, "Low": low, "High": [preco] * n,
+            "atr": [atr] * n, "is_fundo_local": is_fundo, "is_topo_local": [False] * n,
+        }, index=idx)
+
+    def test_um_unico_toque_nao_caracteriza_zona_de_demanda(self):
+        """Um único fundo confirmado perto do preço não é zona — precisa de
+        ao menos 2 toques na mesma região (regressão do falso-positivo)."""
+        df = self._df_com_fundos({20: 100.5}, preco=100.0, atr=1.0)
+        dem, _ = encontrar_zonas_demanda_oferta(df, ordem=1)
+        assert dem is False
+
+    def test_dois_toques_na_mesma_regiao_caracteriza_zona_de_demanda(self):
+        df = self._df_com_fundos({15: 100.3, 20: 100.6}, preco=100.0, atr=1.0)
+        dem, _ = encontrar_zonas_demanda_oferta(df, ordem=1)
+        assert dem is True
+
+    def test_lookback_em_dias_ignora_fundo_fora_da_janela(self):
+        """Fundos fora dos últimos `lookback` dias não contam, mesmo se
+        próximos entre si — lookback deve ser temporal, não contagem de pivôs."""
+        df = self._df_com_fundos({0: 100.3, 1: 100.6}, n=100, preco=100.0, atr=1.0)
+        dem, _ = encontrar_zonas_demanda_oferta(df, lookback=20, ordem=1)
+        assert dem is False
 
 
 class TestPivotsConfirmados:
