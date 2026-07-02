@@ -45,8 +45,14 @@ All notable changes to this project will be documented in this file.
   `vxbr`, `evento_label`, `filtro_liquidez_decisao`, `filtro_liquidez_motivo` (todos `null`
   se dados indisponíveis), persistidos no Supabase (migração `015`).
 
-> **Pendências da Fase 3:** aplicar as migrações `013`/`014`/`015` no Supabase (SQL Editor)
-> antes do deploy; medir em shadow o impacto na taxa de emissão vs. aprovadas por classe.
+- **SignalCard (frontend)**: exibe indicadores de executabilidade (OI, bid/ask + spread%),
+  contexto (VXBR, evento) e classe v2 recebidos no payload do sinal
+  ([src/components/SignalCard.tsx](../src/components/SignalCard.tsx)), com badge
+  "desconhecido" quando os campos vêm `null`.
+
+**Status: Fase 3 CONCLUÍDA (2026-07-02)** — migrações `013`/`014`/`015` aplicadas no
+Supabase; 687 testes verdes, lint limpo. Tudo em shadow (vetos não bloqueiam emissão)
+até a validação da Fase 4.
 
 ### Fixed
 - **Look-ahead bias eliminado nos pivots locais (Camada 0.1):** `is_fundo_local`/

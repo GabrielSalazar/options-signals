@@ -98,7 +98,8 @@ Regra geral: cada gatilho novo vale no máximo 2; os pesos 3 ficam reservados ao
     - **VXBR**: `indicators.py::obter_vxbr_diaria()` via brapi (fail-safe).
     - **Eventos**: `event_service.py::registrar_copom_datas()` cadastra Copom 2026 no boot (tabela `calendar_events`, migração `014`); `obter_evento_na_data()` consulta no ato como fallback em `core_engine.py`.
     - **Vetos shadow**: `scoring.py::avaliar_filtro_liquidez_shadow()` (normal/atencao/bloquear), wired em `core_engine.py::analisar_ativo()` sem bloquear emissão; telemetria (`oi`, `bid`, `ask`, `spread_pct`, `vxbr`, `evento_label`, `filtro_liquidez_decisao/motivo`) persistida em `signals` (migração `015`, `signal_service.py`).
-    - **Testes**: `tests/test_liquidity_service.py`, `tests/test_core_engine_liquidity.py`, `tests/test_event_service.py` — suíte total 681 verdes.
+    - **Testes**: `tests/test_liquidity_service.py`, `tests/test_core_engine_liquidity.py`, `tests/test_event_service.py` — suíte total 687 verdes (backend), lint (ruff) limpo, coverage 93%.
+    - **SignalCard (frontend)**: `src/components/SignalCard.tsx` exibe OI, bid/ask+spread%, VXBR, evento e classe v2 com badge "desconhecido" para campos `null`.
 - **Fase 4 — validação e ativação** (~1 semana; é a Camada 5 do roadmap): medir em shadow taxa de emissão por classe e hit-rate dos vetados vs. aprovados (backtest + histórico real); ativar por etapas — 1º executabilidade (OI/spread), 2º vetos técnicos, 3º thresholds 8/12. Cada etapa reversível por flag; reverter se derrubar expectância.
 
 ## 7. Riscos aceitos e mitigações
