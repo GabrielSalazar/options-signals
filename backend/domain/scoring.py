@@ -265,6 +265,8 @@ GATILHOS: dict[str, dict] = {
     "G21": {"familia": "MOMENTUM",  "pontos": 2},   # Divergência de fluxo (absorção compradora)
     "B20": {"familia": "ESTRUTURA", "pontos": 3},   # Rompimento baixista do HC
     "B21": {"familia": "MOMENTUM",  "pontos": 2},   # Divergência de fluxo (absorção vendedora)
+    "G22": {"familia": "ESTRUTURA", "pontos": 3},   # Teste do HC defendido (pullback institucional)
+    "B22": {"familia": "ESTRUTURA", "pontos": 3},   # Teste baixista do HC (pullback rejeitado)
 }
 
 

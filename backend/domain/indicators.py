@@ -172,6 +172,11 @@ def calcular_indicadores(df: pd.DataFrame) -> pd.DataFrame:
     df["fluxo_persist_pos"] = pos * (pos.groupby((pos != pos.shift()).cumsum()).cumcount() + 1)
     df["fluxo_persist_neg"] = neg * (neg.groupby((neg != neg.shift()).cumsum()).cumcount() + 1)
 
+    # Aceleração de fluxo (OPÇÕES B3 v8.2, filtro 4): CMF estritamente
+    # crescente/decrescente por 3 barras. Comparação com NaN é False → fail-safe.
+    df["cmf_acel_pos"] = (df["cmf"] > df["cmf"].shift(1)) & (df["cmf"].shift(1) > df["cmf"].shift(2))
+    df["cmf_acel_neg"] = (df["cmf"] < df["cmf"].shift(1)) & (df["cmf"].shift(1) < df["cmf"].shift(2))
+
     # Derivados úteis para o score ponderado (independentes da lib ta)
     df["bb_pct"]   = (c - df["bb_lower"]) / (df["bb_upper"] - df["bb_lower"] + 1e-9)
     df["bb_width"] = (df["bb_upper"] - df["bb_lower"]) / df["bb_mid"]

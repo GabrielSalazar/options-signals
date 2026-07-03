@@ -152,7 +152,7 @@ def _carregar_ohlcv(ticker: str, interval: str, df_provided: pd.DataFrame | None
     return df
 
 
-_PUCK_IDS = {"G20", "G21", "B20", "B21"}
+_PUCK_IDS = {"G20", "G21", "G22", "B20", "B21", "B22"}
 
 
 def _filtrar_ids_puck_shadow(ids: list[str], sinais: list[str]) -> tuple[list[str], list[str]]:
@@ -457,6 +457,22 @@ def _avaliar_gatilhos_v2(df: pd.DataFrame, ultimo, stoch_k: float, rsi: float,
             _fire("baixa", "B21",
                   "📉 Divergência de fluxo (compra absorvida, preço caiu)",
                   2 if puck_ativo else 0)
+
+    acel_pos = _val("cmf_acel_pos")
+    acel_neg = _val("cmf_acel_neg")
+
+    if None not in (hc_max, ema21_v, cmf_z, low_v, acel_pos):
+        if (low_v <= hc_max and preco > hc_max and cmf_z >= z_min
+                and acel_pos == 1.0 and preco > ema21_v):
+            _fire("alta", "G22",
+                  f"📈 Teste do HC defendido (pullback institucional, z-fluxo {cmf_z:.1f})",
+                  3 if puck_ativo else 0)
+    if None not in (hc_min, ema21_v, cmf_z, high_v, acel_neg):
+        if (high_v >= hc_min and preco < hc_min and cmf_z <= -z_min
+                and acel_neg == 1.0 and preco < ema21_v):
+            _fire("baixa", "B22",
+                  f"📉 Teste baixista do HC (pullback rejeitado, z-fluxo {cmf_z:.1f})",
+                  3 if puck_ativo else 0)
 
     # Redutores (spec §3): fluxo contra o sinal e ADX fraco
     redutores_alta, redutores_baixa = [], []

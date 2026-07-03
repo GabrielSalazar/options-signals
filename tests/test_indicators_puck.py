@@ -110,3 +110,22 @@ def test_absorcao_detectada():
     df.loc[59, "Close"] = 199.0            # < hc_max e CLV = (2-2)/4 = 0
     out = calcular_indicadores(df)
     assert bool(out["absorcao"].iloc[-1]) is True
+
+
+def test_cmf_acel_pos_tres_barras_crescentes():
+    """cmf_acel_pos exige CMF estritamente crescente por 3 barras."""
+    df = calcular_indicadores(_df_sintetico(80))
+    # Colunas existem e são booleanas
+    assert "cmf_acel_pos" in df.columns and "cmf_acel_neg" in df.columns
+    # Verificação direta da definição na última barra
+    cmf = df["cmf"]
+    esperado = bool(cmf.iloc[-1] > cmf.iloc[-2] > cmf.iloc[-3])
+    assert bool(df["cmf_acel_pos"].iloc[-1]) == esperado
+
+
+def test_cmf_acel_nan_nao_dispara():
+    """Warm-up (CMF NaN) → aceleração False, nunca NaN/True."""
+    df = calcular_indicadores(_df_sintetico(80))
+    warmup = df["cmf"].isna()
+    assert not df.loc[warmup, "cmf_acel_pos"].any()
+    assert not df.loc[warmup, "cmf_acel_neg"].any()

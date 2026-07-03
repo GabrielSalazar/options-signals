@@ -25,6 +25,7 @@ def _ultimo(**kwargs):
         "ema21": None, "adx": None, "bb_width": None,
         "hc_max": None, "hc_min": None, "ema50": None, "cmf_z": None,
         "Low": 100.0, "High": 100.0,
+        "cmf_acel_pos": None, "cmf_acel_neg": None,
     }
     base.update(kwargs)
     return pd.Series(base)
@@ -133,7 +134,7 @@ def test_indicador_ausente_fail_safe():
     """hc_max/cmf_z None (df antigo) → nunca dispara, sem exceção."""
     ultimo = _ultimo()  # tudo None
     v2 = _avaliar_gatilhos_v2(_df_base(), ultimo, stoch_k=50, rsi=50, preco=100.0)
-    for gid in ("G20", "B20", "G21", "B21"):
+    for gid in ("G20", "B20", "G21", "B21", "G22", "B22"):
         assert gid not in v2["ids_alta_v2"] + v2["ids_baixa_v2"]
 
 
@@ -156,3 +157,50 @@ def test_sem_absorcao_nem_persistencia_nao_altera():
         classe_v2="B", razoes=["x"], absorcao=False, persist=1, tipo_sinal="CALL")
     assert classe == "B"
     assert razoes == ["x"]
+
+
+def test_g22_teste_do_hc_dispara():
+    """Low tocou hc_max, Close fechou acima, z-fluxo ok, acelerando, acima da EMA21."""
+    ultimo = _ultimo(hc_max=95.0, Low=94.5, cmf_z=1.5, ema21=90.0, ema50=88.0,
+                     cmf_acel_pos=True, cmf_acel_neg=False)
+    v2 = _avaliar_gatilhos_v2(_df_base(), ultimo, stoch_k=50, rsi=50, preco=96.0)
+    assert "G22" in v2["ids_alta_v2"]
+
+
+def test_g22_nao_dispara_sem_aceleracao():
+    ultimo = _ultimo(hc_max=95.0, Low=94.5, cmf_z=1.5, ema21=90.0, ema50=88.0,
+                     cmf_acel_pos=False, cmf_acel_neg=False)
+    v2 = _avaliar_gatilhos_v2(_df_base(), ultimo, stoch_k=50, rsi=50, preco=96.0)
+    assert "G22" not in v2["ids_alta_v2"]
+
+
+def test_g22_nao_dispara_se_fechou_dentro_da_zona():
+    """Close <= hc_max (não defendeu) → sem sinal."""
+    ultimo = _ultimo(hc_max=95.0, Low=93.0, cmf_z=1.5, ema21=90.0, ema50=88.0,
+                     cmf_acel_pos=True, cmf_acel_neg=False)
+    v2 = _avaliar_gatilhos_v2(_df_base(), ultimo, stoch_k=50, rsi=50, preco=94.0)
+    assert "G22" not in v2["ids_alta_v2"]
+
+
+def test_g22_sentinela_inf_nao_dispara():
+    """hc_max=+inf → Close > inf é False → nunca dispara."""
+    ultimo = _ultimo(hc_max=float("inf"), Low=94.5, cmf_z=1.5, ema21=90.0, ema50=88.0,
+                     cmf_acel_pos=True, cmf_acel_neg=False)
+    v2 = _avaliar_gatilhos_v2(_df_base(), ultimo, stoch_k=50, rsi=50, preco=96.0)
+    assert "G22" not in v2["ids_alta_v2"]
+
+
+def test_b22_teste_baixista():
+    ultimo = _ultimo(hc_min=105.0, High=105.5, cmf_z=-1.5, ema21=110.0, ema50=112.0,
+                     cmf_acel_pos=False, cmf_acel_neg=True)
+    v2 = _avaliar_gatilhos_v2(_df_base(), ultimo, stoch_k=50, rsi=50, preco=104.0)
+    assert "B22" in v2["ids_baixa_v2"]
+
+
+def test_g20_e_g22_mutuamente_exclusivos():
+    """Rompimento (Low>hc_max) e teste (Low<=hc_max) não coexistem na mesma barra."""
+    # Cenário de teste do HC: G22 arma, G20 não
+    ultimo = _ultimo(hc_max=95.0, Low=94.5, cmf_z=1.5, ema21=90.0, ema50=88.0,
+                     cmf_acel_pos=True, cmf_acel_neg=False)
+    v2 = _avaliar_gatilhos_v2(_df_base(), ultimo, stoch_k=50, rsi=50, preco=96.0)
+    assert "G22" in v2["ids_alta_v2"] and "G20" not in v2["ids_alta_v2"]
