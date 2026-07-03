@@ -133,6 +133,45 @@ def calcular_indicadores(df: pd.DataFrame) -> pd.DataFrame:
     # SuperTrend (matriz v2 §2.3) — não existe na lib ta; sempre manual
     df["supertrend_dir"] = _supertrend_dir(h, l, c, df["atr"], mult=3.0)
 
+    # ── Camada PUCK: HC institucional, fluxo normalizado, absorção ────────
+    df["ema50"] = c.ewm(span=50, adjust=False).mean()
+    df["clv"] = _clv(h, l, c)
+    df["hc_max"], df["hc_min"] = _high_candle_zones(
+        h, l, v, CONFIG.get("hc_fator_volume", 1.5))
+
+    periodo_z = CONFIG.get("cmf_z_periodo", 21)
+    mfv = df["clv"] * v
+    soma_vol = v.rolling(periodo_z).sum()
+    agress_pos = mfv.clip(lower=0).rolling(periodo_z).sum() / (soma_vol + 1e-9)
+    agress_neg = (-mfv).clip(lower=0).rolling(periodo_z).sum() / (soma_vol + 1e-9)
+    media_pos = agress_pos.ewm(span=periodo_z, adjust=False).mean()
+    media_neg = agress_neg.ewm(span=periodo_z, adjust=False).mean()
+    # cmf_norm: intensidade do fluxo vs. média histórica do próprio ativo
+    # (>1.5 = evento institucional; PUCK v3.1 §7). Sinal segue o CMF.
+    df["cmf_norm"] = np.where(
+        df["cmf"] > 0, agress_pos / (media_pos + 1e-9),
+        np.where(df["cmf"] < 0, -(agress_neg / (media_neg + 1e-9)), 0.0))
+    # cmf_z: z-score do CMF (PUCK v4.4 §5) — threshold autocalibrado cross-asset.
+    # min_periods reduzido: "cmf" já carrega ~19 NaN de warm-up próprio: exigir
+    # a janela cheia de `periodo_z` ADICIONAL empurraria o warm-up total de
+    # cmf_z para muito além do de qualquer outro indicador (ex.: ADX, 14+14
+    # períodos), inflando as linhas descartadas por `dropna()` a jusante bem
+    # além do necessário para uma estimativa razoável de média/desvio.
+    cmf_min_periods = max(5, periodo_z // 2 - 1)
+    df["cmf_z"] = ((df["cmf"] - df["cmf"].rolling(periodo_z, min_periods=cmf_min_periods).mean())
+                   / (df["cmf"].rolling(periodo_z, min_periods=cmf_min_periods).std() + 1e-9))
+
+    # Absorção (PUCK v4.4 §8): testou o topo do HC, fechou abaixo, fluxo neutro
+    df["absorcao"] = ((h >= df["hc_max"]) & (c < df["hc_max"])
+                      & (df["clv"].abs() < CONFIG.get("absorcao_clv_max", 0.1)))
+
+    # Persistência de fluxo (PUCK v4.4 §12): dias consecutivos com CLV direcional
+    limite_clv = CONFIG.get("fluxo_persistencia_clv", 0.3)
+    pos = (df["clv"] > limite_clv).astype(int)
+    neg = (df["clv"] < -limite_clv).astype(int)
+    df["fluxo_persist_pos"] = pos * (pos.groupby((pos != pos.shift()).cumsum()).cumcount() + 1)
+    df["fluxo_persist_neg"] = neg * (neg.groupby((neg != neg.shift()).cumsum()).cumcount() + 1)
+
     # Derivados úteis para o score ponderado (independentes da lib ta)
     df["bb_pct"]   = (c - df["bb_lower"]) / (df["bb_upper"] - df["bb_lower"] + 1e-9)
     df["bb_width"] = (df["bb_upper"] - df["bb_lower"]) / df["bb_mid"]
@@ -241,6 +280,50 @@ def _supertrend_dir(high, low, close, atr, mult: float = 3.0) -> pd.Series:
         else:
             dir_[i] = 1 if c[i] > upper[i] else -1
     return pd.Series(dir_, index=close.index)
+
+
+def _clv(high, low, close) -> pd.Series:
+    """Close Location Value (PUCK §5): +1 fecha na máxima, -1 na mínima.
+    Range zero (leilão) → 0 (sem pressão)."""
+    rng = (high - low).replace(0, np.nan)
+    return (((close - low) - (high - close)) / rng).fillna(0.0)
+
+
+def _high_candle_zones(high, low, volume, fator: float = 1.5) -> tuple:
+    """Zona do High Candle institucional (PUCK §3-4).
+
+    O HC é o candle de maior volume visto até então, desde que o volume seja
+    também > fator × média20 (filtro institucional — sem ele qualquer volume
+    crescente atualizaria a zona). Retorna (hc_max, hc_min) forward-filled.
+    Loop necessário (estado sequencial), mesmo padrão do _supertrend_dir.
+    Sem look-ahead: a zona do dia i usa apenas candles 0..i.
+
+    Enquanto nenhum candle institucional jamais ocorreu na série (ativos de
+    baixa volatilidade de volume, ou janela ainda curta), a coluna ficaria
+    NaN por TODA a série — o que faz `df.dropna()` a jusante (usado em
+    `_carregar_ohlcv`/`rodar_backtest`) descartar o dataframe inteiro. Por
+    isso, antes do primeiro HC institucional, usamos como fallback o
+    teto/piso das últimas 20 barras (rolling, só passado — sem look-ahead).
+    O HC institucional real, quando surge, sempre prevalece sobre o
+    fallback (só preenchemos onde o loop deixou NaN).
+    """
+    media_vol = volume.rolling(20).mean().values
+    vol, hi, lo = volume.values, high.values, low.values
+    n = len(vol)
+    hc_max = np.full(n, np.nan)
+    hc_min = np.full(n, np.nan)
+    maior_vol = 0.0
+    cur_max = cur_min = np.nan
+    for i in range(n):
+        limiar = media_vol[i] * fator if media_vol[i] == media_vol[i] else float("inf")
+        if vol[i] > maior_vol and vol[i] > limiar:
+            maior_vol = vol[i]
+            cur_max, cur_min = hi[i], lo[i]
+        hc_max[i] = cur_max
+        hc_min[i] = cur_min
+    hc_max_s = pd.Series(hc_max, index=high.index).fillna(high.rolling(20).max())
+    hc_min_s = pd.Series(hc_min, index=high.index).fillna(low.rolling(20).min())
+    return hc_max_s, hc_min_s
 
 
 def detectar_divergencia(df: pd.DataFrame, janela: int = 5, ordem: int | None = None) -> tuple:
