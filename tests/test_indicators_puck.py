@@ -49,6 +49,18 @@ def test_high_candle_atualiza_somente_com_volume_institucional():
     assert hc_max.iloc[29] == 12.0   # barra 27 não substituiu o HC
 
 
+def test_high_candle_novo_maximo_abaixo_do_fator_nao_vira_hc():
+    """Novo recorde de volume, mas < fator × média20 → NÃO institucional (isola o filtro)."""
+    n = 30
+    vol = pd.Series([1e6] * n)
+    vol.iloc[25] = 1.2e6  # novo máximo absoluto, mas < 1.5x a média ~1e6
+    high = pd.Series([10.0] * n); high.iloc[25] = 12.0
+    low = pd.Series([9.0] * n); low.iloc[25] = 11.0
+    hc_max, hc_min = _high_candle_zones(high, low, vol, fator=1.5)
+    assert hc_max.iloc[29] == np.inf
+    assert hc_min.iloc[29] == -np.inf
+
+
 def test_high_candle_sem_lookahead():
     """O HC do dia i não pode usar dados de i+1..n."""
     df = _df_sintetico(60)

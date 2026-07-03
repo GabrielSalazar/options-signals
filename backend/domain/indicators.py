@@ -289,7 +289,7 @@ def _clv(high, low, close) -> pd.Series:
     return (((close - low) - (high - close)) / rng).fillna(0.0)
 
 
-def _high_candle_zones(high, low, volume, fator: float = 1.5) -> tuple:
+def _high_candle_zones(high, low, volume, fator: float = 1.5) -> tuple[pd.Series, pd.Series]:
     """Zona do High Candle institucional (PUCK §3-4).
 
     O HC é o candle de maior volume visto até então, desde que o volume seja
