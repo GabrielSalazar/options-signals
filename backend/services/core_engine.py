@@ -409,6 +409,37 @@ def _avaliar_gatilhos_v2(df: pd.DataFrame, ultimo, stoch_k: float, rsi: float,
         if stoch_k > CONFIG["stoch_overbought"] or rsi > CONFIG["rsi_overbought"]:
             _fire("baixa", "B19", f"📉 Compressão Bollinger (BW {bw*100:.0f}%) + oscilador extremo", 2)
 
+    # ── Gatilhos PUCK (rompimento HC + divergência de fluxo) ─────────────
+    # Em shadow os pontos são 0: o ID entra na telemetria (trigger_outcomes)
+    # sem afetar score mesmo se matriz_v2_gatilhos_mode virar "ativo".
+    puck_ativo = CONFIG.get("puck_gatilhos_mode") == "ativo"
+    hc_max = _val("hc_max"); hc_min = _val("hc_min")
+    ema50_v = _val("ema50"); cmf_z = _val("cmf_z")
+    low_v = _val("Low"); high_v = _val("High")
+    z_min = CONFIG.get("cmf_z_gatilho", 1.0)
+
+    if None not in (hc_max, ema21_v, ema50_v, cmf_z, low_v):
+        if low_v > hc_max and cmf_z >= z_min and preco > ema21_v > ema50_v:
+            _fire("alta", "G20",
+                  f"📈 Rompimento do HC institucional (z-fluxo {cmf_z:.1f})",
+                  3 if puck_ativo else 0)
+    if None not in (hc_min, ema21_v, ema50_v, cmf_z, high_v):
+        if high_v < hc_min and cmf_z <= -z_min and preco < ema21_v < ema50_v:
+            _fire("baixa", "B20",
+                  f"📉 Rompimento baixista do HC institucional (z-fluxo {cmf_z:.1f})",
+                  3 if puck_ativo else 0)
+
+    close_prev = float(df["Close"].iloc[-2]) if len(df) >= 2 else None
+    if cmf is not None and close_prev is not None:
+        if cmf < 0 and preco > close_prev:
+            _fire("alta", "G21",
+                  "📈 Divergência de fluxo (venda absorvida, preço subiu)",
+                  2 if puck_ativo else 0)
+        elif cmf > 0 and preco < close_prev:
+            _fire("baixa", "B21",
+                  "📉 Divergência de fluxo (compra absorvida, preço caiu)",
+                  2 if puck_ativo else 0)
+
     # Redutores (spec §3): fluxo contra o sinal e ADX fraco
     redutores_alta, redutores_baixa = [], []
     fluxo_contra_alta = (obv_slope is not None and obv_slope < 0) or (cmf is not None and cmf < 0)

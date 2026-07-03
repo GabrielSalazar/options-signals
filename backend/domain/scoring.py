@@ -260,6 +260,11 @@ GATILHOS: dict[str, dict] = {
     "B17": {"familia": "TENDENCIA", "pontos": 1},   # Close < EMA21
     "B18": {"familia": "TENDENCIA", "pontos": 2},   # ADX >= 25
     "B19": {"familia": "ESTRUTURA", "pontos": 2},   # BW < 10% + oscilador extremo
+    # Camada PUCK (shadow até validação — pontos só valem com puck_gatilhos_mode=ativo)
+    "G20": {"familia": "ESTRUTURA", "pontos": 3},   # Rompimento do HC institucional
+    "G21": {"familia": "MOMENTUM",  "pontos": 2},   # Divergência de fluxo (absorção compradora)
+    "B20": {"familia": "ESTRUTURA", "pontos": 3},   # Rompimento baixista do HC
+    "B21": {"familia": "MOMENTUM",  "pontos": 2},   # Divergência de fluxo (absorção vendedora)
 }
 
 

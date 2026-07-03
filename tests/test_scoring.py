@@ -316,16 +316,16 @@ def test_avaliar_filtro_iv_score_tecnico_exatamente_7_compensa_faixa_media():
     assert r["decisao"] == "normal"
 
 
-def test_gatilhos_alta_somam_35_pontos():
-    """23 clássicos + 12 da matriz v2 (G12-G19: 2+2+1+1+1+1+2+2)."""
+def test_gatilhos_alta_somam_40_pontos():
+    """23 clássicos + 12 da matriz v2 (G12-G19) + 5 PUCK (G20-G21)."""
     soma = sum(v["pontos"] for k, v in GATILHOS.items() if k.startswith("G"))
-    assert soma == 35
+    assert soma == 40
 
 
-def test_gatilhos_baixa_somam_35_pontos():
-    """Simetria CALL×PUT preservada também nos gatilhos da matriz v2."""
+def test_gatilhos_baixa_somam_40_pontos():
+    """Simetria CALL×PUT preservada também nos gatilhos PUCK."""
     soma = sum(v["pontos"] for k, v in GATILHOS.items() if k.startswith("B"))
-    assert soma == 35
+    assert soma == 40
 
 
 def test_gatilhos_v2_sao_simetricos_em_familia_e_pontos():
