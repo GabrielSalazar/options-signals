@@ -16,6 +16,14 @@ All notable changes to this project will be documented in this file.
   família MOMENTUM, 2 pts) — 0 pontos até `puck_gatilhos_mode=ativo`; telemetria via
   `trigger_outcomes` como os demais gatilhos v2. Guard `_filtrar_ids_puck_shadow`
   impede que IDs PUCK vazem para famílias/classe se a matriz v2 ativar antes do PUCK.
+- **Gatilhos shadow G22/B22 "Teste do HC"** (OPÇÕES B3 v8.2): pullback ao topo/fundo da
+  zona institucional defendido no fechamento (`Low <= hc_max` e `Close > hc_max`, espelho
+  na baixa), com z-fluxo, **aceleração de CMF em 3 barras** (`cmf_acel_pos/neg`) e lado da
+  EMA21 — família ESTRUTURA, 3 pts (0 em shadow). Complementar e mutuamente exclusivo ao
+  G20 (rompimento). Notas para a ativação (Fase 4): avaliar restringir o toque a
+  `hc_min <= Low` se a telemetria mostrar falsos positivos de barras que varam a zona
+  inteira; e observar que o cap da família ESTRUTURA (4) satura com gatilhos clássicos
+  co-disparando — pontos PUCK podem ser marginais mesmo ativos.
 - **Modificadores shadow de classe**: absorção no HC (rompimento testado e rejeitado
   com fluxo neutro) registra razão de downgrade; fluxo persistente ≥3d em classe C
   registra candidato a upgrade C→B (flags `absorcao_classe_mode`/`fluxo_upgrade_mode`).
@@ -32,7 +40,7 @@ All notable changes to this project will be documented in this file.
 > **Pendências (Camada PUCK):** aplicar migração `016` no Supabase; medir
 > G20/B20/G21/B21 e modificadores na janela shadow da Fase 4
 > (query `fase4_monitor_shadow.sql`) antes de qualquer ativação; delta/DTE por
-> classe adiado para pós-validação. Suíte: 712 testes backend + 138 frontend.
+> classe adiado para pós-validação. Suíte: 720 testes backend + 138 frontend.
 
 ### Added (Matriz v2 — Fase 3: Dados Externos)
 - **Coleta diária de OI via PriceReport (PR) da B3**
