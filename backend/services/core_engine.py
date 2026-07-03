@@ -152,6 +152,19 @@ def _carregar_ohlcv(ticker: str, interval: str, df_provided: pd.DataFrame | None
     return df
 
 
+_PUCK_IDS = {"G20", "G21", "B20", "B21"}
+
+
+def _filtrar_ids_puck_shadow(ids: list[str], sinais: list[str]) -> tuple[list[str], list[str]]:
+    """Remove IDs PUCK (e textos correspondentes) quando puck_gatilhos_mode != "ativo".
+    Evita que gatilhos em shadow contaminem calcular_familias/classe via as
+    listas principais quando matriz_v2_gatilhos_mode está "ativo"."""
+    if CONFIG.get("puck_gatilhos_mode") == "ativo":
+        return ids, sinais
+    pares = [(i, s) for i, s in zip(ids, sinais) if i not in _PUCK_IDS]
+    return [i for i, _ in pares], [s for _, s in pares]
+
+
 def _avaliar_gatilhos(df: pd.DataFrame, ultimo, penult, preco: float,
                       vol_med: float, volume: float) -> dict:
     """Avalia os gatilhos técnicos (alta/baixa) sobre o df e retorna os scores,
@@ -311,8 +324,13 @@ def _avaliar_gatilhos(df: pd.DataFrame, ultimo, penult, preco: float,
     v2 = _avaliar_gatilhos_v2(df, ultimo, stoch_k, rsi, preco)
 
     if CONFIG.get("matriz_v2_gatilhos_mode") == "ativo":
-        sinais_alta.extend(v2["sinais_alta_v2"]);   ids_alta.extend(v2["ids_alta_v2"])
-        sinais_baixa.extend(v2["sinais_baixa_v2"]); ids_baixa.extend(v2["ids_baixa_v2"])
+        # IDs PUCK só entram nas listas principais (famílias/classe) quando o
+        # flag próprio ativar — senão contaminariam calcular_familias com
+        # pontos do registro enquanto o score os trata como 0 (shadow).
+        ids_a, sinais_a = _filtrar_ids_puck_shadow(v2["ids_alta_v2"], v2["sinais_alta_v2"])
+        ids_b, sinais_b = _filtrar_ids_puck_shadow(v2["ids_baixa_v2"], v2["sinais_baixa_v2"])
+        sinais_alta.extend(sinais_a);   ids_alta.extend(ids_a)
+        sinais_baixa.extend(sinais_b);  ids_baixa.extend(ids_b)
         # Redutores por direção; o score nunca fica negativo (spec §3)
         score_alta  = max(0, score_alta + v2["score_alta_v2"] - v2["redutores_alta_total"])
         score_baixa = max(0, score_baixa + v2["score_baixa_v2"] - v2["redutores_baixa_total"])

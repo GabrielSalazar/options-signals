@@ -2,7 +2,12 @@
 import pandas as pd
 
 from backend.core.config import CONFIG
-from backend.services.core_engine import _avaliar_gatilhos_v2
+from backend.services import core_engine
+from backend.services.core_engine import (
+    _avaliar_gatilhos,
+    _avaliar_gatilhos_v2,
+    _filtrar_ids_puck_shadow,
+)
 
 
 def _df_base(n=10):
@@ -87,6 +92,40 @@ def test_puck_shadow_nao_pontua():
     v2 = _avaliar_gatilhos_v2(_df_base(), ultimo, stoch_k=50, rsi=50, preco=96.5)
     assert "G20" in v2["ids_alta_v2"]
     assert v2["score_alta_v2"] == 1  # apenas o G17; G20 em shadow = 0 pontos
+
+
+def test_filtro_puck_shadow_remove_ids_e_sinais(monkeypatch):
+    """Em shadow, o filtro remove IDs PUCK e textos pareados; em ativo, mantém."""
+    ids = ["G12", "G20", "G17", "G21"]
+    sinais = ["s12", "s20", "s17", "s21"]
+    monkeypatch.setitem(core_engine.CONFIG, "puck_gatilhos_mode", "shadow")
+    assert _filtrar_ids_puck_shadow(ids, sinais) == (["G12", "G17"], ["s12", "s17"])
+    monkeypatch.setitem(core_engine.CONFIG, "puck_gatilhos_mode", "ativo")
+    assert _filtrar_ids_puck_shadow(ids, sinais) == (ids, sinais)
+
+
+def test_matriz_v2_ativa_nao_vaza_puck_shadow_para_listas_principais(monkeypatch):
+    """matriz_v2 ativo + puck shadow: G20 fica só na telemetria v2, não em ids_alta."""
+    monkeypatch.setitem(core_engine.CONFIG, "matriz_v2_gatilhos_mode", "ativo")
+    monkeypatch.setitem(core_engine.CONFIG, "puck_gatilhos_mode", "shadow")
+    n = 30
+    idx = pd.date_range("2026-01-01", periods=n, freq="B")
+    df = pd.DataFrame({
+        "Open": [100.0] * n, "High": [101.0] * n, "Low": [99.0] * n,
+        "Close": [100.0] * n, "Volume": [3e6] * n, "rsi": [50.0] * n,
+        "is_fundo_local": [False] * n, "is_topo_local": [False] * n,
+        "atr": [2.0] * n,
+    }, index=idx)
+    base = dict(stoch_k=50, stoch_d=50, rsi=50, ema9=100, ema21=94.0,
+                macd_diff=0, atr=2.0, suporte_20=90, resistencia_20=110,
+                bb_lower=0, hc_max=95.0, hc_min=None, Low=96.0, High=96.5,
+                cmf_z=1.5, ema50=92.0, cmf=None)
+    ultimo = pd.Series(base)
+    penult = pd.Series(base)
+    g = _avaliar_gatilhos(df, ultimo, penult, preco=96.5,
+                          vol_med=3e6, volume=3e6)
+    assert "G20" in g["v2"]["ids_alta_v2"]   # telemetria preservada
+    assert "G20" not in g["ids_alta"]        # não vaza para famílias/classe
 
 
 def test_indicador_ausente_fail_safe():
