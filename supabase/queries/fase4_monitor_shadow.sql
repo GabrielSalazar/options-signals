@@ -1,10 +1,17 @@
 -- ============================================================
--- Fase 4 — Monitoramento em Shadow dos vetos de executabilidade
--- (OI, spread, VXBR, evento) e da classe v2, sem ativar bloqueios.
+-- Fase 4 — Monitoramento em Shadow: vetos de executabilidade
+-- (OI, spread, VXBR, evento), classe v2 e Camada PUCK, sem ativar
+-- nenhum bloqueio.
 --
 -- Rodar diariamente (Supabase SQL Editor) durante a janela de
--- validação (~2026-07-05 a 2026-07-19). Objetivo: reunir 50-60
--- sinais com desfecho conhecido por veto antes de ativar por etapas.
+-- validação. Objetivo: reunir sinais com desfecho conhecido antes
+-- de ativar qualquer flag por etapas.
+--
+-- Convenção de desfecho (trigger_outcomes.resultado_final):
+--   ganho  = 'alvo1' | 'alvo2' | 'alvo_final'
+--   perda  = 'stop'
+--   neutro = 'expirou'
+-- (NÃO existem 'win'/'loss' — são os literais acima, de outcome.py.)
 -- ============================================================
 
 -- 1) Visão geral diária: volume de sinais, classes v2 e vetos shadow
@@ -24,20 +31,28 @@ GROUP BY 1
 ORDER BY 1 DESC;
 
 -- 2) Hit-rate dos vetados (spread>15%) vs. aprovados — usa trigger_outcomes
---    (join por signal_id; requer outcome já resolvido, i.e. trade encerrado)
+--    (join por signal_id; requer outcome já resolvido, i.e. trade encerrado).
+--    Uma linha de trigger_outcomes por gatilho, mas o desfecho é do SINAL
+--    (mesmo resultado_final em todas as linhas do signal_id), então tomamos
+--    um desfecho por sinal com DISTINCT ON para não contar em duplicidade.
+WITH desfecho_por_sinal AS (
+  SELECT DISTINCT ON (signal_id) signal_id, resultado_final
+  FROM trigger_outcomes
+  WHERE resultado_final IS NOT NULL
+)
 SELECT
   s.filtro_liquidez_decisao,
   COUNT(*) AS total,
-  COUNT(*) FILTER (WHERE o.resultado_final = 'win') AS wins,
-  COUNT(*) FILTER (WHERE o.resultado_final = 'loss') AS losses,
+  COUNT(*) FILTER (WHERE d.resultado_final IN ('alvo1','alvo2','alvo_final')) AS ganhos,
+  COUNT(*) FILTER (WHERE d.resultado_final = 'stop') AS perdas,
+  COUNT(*) FILTER (WHERE d.resultado_final = 'expirou') AS expirou,
   ROUND(
-    100.0 * COUNT(*) FILTER (WHERE o.resultado_final = 'win') / NULLIF(COUNT(*), 0),
-    1
+    100.0 * COUNT(*) FILTER (WHERE d.resultado_final IN ('alvo1','alvo2','alvo_final'))
+    / NULLIF(COUNT(*), 0), 1
   ) AS win_rate_pct
 FROM signals s
-JOIN trigger_outcomes o ON o.signal_id = s.id
+JOIN desfecho_por_sinal d ON d.signal_id = s.id
 WHERE s.created_at >= NOW() - INTERVAL '14 days'
-  AND o.resultado_final IS NOT NULL
 GROUP BY 1
 ORDER BY 1;
 
@@ -75,3 +90,80 @@ FROM signals
 WHERE created_at >= NOW() - INTERVAL '14 days'
 GROUP BY 1
 ORDER BY 1 DESC;
+
+-- ============================================================
+-- Camada PUCK (shadow) — telemetria dos campos e gatilhos G20-G22/B20-B22
+-- ============================================================
+
+-- 6) Cobertura diária dos campos PUCK (migração 016): quantos sinais têm
+--    níveis ATR no ativo, absorção detectada e fluxo persistente. Se
+--    "com_niveis_ativo" ficar muito abaixo de total_sinais, revisar o cálculo
+--    de ATR; absorção/persistência = 0 constante pode indicar zona HC ausente.
+SELECT
+  DATE(created_at) AS data,
+  COUNT(*) AS total_sinais,
+  COUNT(ativo_stop) AS com_niveis_ativo,
+  COUNT(*) FILTER (WHERE absorcao IS TRUE) AS com_absorcao,
+  COUNT(*) FILTER (WHERE fluxo_persistencia_dias >= 3) AS fluxo_persist_3d_mais,
+  ROUND(AVG(fluxo_persistencia_dias), 1) AS media_persist_dias
+FROM signals
+WHERE created_at >= NOW() - INTERVAL '14 days'
+GROUP BY 1
+ORDER BY 1 DESC;
+
+-- 7) Hit-rate dos gatilhos PUCK (G20-G22 alta / B20-B22 baixa).
+--    IMPORTANTE: em shadow os IDs PUCK ficam em signals.gatilhos_v2_ids (array),
+--    NÃO em trigger_outcomes (que só recebe os gatilhos principais). Então
+--    cruzamos o array com o desfecho do próprio sinal (um por signal_id).
+--    Pré-requisito: o sinal também disparou >=1 gatilho clássico (todo sinal
+--    emitido dispara, pois exige score mínimo), garantindo linha em outcomes.
+--    OBS: gatilhos_v2_ids é assumido JSONB. Se a coluna for text[] nativo,
+--    troque a linha do CROSS JOIN por:  unnest(s.gatilhos_v2_ids) AS gid
+WITH desfecho_por_sinal AS (
+  SELECT DISTINCT ON (signal_id) signal_id, resultado_final
+  FROM trigger_outcomes
+  WHERE resultado_final IS NOT NULL
+)
+SELECT
+  gid AS gatilho_puck,
+  COUNT(*) AS resolvidos,
+  COUNT(*) FILTER (WHERE d.resultado_final IN ('alvo1','alvo2','alvo_final')) AS ganhos,
+  COUNT(*) FILTER (WHERE d.resultado_final = 'stop') AS perdas,
+  COUNT(*) FILTER (WHERE d.resultado_final = 'expirou') AS expirou,
+  ROUND(
+    100.0 * COUNT(*) FILTER (WHERE d.resultado_final IN ('alvo1','alvo2','alvo_final'))
+    / NULLIF(COUNT(*), 0), 1
+  ) AS win_rate_pct
+FROM signals s
+CROSS JOIN LATERAL jsonb_array_elements_text(s.gatilhos_v2_ids::jsonb) AS gid
+JOIN desfecho_por_sinal d ON d.signal_id = s.id
+WHERE s.created_at >= NOW() - INTERVAL '14 days'
+  AND gid IN ('G20','G21','G22','B20','B21','B22')
+GROUP BY gid
+ORDER BY gid;
+
+-- 8) Frequência dos gatilhos PUCK por dia (mesmo sem desfecho ainda), para
+--    saber se estão disparando o suficiente para gerar amostra estatística.
+SELECT
+  DATE(s.created_at) AS data,
+  gid AS gatilho_puck,
+  COUNT(*) AS disparos
+FROM signals s
+CROSS JOIN LATERAL jsonb_array_elements_text(s.gatilhos_v2_ids::jsonb) AS gid
+WHERE s.created_at >= NOW() - INTERVAL '14 days'
+  AND gid IN ('G20','G21','G22','B20','B21','B22')
+GROUP BY 1, 2
+ORDER BY 1 DESC, 2;
+
+-- 9) Absorção e persistência de fluxo por classe v2 (os modificadores de classe
+--    PUCK só registram razão em shadow; aqui medimos com que frequência
+--    disparariam um downgrade/upgrade se ativados, e em qual classe se concentram).
+SELECT
+  classe_v2,
+  COUNT(*) AS total,
+  COUNT(*) FILTER (WHERE absorcao IS TRUE) AS com_absorcao,
+  COUNT(*) FILTER (WHERE fluxo_persistencia_dias >= 3) AS fluxo_persist_3d_mais
+FROM signals
+WHERE created_at >= NOW() - INTERVAL '14 days'
+GROUP BY 1
+ORDER BY 1;
