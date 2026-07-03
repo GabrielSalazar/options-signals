@@ -111,6 +111,27 @@ def test_post_telegram_payload_vazio_usa_strings_vazias():
         _restore_telegram_config(*saved)
 
 
+def test_post_telegram_test_delega_para_enviar_mensagem_teste():
+    """POST /config/telegram/test delega a enviar_mensagem_teste e devolve o
+    dict de status como está (sucesso)."""
+    with patch(f"{_MOD}.enviar_mensagem_teste", return_value={"ok": True}) as mock_env:
+        response = client.post("/config/telegram/test")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    mock_env.assert_called_once_with()
+
+
+def test_post_telegram_test_propaga_erro():
+    """Falha (ex.: credencial inválida) volta como {ok: false, erro: ...}."""
+    with patch(f"{_MOD}.enviar_mensagem_teste",
+               return_value={"ok": False, "erro": "token/chat_id não configurado"}):
+        response = client.post("/config/telegram/test")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": False, "erro": "token/chat_id não configurado"}
+
+
 def test_post_telegram_get_reflete_atualizacao():
     """Fluxo ponta a ponta: POST grava config; GET subsequente reflete a
     mudança (token/chat_id passam a True) sem persistência real."""

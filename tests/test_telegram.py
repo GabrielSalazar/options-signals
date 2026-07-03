@@ -2,6 +2,53 @@
 from backend.services import telegram_service as ts
 
 
+class _FakeResp:
+    def __init__(self, ok=True, payload=None, status=200):
+        self.ok = ok
+        self.status_code = status
+        self._payload = payload if payload is not None else {"ok": True}
+
+    def json(self):
+        return self._payload
+
+
+def test_enviar_mensagem_teste_sem_config_retorna_erro(monkeypatch):
+    monkeypatch.setitem(ts.CONFIG, "telegram_token", "")
+    monkeypatch.setitem(ts.CONFIG, "telegram_chat_id", "")
+    resultado = ts.enviar_mensagem_teste()
+    assert resultado["ok"] is False
+    assert "não configurado" in resultado["erro"]
+
+
+def test_enviar_mensagem_teste_sucesso(monkeypatch):
+    monkeypatch.setitem(ts.CONFIG, "telegram_token", "tok")
+    monkeypatch.setitem(ts.CONFIG, "telegram_chat_id", "123")
+    monkeypatch.setattr(ts.requests, "post", lambda *a, **k: _FakeResp(ok=True, payload={"ok": True}))
+    assert ts.enviar_mensagem_teste() == {"ok": True}
+
+
+def test_enviar_mensagem_teste_erro_do_telegram(monkeypatch):
+    """Telegram responde ok=false com description → propaga o motivo."""
+    monkeypatch.setitem(ts.CONFIG, "telegram_token", "tok")
+    monkeypatch.setitem(ts.CONFIG, "telegram_chat_id", "123")
+    monkeypatch.setattr(ts.requests, "post",
+                        lambda *a, **k: _FakeResp(ok=False, status=400,
+                                                  payload={"ok": False, "description": "chat not found"}))
+    resultado = ts.enviar_mensagem_teste()
+    assert resultado == {"ok": False, "erro": "chat not found"}
+
+
+def test_enviar_mensagem_teste_excecao_nao_propaga(monkeypatch):
+    monkeypatch.setitem(ts.CONFIG, "telegram_token", "tok")
+    monkeypatch.setitem(ts.CONFIG, "telegram_chat_id", "123")
+    def _boom(*a, **k):
+        raise RuntimeError("timeout")
+    monkeypatch.setattr(ts.requests, "post", _boom)
+    resultado = ts.enviar_mensagem_teste()
+    assert resultado["ok"] is False
+    assert "timeout" in resultado["erro"]
+
+
 def test_notificar_lote_envia_todos_com_throttle(monkeypatch):
     enviados, slept = [], []
     monkeypatch.setattr(ts, "enviar_telegram", lambda s: enviados.append(s["ticker"]))

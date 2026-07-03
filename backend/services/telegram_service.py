@@ -109,6 +109,35 @@ def enviar_telegram(sinal: dict):
         logger.error(f"Erro ao enviar Telegram para {sinal.get('ticker')}: {e}")
 
 
+def enviar_mensagem_teste() -> dict:
+    """Envia uma mensagem de teste ao chat configurado e retorna o status
+    detalhado — usado por POST /config/telegram/test para validar as
+    credenciais sem esperar o próximo scan. Nunca lança exceção.
+
+    Retorna {"ok": True} em sucesso ou {"ok": False, "erro": <motivo>}.
+    """
+    token = CONFIG.get("telegram_token", "")
+    chat_id = CONFIG.get("telegram_chat_id", "")
+    if not token or not chat_id:
+        return {"ok": False, "erro": "token/chat_id não configurado"}
+
+    texto = "✅ Teste — Options Signals B3 conectado ao Telegram."
+    try:
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        resp = requests.post(url, data={"chat_id": chat_id, "text": texto}, timeout=10)
+        payload = resp.json()
+        if resp.ok and payload.get("ok"):
+            logger.info("Mensagem de teste do Telegram enviada com sucesso.")
+            return {"ok": True}
+        # Telegram devolve o motivo em "description" (ex.: chat not found, Unauthorized)
+        erro = payload.get("description", f"HTTP {resp.status_code}")
+        logger.warning(f"Falha no teste do Telegram: {erro}")
+        return {"ok": False, "erro": erro}
+    except Exception as e:
+        logger.error(f"Erro ao enviar teste do Telegram: {e}")
+        return {"ok": False, "erro": str(e)}
+
+
 def notificar_lote(sinais: list, throttle_s: float | None = None) -> None:
     """Envia uma lista de sinais ao Telegram com throttle entre mensagens (A3).
 
