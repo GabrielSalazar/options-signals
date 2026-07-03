@@ -298,14 +298,12 @@ def _high_candle_zones(high, low, volume, fator: float = 1.5) -> tuple:
     Loop necessário (estado sequencial), mesmo padrão do _supertrend_dir.
     Sem look-ahead: a zona do dia i usa apenas candles 0..i.
 
-    Enquanto nenhum candle institucional jamais ocorreu na série (ativos de
-    baixa volatilidade de volume, ou janela ainda curta), a coluna ficaria
-    NaN por TODA a série — o que faz `df.dropna()` a jusante (usado em
-    `_carregar_ohlcv`/`rodar_backtest`) descartar o dataframe inteiro. Por
-    isso, antes do primeiro HC institucional, usamos como fallback o
-    teto/piso das últimas 20 barras (rolling, só passado — sem look-ahead).
-    O HC institucional real, quando surge, sempre prevalece sobre o
-    fallback (só preenchemos onde o loop deixou NaN).
+    Antes do primeiro candle institucional, retorna ±inf (sentinela neutra):
+    comparações de rompimento/absorção nunca disparam (`Low > +inf` = False,
+    `High < -inf` = False, `High >= +inf` = False — fail-safe) e o `dropna()`
+    do pipeline (`_carregar_ohlcv`/`rodar_backtest`) não descarta linhas —
+    com NaN, um ativo sem candle institucional teria a coluna inteira NaN e
+    o dataframe todo seria descartado a jusante.
     """
     media_vol = volume.rolling(20).mean().values
     vol, hi, lo = volume.values, high.values, low.values
@@ -313,7 +311,7 @@ def _high_candle_zones(high, low, volume, fator: float = 1.5) -> tuple:
     hc_max = np.full(n, np.nan)
     hc_min = np.full(n, np.nan)
     maior_vol = 0.0
-    cur_max = cur_min = np.nan
+    cur_max, cur_min = np.inf, -np.inf
     for i in range(n):
         limiar = media_vol[i] * fator if media_vol[i] == media_vol[i] else float("inf")
         if vol[i] > maior_vol and vol[i] > limiar:
@@ -321,9 +319,8 @@ def _high_candle_zones(high, low, volume, fator: float = 1.5) -> tuple:
             cur_max, cur_min = hi[i], lo[i]
         hc_max[i] = cur_max
         hc_min[i] = cur_min
-    hc_max_s = pd.Series(hc_max, index=high.index).fillna(high.rolling(20).max())
-    hc_min_s = pd.Series(hc_min, index=high.index).fillna(low.rolling(20).min())
-    return hc_max_s, hc_min_s
+    return (pd.Series(hc_max, index=high.index),
+            pd.Series(hc_min, index=high.index))
 
 
 def detectar_divergencia(df: pd.DataFrame, janela: int = 5, ordem: int | None = None) -> tuple:
