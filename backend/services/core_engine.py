@@ -481,6 +481,28 @@ def _avaliar_gatilhos_v2(df: pd.DataFrame, ultimo, stoch_k: float, rsi: float,
     }
 
 
+def _aplicar_modificadores_classe_puck(classe_v2: str, razoes: list[str],
+                                       absorcao: bool, persist: int,
+                                       tipo_sinal: str) -> tuple[str, list[str]]:
+    """Modificadores PUCK da classe v2 (v4.4 §8/§12), em shadow por default.
+
+    - Absorção no HC (testou o rompimento e falhou com fluxo neutro):
+      registra razão; rebaixa uma classe apenas com absorcao_classe_mode=ativo.
+    - Persistência de fluxo a favor (>= fluxo_persistencia_min dias):
+      registra candidato a upgrade C→B; sobe apenas com fluxo_upgrade_mode=ativo.
+    """
+    del tipo_sinal  # reservado para direcionalidade futura
+    if absorcao:
+        razoes = razoes + ["absorção no HC (rompimento testado e rejeitado)"]
+        if CONFIG.get("absorcao_classe_mode") == "ativo" and classe_v2 in ("A", "B"):
+            classe_v2 = "B" if classe_v2 == "A" else "C"
+    elif (persist >= CONFIG.get("fluxo_persistencia_min", 3) and classe_v2 == "C"):
+        razoes = razoes + [f"candidato a upgrade C→B: fluxo persistente {persist}d"]
+        if CONFIG.get("fluxo_upgrade_mode") == "ativo":
+            classe_v2 = "B"
+    return classe_v2, razoes
+
+
 def _montar_estrutura_opcao(ticker_base: str, preco: float, tipo_sinal: str,
                             df: pd.DataFrame, interval: str, verbose: bool,
                             is_backtest: bool = False) -> dict | None:
@@ -844,8 +866,18 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
                 familias["breakdown"],
                 score
             )
+            # Modificadores PUCK (absorção / persistência) — shadow
+            absorcao_raw = ultimo.get("absorcao", False)
+            absorcao = bool(absorcao_raw) if absorcao_raw == absorcao_raw else False
+            persist_col = "fluxo_persist_pos" if tipo_sinal == "CALL" else "fluxo_persist_neg"
+            persist_raw = ultimo.get(persist_col, 0)
+            persist = int(persist_raw) if persist_raw == persist_raw else 0  # NaN-safe
+            classe_v2, razoes_downgrade = _aplicar_modificadores_classe_puck(
+                classe_v2, razoes_downgrade, absorcao, persist, tipo_sinal)
             estrutura["classe_v2"] = classe_v2
             estrutura["razoes_downgrade_classe"] = razoes_downgrade
+            estrutura["absorcao"] = absorcao
+            estrutura["fluxo_persistencia_dias"] = persist
 
             # Divergência prêmio real vs. modelado (Bloco 1 item 3 da matriz)
             premio_real = estrutura.get("preco_opcao", 0.0)

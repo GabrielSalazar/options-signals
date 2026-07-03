@@ -4,6 +4,7 @@ import pandas as pd
 from backend.core.config import CONFIG
 from backend.services import core_engine
 from backend.services.core_engine import (
+    _aplicar_modificadores_classe_puck,
     _avaliar_gatilhos,
     _avaliar_gatilhos_v2,
     _filtrar_ids_puck_shadow,
@@ -134,3 +135,24 @@ def test_indicador_ausente_fail_safe():
     v2 = _avaliar_gatilhos_v2(_df_base(), ultimo, stoch_k=50, rsi=50, preco=100.0)
     for gid in ("G20", "B20", "G21", "B21"):
         assert gid not in v2["ids_alta_v2"] + v2["ids_baixa_v2"]
+
+
+def test_absorcao_registra_razao_sem_mudar_classe_em_shadow():
+    classe, razoes = _aplicar_modificadores_classe_puck(
+        classe_v2="A", razoes=[], absorcao=True, persist=0, tipo_sinal="CALL")
+    assert classe == "A"  # shadow: não rebaixa
+    assert any("absorção" in r for r in razoes)
+
+
+def test_persistencia_registra_candidato_a_upgrade():
+    classe, razoes = _aplicar_modificadores_classe_puck(
+        classe_v2="C", razoes=[], absorcao=False, persist=4, tipo_sinal="CALL")
+    assert classe == "C"  # shadow: não sobe
+    assert any("upgrade" in r for r in razoes)
+
+
+def test_sem_absorcao_nem_persistencia_nao_altera():
+    classe, razoes = _aplicar_modificadores_classe_puck(
+        classe_v2="B", razoes=["x"], absorcao=False, persist=1, tipo_sinal="CALL")
+    assert classe == "B"
+    assert razoes == ["x"]
