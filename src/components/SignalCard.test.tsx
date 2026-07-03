@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import SignalCard from './SignalCard';
 import { Signal } from '@/types/signals';
@@ -145,5 +145,28 @@ describe('SignalCard — Matriz v2 (executabilidade, classe, evento)', () => {
     const badge = screen.getByText(/Classe C/i)
     expect(badge.getAttribute('title')).toMatch(/Notas de classe:/)
     expect(badge.getAttribute('title')).not.toMatch(/^Downgrade:/)
+  })
+
+  it('exibe indicadores de fluxo PUCK (Z-Fluxo, Intensidade, Persistência)', () => {
+    render(<SignalCard signal={{ ...baseSignal, cmf_z: 1.8, cmf_norm: 1.5, fluxo_persistencia_dias: 4 }} />)
+    expect(screen.getByText(/Z-Fluxo/i)).toBeInTheDocument()
+    expect(screen.getByText(/\+1\.8/)).toBeInTheDocument()
+    expect(screen.getByText(/Persistência/i)).toBeInTheDocument()
+    expect(screen.getByText(/4d/)).toBeInTheDocument()
+  })
+
+  it('omite o bloco de fluxo PUCK quando todos os campos são null', () => {
+    render(<SignalCard signal={{ ...baseSignal, cmf_z: null, cmf_norm: null, fluxo_persistencia_dias: null }} />)
+    expect(screen.queryByText(/Z-Fluxo/i)).not.toBeInTheDocument()
+  })
+
+  it('lista gatilhos v2/PUCK ao expandir os detalhes', () => {
+    render(<SignalCard signal={{ ...baseSignal, gatilhos_v2: ['📈 Rompimento do HC institucional (z-fluxo 1.8)'] }} />)
+    // Colapsado: seção v2 não aparece
+    expect(screen.queryByText(/Gatilhos v2 \/ PUCK/i)).not.toBeInTheDocument()
+    // Expande
+    fireEvent.click(screen.getByText(/Ver Detalhes/i))
+    expect(screen.getByText(/Gatilhos v2 \/ PUCK/i)).toBeInTheDocument()
+    expect(screen.getByText(/Rompimento do HC institucional/i)).toBeInTheDocument()
   })
 });

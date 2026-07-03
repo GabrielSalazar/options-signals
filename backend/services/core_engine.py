@@ -717,6 +717,7 @@ def _montar_sinal(ticker_base: str, nome: str, tipo_sinal: str, direcao_label: s
         "setup":        estrutura.get("setup"),
         "setup_params_shadow": estrutura.get("setup_params_shadow"),
         "gatilhos_v2_ids": estrutura.get("gatilhos_v2_ids", []),
+        "gatilhos_v2":     estrutura.get("gatilhos_v2", []),
         "score_v2_extra":  estrutura.get("score_v2_extra", 0),
         "redutores_v2":    estrutura.get("redutores_v2", []),
         "vetos_v2":        estrutura.get("vetos_v2", []),
@@ -730,6 +731,8 @@ def _montar_sinal(ticker_base: str, nome: str, tipo_sinal: str, direcao_label: s
         "ativo_tp2":     estrutura.get("ativo_tp2"),
         "absorcao":      estrutura.get("absorcao"),
         "fluxo_persistencia_dias": estrutura.get("fluxo_persistencia_dias"),
+        "cmf_z":         estrutura.get("cmf_z"),
+        "cmf_norm":      estrutura.get("cmf_norm"),
     }
 
 
@@ -899,9 +902,15 @@ def analisar_ativo(ticker: str, nome: str, interval: str = "1d", verbose: bool =
                 score_v2_extra = v2.get("score_baixa_v2", 0)
                 redutores_v2 = v2.get("redutores_baixa", [])
             estrutura["gatilhos_v2_ids"] = gatilhos_v2_ids
+            estrutura["gatilhos_v2"] = (v2.get("sinais_alta_v2", []) if tipo_sinal == "CALL"
+                                        else v2.get("sinais_baixa_v2", []))
             estrutura["score_v2_extra"] = score_v2_extra
             estrutura["redutores_v2"] = redutores_v2
             estrutura["vetos_v2"] = vetos_v2
+            # Indicadores PUCK expostos na telemetria do sinal (NaN-safe -> None)
+            _cmfz, _cmfn = ultimo.get("cmf_z"), ultimo.get("cmf_norm")
+            estrutura["cmf_z"] = float(_cmfz) if _cmfz is not None and _cmfz == _cmfz else None
+            estrutura["cmf_norm"] = float(_cmfn) if _cmfn is not None and _cmfn == _cmfn else None
 
             # ── CLASSE v2 E CAMPOS INFORMATIVOS (matriz v2 Fase 2) ──────────────
             classe_v2, razoes_downgrade = calcular_classe_v2(

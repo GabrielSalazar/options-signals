@@ -172,6 +172,15 @@ def persist_signals(sinais: list[dict]):
             "ativo_tp2":     s.get("ativo_tp2"),
             "absorcao":      s.get("absorcao"),
             "fluxo_persistencia_dias": s.get("fluxo_persistencia_dias"),
+            # Telemetria matriz v2 / PUCK (shadow) — migração 017
+            "classe_v2":     s.get("classe_v2"),
+            "razoes_downgrade_classe": s.get("razoes_downgrade_classe", []),
+            "gatilhos_v2_ids": s.get("gatilhos_v2_ids", []),
+            "gatilhos_v2":   s.get("gatilhos_v2", []),
+            "sizing_sugerido_pct": s.get("sizing_sugerido_pct"),
+            "divergencia_premio_pct": s.get("divergencia_premio_pct"),
+            "cmf_z":         s.get("cmf_z"),
+            "cmf_norm":      s.get("cmf_norm"),
             "timestamp":     datetime.now(timezone.utc).isoformat(),
         })
 

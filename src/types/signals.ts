@@ -47,6 +47,9 @@ export interface Signal {
   razoes_downgrade_classe?: string[] | null
   divergencia_premio_pct?: number | null
   sizing_sugerido_pct?: number | null
+  // Matriz v2 — gatilhos shadow (G12-G22, texto + IDs)
+  gatilhos_v2?: string[] | null
+  gatilhos_v2_ids?: string[] | null
   // Matriz v2 — Fase 3 (executabilidade, dados D-1 da B3)
   oi?: number | null
   bid?: number | null
@@ -63,6 +66,8 @@ export interface Signal {
   ativo_tp2?: number | null
   absorcao?: boolean | null
   fluxo_persistencia_dias?: number | null
+  cmf_z?: number | null
+  cmf_norm?: number | null
   // From Supabase rows
   id?: string
   timestamp?: string

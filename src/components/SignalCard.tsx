@@ -172,6 +172,28 @@ export default function SignalCard({ signal }: { signal: Signal }) {
                 </div>
             )}
 
+            {/* Fluxo institucional (PUCK — shadow) */}
+            {(signal.cmf_z != null || signal.cmf_norm != null || signal.fluxo_persistencia_dias != null) && (
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="bg-dw-bg-soft rounded p-2 text-center" title="Z-score do fluxo (CMF) vs. média histórica do ativo — quão institucional é o fluxo atual">
+                        <p className="label">Z-Fluxo</p>
+                        <p className="font-mono font-bold" style={{ color: signal.cmf_z != null && Math.abs(signal.cmf_z) >= 1.5 ? 'var(--dw-green)' : 'var(--dw-ink-mid)' }}>
+                            {signal.cmf_z != null ? (signal.cmf_z > 0 ? '+' : '') + fmtNum(signal.cmf_z, 1) : '—'}
+                        </p>
+                    </div>
+                    <div className="bg-dw-bg-soft rounded p-2 text-center" title="Intensidade do fluxo vs. média do próprio ativo (cmf_norm)">
+                        <p className="label">Intensidade</p>
+                        <p className="font-mono font-bold text-dw-ink-mid">{fmtNum(signal.cmf_norm, 1)}</p>
+                    </div>
+                    <div className="bg-dw-bg-soft rounded p-2 text-center" title="Dias consecutivos de fluxo direcional (persistência)">
+                        <p className="label">Persistência</p>
+                        <p className="font-mono font-bold text-dw-ink-mid">
+                            {signal.fluxo_persistencia_dias != null ? `${signal.fluxo_persistencia_dias}d` : '—'}
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {/* Indicadores */}
             <div className="grid grid-cols-3 gap-2 text-xs">
                 {[
@@ -312,6 +334,23 @@ export default function SignalCard({ signal }: { signal: Signal }) {
                         {signal.gatilhos.map((g, i) => (
                             <li key={i} className="text-xs text-dw-ink-mid flex items-start gap-2">
                                 <span className="text-dw-blue mt-0.5">•</span>
+                                <span>{g}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            {/* Gatilhos v2 / PUCK — shadow (expandido) */}
+            {expanded && signal.gatilhos_v2 && signal.gatilhos_v2.length > 0 && (
+                <div className="bg-dw-bg-soft border border-dw-rule-soft rounded-lg p-3 space-y-2">
+                    <p className="label text-dw-ink-muted" title="Gatilhos da matriz v2 e da Camada PUCK — em telemetria (não pontuam ainda)">
+                        Gatilhos v2 / PUCK — shadow ({signal.gatilhos_v2.length})
+                    </p>
+                    <ul className="space-y-1">
+                        {signal.gatilhos_v2.map((g, i) => (
+                            <li key={i} className="text-xs text-dw-ink-muted flex items-start gap-2">
+                                <span className="mt-0.5">◦</span>
                                 <span>{g}</span>
                             </li>
                         ))}

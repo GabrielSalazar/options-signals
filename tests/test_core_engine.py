@@ -69,6 +69,25 @@ def test_analisar_ativo_sinal_call_caracterizacao(monkeypatch):
     assert s["greeks"]["delta"] == pytest.approx(0.0166, abs=1e-3)
 
 
+def test_payload_expoe_telemetria_v2_e_puck(monkeypatch):
+    """O payload do sinal carrega os gatilhos v2/PUCK (texto) e os indicadores
+    de fluxo PUCK (cmf_z, cmf_norm) — para o SignalCard e a persistência."""
+    _relax_and_mock(monkeypatch)
+    df = _make_df(0)
+
+    s = core_engine.analisar_ativo("TESTE3", "Teste SA", df_provided=df, indicators_calculated=True)
+
+    assert s is not None
+    # Chaves presentes (podem vir vazias/None conforme o df, mas devem existir)
+    for chave in ("gatilhos_v2", "gatilhos_v2_ids", "cmf_z", "cmf_norm",
+                  "classe_v2", "sizing_sugerido_pct"):
+        assert chave in s, f"chave {chave} ausente no payload"
+    assert isinstance(s["gatilhos_v2"], list)
+    # cmf_z/cmf_norm são float ou None (nunca NaN — seriam quebrados no JSON)
+    assert s["cmf_z"] is None or isinstance(s["cmf_z"], float)
+    assert s["cmf_norm"] is None or isinstance(s["cmf_norm"], float)
+
+
 def test_analisar_ativo_shadow_mode_nao_bloqueia_mesmo_com_filtro_indicando_bloqueio(monkeypatch):
     _relax_and_mock(monkeypatch)
     monkeypatch.setitem(core_engine.CONFIG, "iv_filter_mode", "shadow")
