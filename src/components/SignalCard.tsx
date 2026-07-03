@@ -65,7 +65,7 @@ export default function SignalCard({ signal }: { signal: Signal }) {
             </div>
 
             {/* Badges: evento, classe v2, filtro de liquidez (informativos) */}
-            {(signal.evento_label || classe || liquidez) && (
+            {(signal.evento_label || classe || liquidez || signal.absorcao) && (
                 <div className="flex flex-wrap items-center gap-2">
                     {signal.evento_label && (
                         <span
@@ -81,7 +81,7 @@ export default function SignalCard({ signal }: { signal: Signal }) {
                             className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider"
                             style={{ background: classe.bg, color: classe.color }}
                             title={signal.razoes_downgrade_classe?.length
-                                ? `Downgrade: ${signal.razoes_downgrade_classe.join('; ')}`
+                                ? `Notas de classe: ${signal.razoes_downgrade_classe.join('; ')}`
                                 : 'Classe de emissão v2 (shadow)'}
                         >
                             Classe {signal.classe_v2}
@@ -94,6 +94,15 @@ export default function SignalCard({ signal }: { signal: Signal }) {
                             title={signal.filtro_liquidez_motivo ?? 'Filtro informativo (shadow) — não bloqueia o sinal'}
                         >
                             {liquidez.label}
+                        </span>
+                    )}
+                    {signal.absorcao && (
+                        <span
+                            className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider"
+                            style={{ background: '#FFFBEB', color: '#92400E', border: '1px solid var(--dw-yellow)' }}
+                            title="Rompimento do HC testado e rejeitado com fluxo neutro (telemetria shadow)"
+                        >
+                            Absorção HC
                         </span>
                     )}
                 </div>
@@ -137,6 +146,31 @@ export default function SignalCard({ signal }: { signal: Signal }) {
                     </div>
                 </div>
             </div>
+
+            {/* Níveis no ativo subjacente (PUCK — gestão pela tese, não pela opção) */}
+            {signal.ativo_stop != null && (
+                <div className="bg-dw-bg-soft rounded-lg p-3 space-y-1">
+                    <p className="label">Níveis no ativo (ATR)</p>
+                    <div className="grid grid-cols-3 gap-2 font-mono text-xs">
+                        <div>
+                            <span className="text-dw-ink-muted">Stop</span>
+                            <p className="font-semibold" style={{ color: 'var(--dw-red)' }}>R$ {fmtNum(signal.ativo_stop)}</p>
+                        </div>
+                        <div>
+                            <span className="text-dw-ink-muted">TP1 (50%)</span>
+                            <p className="font-semibold text-dw-ink">R$ {fmtNum(signal.ativo_tp1)}</p>
+                        </div>
+                        <div>
+                            <span className="text-dw-ink-muted">TP2 (100%)</span>
+                            <p className="font-semibold text-dw-ink">R$ {fmtNum(signal.ativo_tp2)}</p>
+                        </div>
+                    </div>
+                    <p className="text-[10px] text-dw-ink-muted">
+                        Gestão pelo ativo: no TP1 realizar 50% e mover o stop para a entrada
+                        (R$ {fmtNum(signal.ativo_entrada)}); zerar se o ativo fechar além do stop.
+                    </p>
+                </div>
+            )}
 
             {/* Indicadores */}
             <div className="grid grid-cols-3 gap-2 text-xs">

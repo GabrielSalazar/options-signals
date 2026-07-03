@@ -56,6 +56,13 @@ export interface Signal {
   evento_label?: string | null
   filtro_liquidez_decisao?: 'normal' | 'atencao' | 'bloquear' | null
   filtro_liquidez_motivo?: string | null
+  // Camada PUCK (níveis no ativo subjacente + telemetria, shadow)
+  ativo_entrada?: number | null
+  ativo_stop?: number | null
+  ativo_tp1?: number | null
+  ativo_tp2?: number | null
+  absorcao?: boolean | null
+  fluxo_persistencia_dias?: number | null
   // From Supabase rows
   id?: string
   timestamp?: string

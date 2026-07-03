@@ -103,7 +103,7 @@ describe('SignalCard — Matriz v2 (executabilidade, classe, evento)', () => {
     );
     expect(screen.getByText(/COPOM/)).toBeInTheDocument();
     const classeBadge = screen.getByText('Classe B');
-    expect(classeBadge).toHaveAttribute('title', 'Downgrade: spread alto; OI baixo');
+    expect(classeBadge).toHaveAttribute('title', 'Notas de classe: spread alto; OI baixo');
   });
 
   it('sizing sugerido e divergência de prêmio > 15% destacada', () => {
@@ -122,4 +122,28 @@ describe('SignalCard — Matriz v2 (executabilidade, classe, evento)', () => {
     render(<SignalCard signal={{ ...baseSignal, divergencia_premio_pct: 8.0 }} />);
     expect(screen.getByText(/Divergência de prêmio/)).not.toHaveClass('font-semibold');
   });
+
+  it('exibe níveis no ativo quando presentes', () => {
+    render(<SignalCard signal={{ ...baseSignal, ativo_entrada: 36.42, ativo_stop: 35.1, ativo_tp1: 37.74, ativo_tp2: 39.06 }} />)
+    expect(screen.getByText(/Níveis no ativo/i)).toBeInTheDocument()
+    expect(screen.getByText(/35\.10/)).toBeInTheDocument()
+    expect(screen.getByText(/39\.06/)).toBeInTheDocument()
+  })
+
+  it('omite níveis no ativo quando null', () => {
+    render(<SignalCard signal={{ ...baseSignal, ativo_stop: null }} />)
+    expect(screen.queryByText(/Níveis no ativo/i)).not.toBeInTheDocument()
+  })
+
+  it('exibe badge de absorção quando true', () => {
+    render(<SignalCard signal={{ ...baseSignal, absorcao: true }} />)
+    expect(screen.getByText(/Absorção/i)).toBeInTheDocument()
+  })
+
+  it('tooltip da classe usa rótulo neutro (não "Downgrade:")', () => {
+    render(<SignalCard signal={{ ...baseSignal, classe_v2: 'C', razoes_downgrade_classe: ['candidato a upgrade C→B: fluxo persistente 4d'] }} />)
+    const badge = screen.getByText(/Classe C/i)
+    expect(badge.getAttribute('title')).toMatch(/Notas de classe:/)
+    expect(badge.getAttribute('title')).not.toMatch(/^Downgrade:/)
+  })
 });
