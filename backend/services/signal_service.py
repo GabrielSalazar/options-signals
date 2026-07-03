@@ -166,6 +166,12 @@ def persist_signals(sinais: list[dict]):
             "evento_label":  s.get("evento_label"),
             "filtro_liquidez_decisao": s.get("filtro_liquidez_decisao"),
             "filtro_liquidez_motivo":  s.get("filtro_liquidez_motivo"),
+            "ativo_entrada": s.get("ativo_entrada"),
+            "ativo_stop":    s.get("ativo_stop"),
+            "ativo_tp1":     s.get("ativo_tp1"),
+            "ativo_tp2":     s.get("ativo_tp2"),
+            "absorcao":      s.get("absorcao"),
+            "fluxo_persistencia_dias": s.get("fluxo_persistencia_dias"),
             "timestamp":     datetime.now(timezone.utc).isoformat(),
         })
 

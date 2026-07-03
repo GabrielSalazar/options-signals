@@ -503,6 +503,22 @@ def _aplicar_modificadores_classe_puck(classe_v2: str, razoes: list[str],
     return classe_v2, razoes
 
 
+def _niveis_ativo_atr(preco: float, atr: float, tipo_sinal: str) -> dict:
+    """Níveis de gestão no ATIVO subjacente (PUCK §12), informativos:
+    stop = entrada ∓ 1.5×ATR | TP1 = ±1.5×ATR (realizar 50%) | TP2 = ±3×ATR.
+    Os alvos % sobre o prêmio da opção continuam sendo os oficiais; estes
+    campos ancoram a gestão no ativo (invalidação da tese, não da opção)."""
+    if atr != atr or atr <= 0:  # NaN ou inválido
+        atr = preco * 0.02
+    d = 1 if tipo_sinal.upper() == "CALL" else -1
+    return {
+        "ativo_entrada": round(preco, 2),
+        "ativo_stop":    round(preco - d * CONFIG.get("atr_mult_stop", 1.5) * atr, 2),
+        "ativo_tp1":     round(preco + d * CONFIG.get("atr_mult_tp1", 1.5) * atr, 2),
+        "ativo_tp2":     round(preco + d * CONFIG.get("atr_mult_tp2", 3.0) * atr, 2),
+    }
+
+
 def _montar_estrutura_opcao(ticker_base: str, preco: float, tipo_sinal: str,
                             df: pd.DataFrame, interval: str, verbose: bool,
                             is_backtest: bool = False) -> dict | None:
@@ -587,7 +603,12 @@ def _montar_estrutura_opcao(ticker_base: str, preco: float, tipo_sinal: str,
     rr_alvo2     = round((alvo2 - preco_base_calculo) / risco, 2) if risco > 0 else 0
     rr_final     = round((alvo_final - preco_base_calculo) / risco, 2) if risco > 0 else 0
 
+    atr_series_ok = "atr" in df.columns and len(df) > 0
+    atr_ativo = float(df["atr"].iloc[-1]) if atr_series_ok else preco * 0.02
+    niveis_ativo = _niveis_ativo_atr(preco, atr_ativo, tipo_sinal)
+
     return {
+        **niveis_ativo,
         "dist_otm": dist_otm, "strike_ref": strike_ref, "hv_20d": hv_20d,
         "iv_impl": iv_impl, "iv_source": iv_source, "iv_mercado": iv_mercado,
         "dte": dte, "mes_v": mes_v, "ano_v": ano_v, "premio_est": premio_est,
@@ -687,6 +708,12 @@ def _montar_sinal(ticker_base: str, nome: str, tipo_sinal: str, direcao_label: s
         "razoes_downgrade_classe": estrutura.get("razoes_downgrade_classe", []),
         "divergencia_premio_pct": estrutura.get("divergencia_premio_pct"),
         "sizing_sugerido_pct": estrutura.get("sizing_sugerido_pct"),
+        "ativo_entrada": estrutura.get("ativo_entrada"),
+        "ativo_stop":    estrutura.get("ativo_stop"),
+        "ativo_tp1":     estrutura.get("ativo_tp1"),
+        "ativo_tp2":     estrutura.get("ativo_tp2"),
+        "absorcao":      estrutura.get("absorcao"),
+        "fluxo_persistencia_dias": estrutura.get("fluxo_persistencia_dias"),
     }
 
 
