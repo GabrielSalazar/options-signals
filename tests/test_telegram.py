@@ -49,6 +49,63 @@ def test_enviar_mensagem_teste_excecao_nao_propaga(monkeypatch):
     assert "timeout" in resultado["erro"]
 
 
+def test_formatter_inclui_telemetria_v2_puck(monkeypatch):
+    """Sinal com classe/níveis ATR/fluxo/gatilhos v2 → seções aparecem na msg."""
+    capt = {}
+    monkeypatch.setitem(ts.CONFIG, "telegram_token", "x")
+    monkeypatch.setitem(ts.CONFIG, "telegram_chat_id", "y")
+    monkeypatch.setattr(ts.requests, "post",
+                        lambda *a, **k: capt.update(k.get("data", {})) or object())
+    ts.enviar_telegram({
+        "ticker": "PETR4", "nome": "Petrobras", "tipo_sinal": "CALL",
+        "mes_venc": 8, "ano_venc": 2026, "gatilhos": ["g1"],
+        "classe_v2": "A", "sizing_sugerido_pct": 1.8,
+        "ativo_stop": 37.10, "ativo_entrada": 38.5, "ativo_tp1": 39.9, "ativo_tp2": 41.3,
+        "oi": 5200, "spread_pct": 8.4, "vxbr": 22.5,
+        "cmf_z": 1.8, "cmf_norm": 1.6, "fluxo_persistencia_dias": 4,
+        "gatilhos_v2": ["📈 Rompimento do HC institucional"],
+    })
+    texto = capt["text"]
+    assert "*Classe:* A" in texto
+    assert "Níveis no ativo (ATR)" in texto
+    assert "Exec (D-1):* OI 5.200" in texto
+    assert "*Fluxo:* Z +1.8" in texto
+    assert "Sizing sugerido:* 1.8%" in texto
+    assert "Gatilhos v2/PUCK (shadow)" in texto
+
+
+def test_formatter_evento_com_underscore_sanitizado(monkeypatch):
+    """evento_label com '_' é sanitizado (não quebra o Markdown do Telegram)."""
+    capt = {}
+    monkeypatch.setitem(ts.CONFIG, "telegram_token", "x")
+    monkeypatch.setitem(ts.CONFIG, "telegram_chat_id", "y")
+    monkeypatch.setattr(ts.requests, "post",
+                        lambda *a, **k: capt.update(k.get("data", {})) or object())
+    ts.enviar_telegram({"ticker": "PETR4", "nome": "P", "tipo_sinal": "CALL",
+                        "mes_venc": 8, "ano_venc": 2026, "gatilhos": ["g"],
+                        "evento_label": "EARNINGS_PETR4"})
+    assert "EARNINGS PETR4" in capt["text"]
+    assert "EARNINGS_PETR4" not in capt["text"]
+
+
+def test_enviar_card_exemplo_sem_config(monkeypatch):
+    monkeypatch.setitem(ts.CONFIG, "telegram_token", "")
+    monkeypatch.setitem(ts.CONFIG, "telegram_chat_id", "")
+    assert ts.enviar_card_exemplo()["ok"] is False
+
+
+def test_enviar_card_exemplo_envia_sinal_sintetico(monkeypatch):
+    monkeypatch.setitem(ts.CONFIG, "telegram_token", "tok")
+    monkeypatch.setitem(ts.CONFIG, "telegram_chat_id", "123")
+    enviados = []
+    monkeypatch.setattr(ts, "enviar_telegram", lambda s: enviados.append(s))
+    resultado = ts.enviar_card_exemplo()
+    assert resultado == {"ok": True}
+    assert len(enviados) == 1
+    assert enviados[0]["ticker"] == "PETR4"
+    assert enviados[0]["classe_v2"] == "A"
+
+
 def test_notificar_lote_envia_todos_com_throttle(monkeypatch):
     enviados, slept = [], []
     monkeypatch.setattr(ts, "enviar_telegram", lambda s: enviados.append(s["ticker"]))

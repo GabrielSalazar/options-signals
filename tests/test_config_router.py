@@ -132,6 +132,16 @@ def test_post_telegram_test_propaga_erro():
     assert response.json() == {"ok": False, "erro": "token/chat_id não configurado"}
 
 
+def test_post_telegram_test_card_delega_para_enviar_card_exemplo():
+    """POST /config/telegram/test-card delega a enviar_card_exemplo."""
+    with patch(f"{_MOD}.enviar_card_exemplo", return_value={"ok": True}) as mock_card:
+        response = client.post("/config/telegram/test-card")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    mock_card.assert_called_once_with()
+
+
 def test_post_telegram_get_reflete_atualizacao():
     """Fluxo ponta a ponta: POST grava config; GET subsequente reflete a
     mudança (token/chat_id passam a True) sem persistência real."""

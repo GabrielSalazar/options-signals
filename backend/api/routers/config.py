@@ -2,7 +2,11 @@
 from fastapi import APIRouter
 
 from backend.core.config import CONFIG
-from backend.services.telegram_service import enviar_mensagem_teste, save_telegram_config
+from backend.services.telegram_service import (
+    enviar_card_exemplo,
+    enviar_mensagem_teste,
+    save_telegram_config,
+)
 
 router = APIRouter(prefix="/config", tags=["Config"])
 
@@ -28,3 +32,10 @@ def test_telegram():
     credenciais na hora (sem esperar o próximo scan). Retorna {ok: true} ou
     {ok: false, erro: <motivo>} — nunca expõe o token."""
     return enviar_mensagem_teste()
+
+
+@router.post("/telegram/test-card")
+def test_telegram_card():
+    """Envia um card de sinal de EXEMPLO ao Telegram (preview do formato,
+    mesma via dos alertas reais). Retorna {ok: true} ou {ok: false, erro}."""
+    return enviar_card_exemplo()

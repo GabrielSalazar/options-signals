@@ -87,19 +87,72 @@ def enviar_telegram(sinal: dict):
         return
 
     mes_str = NOMES_MESES.get(sinal.get("mes_venc"), "")
-    msg = (
-        f"🎯 *SINAL B3 — {sinal.get('ticker')}* ({sinal.get('nome')})\n"
-        f"*Tipo:* {sinal.get('tipo_sinal')} | *Venc:* {mes_str}/{sinal.get('ano_venc')}\n"
-        f"*Strike ref:* R$ {sinal.get('strike_ref', 0):.2f} ({sinal.get('dist_otm_pct', 0):.0f}% OTM)\n"
-        f"*HV 20d:* {sinal.get('hv_20d')}% | *DTE:* {sinal.get('dte')} du\n\n"
-        f"*Entrada:* R$ {sinal.get('entrada_min', 0):.2f} – {sinal.get('entrada_max', 0):.2f}\n"
-        f"*Alvo 1:* R$ {sinal.get('alvo1', 0):.2f} (+{CONFIG.get('alvo1_pct', 0.25)*100:.0f}%) | R/R: {sinal.get('rr_alvo1', 0):.1f}×\n"
-        f"*Alvo 2:* R$ {sinal.get('alvo2', 0):.2f} (+{CONFIG.get('alvo2_pct', 0.5)*100:.0f}%) | R/R: {sinal.get('rr_alvo2', 0):.1f}×\n"
-        f"*Stop:* R$ {sinal.get('stop', 0):.2f} ({CONFIG.get('stop_pct', 0.5)*100:.0f}%)\n\n"
-        f"*Score técnico:* {sinal.get('score_tecnico', sinal.get('score'))} (mín. {CONFIG.get('min_score', 5)})\n"
-        f"*Bônus sessão:* +{sinal.get('bonus_sessao', 0)} (prioridade, não entra no corte)\n"
-        f"*Gatilhos:*\n• " + "\n• ".join(sinal.get("gatilhos", []))
-    )
+    linha_venc = f"*Tipo:* {sinal.get('tipo_sinal')} | *Venc:* {mes_str}/{sinal.get('ano_venc')}"
+    if sinal.get("classe_v2"):
+        linha_venc += f" | *Classe:* {sinal.get('classe_v2')}"
+
+    partes = [
+        f"🎯 *SINAL B3 — {sinal.get('ticker')}* ({sinal.get('nome')})",
+        linha_venc,
+        f"*Strike ref:* R$ {sinal.get('strike_ref', 0):.2f} ({sinal.get('dist_otm_pct', 0):.0f}% OTM)",
+        f"*HV 20d:* {sinal.get('hv_20d')}% | *DTE:* {sinal.get('dte')} du",
+    ]
+    if sinal.get("evento_label"):
+        # underscores quebram o Markdown do Telegram (ex.: EARNINGS_PETR4)
+        partes.append(f"⚠ *Evento no dia:* {str(sinal['evento_label']).replace('_', ' ')}")
+
+    partes += [
+        "",
+        f"*Entrada (opção):* R$ {sinal.get('entrada_min', 0):.2f} – {sinal.get('entrada_max', 0):.2f}",
+        f"*Alvo 1:* R$ {sinal.get('alvo1', 0):.2f} (+{CONFIG.get('alvo1_pct', 0.25)*100:.0f}%) | R/R: {sinal.get('rr_alvo1', 0):.1f}×",
+        f"*Alvo 2:* R$ {sinal.get('alvo2', 0):.2f} (+{CONFIG.get('alvo2_pct', 0.5)*100:.0f}%) | R/R: {sinal.get('rr_alvo2', 0):.1f}×",
+        f"*Stop:* R$ {sinal.get('stop', 0):.2f} ({CONFIG.get('stop_pct', 0.5)*100:.0f}%)",
+    ]
+
+    # Níveis no ativo subjacente (Camada PUCK — gestão pela tese, não pela opção)
+    if sinal.get("ativo_stop") is not None:
+        partes += [
+            "",
+            "*📍 Níveis no ativo (ATR):*",
+            f"Entrada R$ {sinal.get('ativo_entrada', 0):.2f} | Stop R$ {sinal.get('ativo_stop', 0):.2f}",
+            f"TP1 R$ {sinal.get('ativo_tp1', 0):.2f} (50%) | TP2 R$ {sinal.get('ativo_tp2', 0):.2f}",
+            "_No TP1 realize 50% e mova o stop p/ a entrada._",
+        ]
+
+    # Executabilidade (dados D-1 da B3)
+    exec_bits = []
+    if sinal.get("oi") is not None:
+        exec_bits.append(f"OI {int(sinal['oi']):,}".replace(",", "."))
+    if sinal.get("spread_pct") is not None:
+        exec_bits.append(f"Spread {sinal['spread_pct']:.1f}%")
+    if sinal.get("vxbr") is not None:
+        exec_bits.append(f"VXBR {sinal['vxbr']:.1f}")
+    if exec_bits:
+        partes.append("*Exec (D-1):* " + " | ".join(exec_bits))
+
+    # Fluxo institucional (Camada PUCK)
+    if sinal.get("cmf_z") is not None:
+        fluxo = f"*Fluxo:* Z {sinal['cmf_z']:+.1f}"
+        if sinal.get("cmf_norm") is not None:
+            fluxo += f" | Intens {sinal['cmf_norm']:.1f}"
+        if sinal.get("fluxo_persistencia_dias") is not None:
+            fluxo += f" | Persist {sinal['fluxo_persistencia_dias']}d"
+        partes.append(fluxo)
+
+    partes += [
+        "",
+        f"*Score técnico:* {sinal.get('score_tecnico', sinal.get('score'))} (mín. {CONFIG.get('min_score', 5)})",
+        f"*Bônus sessão:* +{sinal.get('bonus_sessao', 0)} (prioridade, não entra no corte)",
+    ]
+    if sinal.get("sizing_sugerido_pct") is not None:
+        partes.append(f"*Sizing sugerido:* {sinal['sizing_sugerido_pct']:.1f}% do capital")
+
+    partes.append("*Gatilhos:*\n• " + "\n• ".join(sinal.get("gatilhos", [])))
+
+    if sinal.get("gatilhos_v2"):
+        partes.append("*Gatilhos v2/PUCK (shadow):*\n◦ " + "\n◦ ".join(sinal["gatilhos_v2"]))
+
+    msg = "\n".join(partes)
 
     try:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -135,6 +188,41 @@ def enviar_mensagem_teste() -> dict:
         return {"ok": False, "erro": erro}
     except Exception as e:
         logger.error(f"Erro ao enviar teste do Telegram: {e}")
+        return {"ok": False, "erro": str(e)}
+
+
+def enviar_card_exemplo() -> dict:
+    """Envia um sinal de EXEMPLO (sintético) ao Telegram, pela mesma via de
+    `enviar_telegram`, para preview do formato do card. Retorna {"ok": True}
+    ou {"ok": False, "erro": <motivo>}."""
+    token = CONFIG.get("telegram_token", "")
+    chat_id = CONFIG.get("telegram_chat_id", "")
+    if not token or not chat_id:
+        return {"ok": False, "erro": "token/chat_id não configurado"}
+
+    exemplo = {
+        "ticker": "PETR4", "nome": "Petrobras PN (EXEMPLO)", "tipo_sinal": "CALL",
+        "mes_venc": 8, "ano_venc": 2026, "strike_ref": 40.0, "dist_otm_pct": 6.0,
+        "hv_20d": 32.5, "dte": 28,
+        "entrada_min": 0.80, "entrada_max": 0.92,
+        "alvo1": 1.15, "alvo2": 1.60, "alvo_final": 2.40, "stop": 0.46,
+        "rr_alvo1": 1.5, "rr_alvo2": 2.5, "rr_final": 4.0,
+        "score_tecnico": 11, "score": 11, "bonus_sessao": 2,
+        "classe_v2": "A", "sizing_sugerido_pct": 1.8,
+        "ativo_entrada": 38.50, "ativo_stop": 37.10, "ativo_tp1": 39.90, "ativo_tp2": 41.30,
+        "oi": 5200, "bid": 0.80, "ask": 0.92, "spread_pct": 8.4, "vxbr": 22.5,
+        "cmf_z": 1.8, "cmf_norm": 1.6, "fluxo_persistencia_dias": 4,
+        "gatilhos": ["📈 Estocástico: cruzamento altista em sobrevenda",
+                     "📈 RSI sobrevenda: 32.1",
+                     "📈 Volume 1.8x acima da média"],
+        "gatilhos_v2": ["📈 Rompimento do HC institucional (z-fluxo 1.8)",
+                        "📈 Preço acima da EMA21"],
+    }
+    try:
+        enviar_telegram(exemplo)
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"Erro ao enviar card de exemplo: {e}")
         return {"ok": False, "erro": str(e)}
 
 
