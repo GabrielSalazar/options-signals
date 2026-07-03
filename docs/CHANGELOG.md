@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 ## [Não lançado]
 
+### Added (Camada PUCK — shadow)
+- **Indicadores PUCK** ([backend/domain/indicators.py](../backend/domain/indicators.py)):
+  `ema50`, `clv` (Close Location Value), zona do High Candle institucional
+  (`hc_max`/`hc_min`, volume > 1.5× média20; sentinela ±inf antes do primeiro candle
+  institucional — fail-safe que não envenena o `dropna` do pipeline), `cmf_norm`
+  (intensidade de fluxo vs. média do próprio ativo), `cmf_z` (z-score do CMF —
+  threshold autocalibrado cross-asset, PUCK v4.4), `absorcao` e `fluxo_persist_pos/neg`.
+- **Gatilhos shadow G20/B20** (rompimento do HC com z-fluxo e tendência EMA21>EMA50
+  alinhados, família ESTRUTURA, 3 pts) e **G21/B21** (divergência de fluxo CMF×preço,
+  família MOMENTUM, 2 pts) — 0 pontos até `puck_gatilhos_mode=ativo`; telemetria via
+  `trigger_outcomes` como os demais gatilhos v2. Guard `_filtrar_ids_puck_shadow`
+  impede que IDs PUCK vazem para famílias/classe se a matriz v2 ativar antes do PUCK.
+- **Modificadores shadow de classe**: absorção no HC (rompimento testado e rejeitado
+  com fluxo neutro) registra razão de downgrade; fluxo persistente ≥3d em classe C
+  registra candidato a upgrade C→B (flags `absorcao_classe_mode`/`fluxo_upgrade_mode`).
+- **Níveis ATR no ativo subjacente** (informativos): `ativo_entrada/stop/tp1/tp2`
+  (stop 1.5×ATR, TP1 1.5×, TP2 3× → R:R 2:1) no payload, persistidos (migração
+  `016`) e exibidos no SignalCard com a regra de gestão parcial (TP1 = realizar 50%
+  e mover stop à entrada). Os alvos % sobre o prêmio da opção permanecem os oficiais.
+- **SignalCard**: badge "Absorção HC" e tooltip do badge de classe relabelado para
+  "Notas de classe:" (a lista carrega downgrades e candidatos a upgrade).
+- **Decisões registradas**: agressão por tape reading e lote institucional são
+  inviáveis sem dados intraday pagos (proxy = CLV/CMF); grid gradiente (v1.4) e
+  VWAP de sessão ficam fora do escopo (spec v2 §7).
+
+> **Pendências (Camada PUCK):** aplicar migração `016` no Supabase; medir
+> G20/B20/G21/B21 e modificadores na janela shadow da Fase 4
+> (query `fase4_monitor_shadow.sql`) antes de qualquer ativação; delta/DTE por
+> classe adiado para pós-validação. Suíte: 712 testes backend + 138 frontend.
+
 ### Added (Matriz v2 — Fase 3: Dados Externos)
 - **Coleta diária de OI via PriceReport (PR) da B3**
   (`https://www.b3.com.br/pesquisapregao/download?filelist=PRAAMMDD.zip`, formato AAMMDD):
