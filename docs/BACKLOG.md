@@ -104,3 +104,14 @@ mais valioso, mas deve esperar a Fase 4 por tocar na forma de medir o desfecho.
   condição de cmf) — conferir efeito líquido ao ativar.
 - **`cmf_z_periodo` > 28** estenderia o warm-up além do ADX e mudaria linhas do
   backtest (dropna) — manter 21 salvo recalibração deliberada.
+
+---
+
+## Precificação — próximos passos (análise repositórios B3, jul/2026)
+- [ ] Métricas de performance no backtest (Sharpe/Sortino/drawdown) — ref. ffn
+- [ ] IV robusta com fallback LetsBeRational — ref. vollib
+- [ ] Curva de juros por vencimento (estrutura a termo) — ref. brasa/ANBIMA
+- [ ] Superfície de volatilidade / skew — ref. ysaporito/QuantLib
+- [ ] Integrar COTAHIST no fluxo de backtest para medir hit-rate PUCK (Fase 4)
+- [ ] Implementar parser fixed-width real para `cotahist_service.carregar_cotahist_diario`
+  (sem pacote PyPI viável; usar layout oficial B3 — ver docstring do módulo)
