@@ -248,3 +248,12 @@ def test_estimar_premio_otm_put_bate_com_bs_put_price_com_selic():
     premio = estimar_premio_otm(preco, strike, dte_du, iv, tipo="PUT")
     esperado = bs_put_price(preco, strike, dte_du / 252, r=0.135, sigma=iv)
     assert premio == pytest.approx(round(esperado, 2), abs=0.01)
+
+
+def test_estimar_premio_otm_usa_taxa_injetada():
+    # r maior encarece a call; comprova que o parâmetro r é respeitado
+    barato = estimar_premio_otm(preco=100.0, strike=100.0, dte_du=30, iv=0.30,
+                                tipo="CALL", r=0.05)
+    caro = estimar_premio_otm(preco=100.0, strike=100.0, dte_du=30, iv=0.30,
+                              tipo="CALL", r=0.20)
+    assert caro > barato

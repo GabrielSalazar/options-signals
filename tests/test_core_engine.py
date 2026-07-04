@@ -38,6 +38,9 @@ def _relax_and_mock(monkeypatch):
     monkeypatch.setattr(core_engine, "mes_vencimento_ideal", lambda *a, **k: (6, 2026, 30))
     monkeypatch.setattr(core_engine, "score_horario", lambda *a, **k: 0)
     monkeypatch.setattr(core_engine, "get_real_options_from_opcoes_net", lambda *a, **k: None)
+    # Evita chamada de rede real ao BCB nos testes de caracterização; mantém a
+    # taxa fixa histórica (0.135) para preservar os valores de greeks esperados.
+    monkeypatch.setattr(core_engine, "get_selic_anual", lambda: 0.135)
 
 
 def test_analisar_ativo_sinal_call_caracterizacao(monkeypatch):

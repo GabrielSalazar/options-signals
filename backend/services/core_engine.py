@@ -17,6 +17,7 @@ from backend.core.config import (
     score_horario,
 )
 from backend.domain.greeks import calculate_greeks, implied_volatility
+from backend.services.risk_free_service import get_selic_anual
 from backend.domain.indicators import (
     calcular_indicadores,
     detectar_canal_linear,
@@ -591,7 +592,7 @@ def _montar_estrutura_opcao(ticker_base: str, preco: float, tipo_sinal: str,
 
     iv_impl, iv_source = resolver_iv(preco_tela, preco, strike_ref, T, tipo_sinal, hv_20d, ivs_vizinhos)
     iv_mercado = iv_impl if iv_source == "tela" else None
-    greeks = calculate_greeks(preco, strike_ref, T, iv_impl, tipo_sinal)
+    greeks = calculate_greeks(preco, strike_ref, T, iv_impl, tipo_sinal, r=get_selic_anual())
 
     delta_abs = abs(greeks["delta"])
     if delta_abs and not (CONFIG.get("delta_min", 0.0) <= delta_abs <= CONFIG.get("delta_max", 1.0)):

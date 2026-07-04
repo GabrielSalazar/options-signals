@@ -116,16 +116,19 @@ def estimar_iv_historica(df: pd.DataFrame, janela: int = 20, interval: str = "1d
     return float(iv_periodo * fator_anualizacao)
 
 def estimar_premio_otm(preco: float, strike: float, dte_du: int,
-                       iv: float, tipo: str = "PUT") -> float:
+                       iv: float, tipo: str = "PUT",
+                       r: float = RISK_FREE_RATE_DEFAULT) -> float:
     """Precifica via Black-Scholes com taxa livre de risco (Selic), delegando
     para os mesmos precificadores usados por `calculate_greeks` — antes desta
-    correção a fórmula local ignorava `r`/desconto e divergia dos greeks."""
+    correção a fórmula local ignorava `r`/desconto e divergia dos greeks.
+    `r` é injetável (Selic dinâmica) e default para a constante fixa, mantendo
+    compatibilidade retroativa com os chamadores existentes."""
     if dte_du <= 0 or iv <= 0:
         return max(0.01, round(preco * 0.015, 2))
     t = dte_du / 252
     try:
         pricer = bs_put_price if tipo == "PUT" else bs_call_price
-        premio = pricer(preco, strike, t, r=RISK_FREE_RATE_DEFAULT, sigma=iv)
+        premio = pricer(preco, strike, t, r=r, sigma=iv)
         return max(0.01, round(float(premio), 2))
     except Exception:
         fator_otm = abs(preco - strike) / preco
