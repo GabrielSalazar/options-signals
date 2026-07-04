@@ -11,8 +11,10 @@ Cobre:
 import math
 
 import pytest
+from scipy.stats import norm
 
 from backend.domain.greeks import (
+    TRADING_DAYS_PER_YEAR,
     _d1_d2,
     bs_call_price,
     bs_put_price,
@@ -172,6 +174,30 @@ class TestCalculateGreeks:
         assert g["delta"] == 0.0
         assert g["gamma"] == 0.0
         assert g["vega"] == 0.0
+
+    def test_theta_usa_base_252(self):
+        """Theta deve ser anualizado dividido por 252 dias úteis, não 365."""
+        assert TRADING_DAYS_PER_YEAR == 252
+
+        d1, d2 = _d1_d2(S, K, T, R, SIGMA)
+        sqrt_T = math.sqrt(T)
+        pdf_d1 = math.exp(-0.5 * d1 ** 2) / math.sqrt(2 * math.pi)
+
+        theta_annual_call = (-(S * pdf_d1 * SIGMA) / (2 * sqrt_T)
+                              - R * K * math.exp(-R * T) * norm.cdf(d2))
+        expected_theta_call = round(theta_annual_call / 252, 6)
+
+        g_call = calculate_greeks(S, K, T, SIGMA, "CALL")
+        assert g_call["theta"] == pytest.approx(expected_theta_call, abs=1e-6)
+        # confirma que NÃO é a base antiga de 365
+        assert g_call["theta"] != pytest.approx(theta_annual_call / 365, abs=1e-6)
+
+        theta_annual_put = (-(S * pdf_d1 * SIGMA) / (2 * sqrt_T)
+                             + R * K * math.exp(-R * T) * norm.cdf(-d2))
+        expected_theta_put = round(theta_annual_put / 252, 6)
+
+        g_put = calculate_greeks(S, K, T, SIGMA, "PUT")
+        assert g_put["theta"] == pytest.approx(expected_theta_put, abs=1e-6)
 
 
 class TestImpliedVolatility:

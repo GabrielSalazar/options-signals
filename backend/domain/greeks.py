@@ -13,6 +13,7 @@ import math
 from scipy.stats import norm
 
 RISK_FREE_RATE_DEFAULT = 0.135  # Selic ~13,5% a.a.
+TRADING_DAYS_PER_YEAR = 252  # Dias úteis B3 (consistente com T = dte/252 em options_math.py)
 
 
 def _d1_d2(S: float, K: float, T: float, r: float, sigma: float) -> tuple:
@@ -60,13 +61,13 @@ def calculate_greeks(S: float, K: float, T: float, sigma: float,
     if opt_type.upper() == "CALL":
         delta = norm.cdf(d1)
         theta = (-(S * pdf_d1 * sigma) / (2 * sqrt_T)
-                 - r * K * math.exp(-r * T) * norm.cdf(d2)) / 365
+                 - r * K * math.exp(-r * T) * norm.cdf(d2)) / TRADING_DAYS_PER_YEAR
         rho   = K * T * math.exp(-r * T) * norm.cdf(d2) / 100
         prob  = norm.cdf(d2)
     else:
         delta = norm.cdf(d1) - 1
         theta = (-(S * pdf_d1 * sigma) / (2 * sqrt_T)
-                 + r * K * math.exp(-r * T) * norm.cdf(-d2)) / 365
+                 + r * K * math.exp(-r * T) * norm.cdf(-d2)) / TRADING_DAYS_PER_YEAR
         rho   = -K * T * math.exp(-r * T) * norm.cdf(-d2) / 100
         prob  = norm.cdf(-d2)
 
