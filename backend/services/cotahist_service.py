@@ -14,28 +14,38 @@ com suporte a registros de opção do COTAHIST — candidatos avaliados (bovespa
 b3parser, bovespaparser, pybov) estão obsoletos/genéricos e nenhum confirma
 tratar os registros TIPREG=1 com TIPO_MERCADO de opção (70/80).
 
-Por isso `carregar_cotahist_diario` abaixo é um stub deliberado: não faz
-nenhum import de dependência externa (nem `rb3`, nem outro pacote), apenas
-loga um aviso e retorna um DataFrame vazio. A implementação real precisará de
-um parser posicional (fixed-width) próprio, escrito à mão, para o arquivo
+IMPORTANTE — já existe um parser fixed-width do COTAHIST no repositório,
+testado contra arquivo real: `_parse_cotahist_zip` em
+`backend/services/liquidity_service.py` (usado por `coletar_liquidity_diaria`
+para extrair bid/ask de fechamento por opção). Antes de escrever um parser do
+zero, ver esse código — ele já resolve download do ZIP diário (COTAHIST_DDMMAAAA.ZIP,
+`COTAHIST_BASE_URL`), leitura linha a linha em latin-1, e filtro por TPMERC.
+Os offsets REAIS usados lá (conferidos em produção, diferentes dos que uma
+leitura do leiaute oficial sugeriria à primeira vista) são:
+  - TPMERC (posição 2:5, string de 3 chars): "070" = opção de compra,
+    "080" = opção de venda — outros tipos (ex.: "010" = ação) são ignorados.
+  - ESPECS/ticker da série (posição 36:40): 4 primeiros chars = raiz do ativo
+    (ex.: "PETRG360" → raiz "PETR").
+  - PREOFC (posição 82:95): preço ofertado de compra (ask no parser, right-aligned,
+    vírgula decimal).
+  - PREOFV (posição 95:108): preço ofertado de venda (bid no parser).
+
+Esse parser é específico para bid/ask agregados por raiz de ativo (não guarda
+strike nem data de vencimento por linha — o dict de saída é
+`{ticker_base: {"bid", "ask", "spread_pct"}}`), então NÃO generaliza
+diretamente para o caso desta task (prêmio de fechamento por série individual,
+com strike/vencimento, para validação de hit-rate no backtest). Por isso
+`carregar_cotahist_diario` abaixo permanece um stub deliberado — mas qualquer
+parser real que vier a substituí-lo deve reusar os offsets acima (já
+verificados) em vez de re-derivar posições do leiaute oficial da B3.
+
+`carregar_cotahist_diario` não faz nenhum import de dependência externa (nem
+`rb3`, nem outro pacote), apenas loga um aviso e retorna um DataFrame vazio
+até que um parser posicional (fixed-width) específico para registros de
+opção completos (com PREULT/PREEXE/DATVEN) seja implementado, para o arquivo
 COTAHIST_A{YYYY}.ZIP publicado pela B3 (download em
 https://www.b3.com.br/pt_br/market-data-e-indices/servicos-de-dados/
 market-data/historico/mercado-a-vista/cotacoes-historicas/).
-
-Referência de layout conhecida (arquivo texto de largura fixa, codificação
-ISO-8859-1; layout oficial "Histórico de Cotações — Leiaute" publicado pela
-B3 junto com o ZIP anual):
-  - TIPREG (posições 0-2): tipo de registro (variável de referência p/ pular
-    cabeçalho/rodapé).
-  - DATA_PREGAO (2-10): data do pregão.
-  - TIPO_MERCADO (10-12): "70" = opção de compra, "80" = opção de venda.
-  - CODNEG (12-24): código de negociação (ticker da série de opção).
-  - PREULT (~94-105): preço/prêmio de fechamento, casas decimais implícitas
-    (últimos 2 dígitos são centavos).
-  - PREEXE (~188-200): preço de exercício (strike), mesma convenção decimal.
-  - DATVEN (~202-210): data de vencimento da série.
-As posições acima são aproximadas e devem ser conferidas contra o PDF de
-layout oficial da B3 antes de implementar o parser real.
 
 A peça estável e testada desta task é `filtrar_opcoes_do_ativo`.
 """
@@ -66,10 +76,14 @@ def carregar_cotahist_diario(data_ref: str) -> pd.DataFrame:
 
     STUB DELIBERADO (ver docstring do módulo): não existe hoje, no PyPI, um
     parser Python confiável para os registros de opção do COTAHIST — não há
-    import de nenhuma dependência externa aqui. Esta função apenas loga um
-    aviso e retorna um DataFrame vazio até que um parser posicional próprio
-    seja implementado (fixed-width, ISO-8859-1, arquivo COTAHIST_A{YYYY}.ZIP
-    da B3).
+    import de nenhuma dependência externa aqui. Já existe um parser fixed-width
+    testado em produção para bid/ask (`_parse_cotahist_zip` em
+    `backend/services/liquidity_service.py`), mas ele não guarda strike/vencimento
+    por série, então não serve diretamente aqui — ver docstring do módulo para
+    os offsets reais já verificados. Esta função apenas loga um aviso e retorna
+    um DataFrame vazio até que um parser posicional próprio para registros de
+    opção completos seja implementado (fixed-width, ISO-8859-1, arquivo
+    COTAHIST_A{YYYY}.ZIP da B3).
 
     data_ref: 'YYYY-MM-DD'.
     """
