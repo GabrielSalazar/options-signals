@@ -115,3 +115,13 @@ mais valioso, mas deve esperar a Fase 4 por tocar na forma de medir o desfecho.
 - [ ] Integrar COTAHIST no fluxo de backtest para medir hit-rate PUCK (Fase 4)
 - [ ] Implementar parser fixed-width real para `cotahist_service.carregar_cotahist_diario`
   (sem pacote PyPI viável; usar layout oficial B3 — ver docstring do módulo)
+
+**Fontes de dados de opções avaliadas (jul/2026) — nenhuma adotada ainda:**
+- `Api-Series-Autorizadas-B3` (github.com/Megas-MDN) — grátis, API REST hospedada,
+  mas só séries autorizadas (strike/vencimento/tipo), **sem prêmio/IV**.
+- `B3API` (github.com/Geovane2dd) — arquivado/descontinuado desde mai/2025, descartado.
+- `brapi.dev` — único com prêmio/Greeks/IV reais via API documentada, mas dados de
+  opções exigem o plano Pro pago (~R$117/mês); free tier não inclui opções.
+- `opcoes.net.br` — dados reais na interface, sem API pública documentada (exigiria
+  scraping).
+Decisão: manter o stub por ora; reavaliar quando houver orçamento/prioridade definidos.
