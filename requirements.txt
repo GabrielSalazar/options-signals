@@ -19,3 +19,4 @@ tqdm
 slowapi
 prometheus-client
 tzdata
+python-bcb
