@@ -9,14 +9,33 @@ relacionada chamada "redis blaster" (módulo `rb`, cliente sharded para Redis). 
 pacote real de dados da B3 chamado "rb3" (por wilsonfreitas) é um pacote do R/CRAN,
 sem port oficial para Python no PyPI sob esse nome.
 
-Por isso `carregar_cotahist_diario` abaixo faz um import tardio de `rb3` apenas
-para manter a assinatura pedida pelo plano; na prática esse import falha
-(ModuleNotFoundError) e a função degrada com segurança para um DataFrame vazio,
-logando um aviso. Antes de usar essa função em produção é necessário substituir
-sua implementação por um parser real de COTAHIST (ex.: download do arquivo
-zipado em https://www.b3.com.br/pt_br/market-data-e-indices/servicos-de-dados/
-market-data/historico/mercado-a-vista/cotacoes-historicas/ e parse do layout
-posicional, ou uma ponte via rpy2 para o pacote R rb3).
+Também não foi encontrado no PyPI nenhum pacote Python ativamente mantido e
+com suporte a registros de opção do COTAHIST — candidatos avaliados (bovespa,
+b3parser, bovespaparser, pybov) estão obsoletos/genéricos e nenhum confirma
+tratar os registros TIPREG=1 com TIPO_MERCADO de opção (70/80).
+
+Por isso `carregar_cotahist_diario` abaixo é um stub deliberado: não faz
+nenhum import de dependência externa (nem `rb3`, nem outro pacote), apenas
+loga um aviso e retorna um DataFrame vazio. A implementação real precisará de
+um parser posicional (fixed-width) próprio, escrito à mão, para o arquivo
+COTAHIST_A{YYYY}.ZIP publicado pela B3 (download em
+https://www.b3.com.br/pt_br/market-data-e-indices/servicos-de-dados/
+market-data/historico/mercado-a-vista/cotacoes-historicas/).
+
+Referência de layout conhecida (arquivo texto de largura fixa, codificação
+ISO-8859-1; layout oficial "Histórico de Cotações — Leiaute" publicado pela
+B3 junto com o ZIP anual):
+  - TIPREG (posições 0-2): tipo de registro (variável de referência p/ pular
+    cabeçalho/rodapé).
+  - DATA_PREGAO (2-10): data do pregão.
+  - TIPO_MERCADO (10-12): "70" = opção de compra, "80" = opção de venda.
+  - CODNEG (12-24): código de negociação (ticker da série de opção).
+  - PREULT (~94-105): preço/prêmio de fechamento, casas decimais implícitas
+    (últimos 2 dígitos são centavos).
+  - PREEXE (~188-200): preço de exercício (strike), mesma convenção decimal.
+  - DATVEN (~202-210): data de vencimento da série.
+As posições acima são aproximadas e devem ser conferidas contra o PDF de
+layout oficial da B3 antes de implementar o parser real.
 
 A peça estável e testada desta task é `filtrar_opcoes_do_ativo`.
 """
@@ -45,15 +64,18 @@ def filtrar_opcoes_do_ativo(df: pd.DataFrame, ativo_base: str) -> pd.DataFrame:
 def carregar_cotahist_diario(data_ref: str) -> pd.DataFrame:
     """Baixa o COTAHIST diário e retorna DataFrame padronizado.
 
-    data_ref: 'YYYY-MM-DD'. Requer rede/parser real; qualquer falha (incluindo a
-    ausência de um parser real de COTAHIST hoje — ver docstring do módulo) retorna
-    DataFrame vazio e loga um aviso, sem propagar exceção.
-    """
-    try:
-        import rb3  # import tardio: dep pesada, só quando há download real
+    STUB DELIBERADO (ver docstring do módulo): não existe hoje, no PyPI, um
+    parser Python confiável para os registros de opção do COTAHIST — não há
+    import de nenhuma dependência externa aqui. Esta função apenas loga um
+    aviso e retorna um DataFrame vazio até que um parser posicional próprio
+    seja implementado (fixed-width, ISO-8859-1, arquivo COTAHIST_A{YYYY}.ZIP
+    da B3).
 
-        raw = rb3.cotahist(data_ref)  # nome/assinatura ainda a confirmar com parser real
-        return pd.DataFrame(raw)
-    except Exception as e:
-        logger.warning(f"COTAHIST indisponível para {data_ref}: {e}")
-        return pd.DataFrame()
+    data_ref: 'YYYY-MM-DD'.
+    """
+    logger.warning(
+        f"COTAHIST indisponível para {data_ref}: download/parse ainda não "
+        "implementado (nenhum pacote PyPI viável encontrado; requer parser "
+        "fixed-width próprio — ver docstring do módulo)."
+    )
+    return pd.DataFrame()

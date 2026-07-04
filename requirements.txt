@@ -20,4 +20,3 @@ slowapi
 prometheus-client
 tzdata
 python-bcb
-rb3
