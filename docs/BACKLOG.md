@@ -113,8 +113,22 @@ mais valioso, mas deve esperar a Fase 4 por tocar na forma de medir o desfecho.
 - [ ] Curva de juros por vencimento (estrutura a termo) — ref. brasa/ANBIMA
 - [ ] Superfície de volatilidade / skew — ref. ysaporito/QuantLib
 - [ ] Integrar COTAHIST no fluxo de backtest para medir hit-rate PUCK (Fase 4)
-- [ ] Implementar parser fixed-width real para `cotahist_service.carregar_cotahist_diario`
-  (sem pacote PyPI viável; usar layout oficial B3 — ver docstring do módulo)
+- [ ] **Executar plano do parser COTAHIST próprio** — plano pronto em
+  `docs/superpowers/plans/2026-07-03-cotahist-parser-proprio.md` (4 tasks, zero deps
+  novas; offsets verificados contra arquivo real `COTAHIST_D02072026.ZIP` em 03/07/2026,
+  fixtures com linhas reais verbatim). Substitui o item anterior de "parser fixed-width".
+- [ ] **BUG de produção descoberto em 03/07/2026 (Task 3 do plano acima corrige):**
+  `liquidity_service` nunca coleta bid/ask de verdade — a URL do COTAHIST sem o prefixo
+  `D` (`COTAHIST_{DDMMYYYY}.ZIP`) retorna 404 (o real é `COTAHIST_D{DDMMYYYY}.ZIP`), e os
+  offsets do parser (`TPMERC` em `[2:5]`, que é o meio da data) nunca casam com linha
+  real; preços reais têm 2 decimais implícitos, não vírgula. Resultado:
+  `bid/ask/spread_pct` sempre NULL em `option_liquidity`, silenciosamente. Ao corrigir,
+  conferir flags de veto de liquidez por spread antes do deploy (NULL→valor real pode
+  ativar veto que nunca atuou).
+- [ ] Decisão pendente (na integração backtest): prêmios COTAHIST sob demanda (opção A)
+  ou persistência diária em tabela nova `option_premiums_eod` dentro do job diário
+  existente com skip-if-exists (opção B — recomendada; ~11,5 mil registros/pregão,
+  poucos MB/mês, hit-rate PUCK consultável por SQL).
 
 **Fontes de dados de opções avaliadas (jul/2026) — nenhuma adotada ainda:**
 - `Api-Series-Autorizadas-B3` (github.com/Megas-MDN) — grátis, API REST hospedada,
