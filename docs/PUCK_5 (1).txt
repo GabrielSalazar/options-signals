@@ -1,0 +1,252 @@
+// ================================
+// PUCK 5 - MEDIDOR DE AGRESSÃO (CMF COM AGRESSÃO REAL)
+// + DETECÇÃO DE ABSORÇÃO (FLUXO vs PREÇO) + HC CANDLE VOLUME
+// ================================
+input
+  //Parâmetros CMF Agressão
+  Periodo(21);
+  NivelExtremo(0.10);
+  PeriodoMediaLonga(80);
+  PeriodoMediaCurta(34);
+  //Parâmetros HC Candle Volume
+  DiaAtual(false);
+  DataInicio(1250901);
+  //Parâmetros comuns
+  QuantidadePorOrdem(1);
+  //Parâmetros Condicionais
+  SinalCandleVolume(false);
+  SinalCandleVolumeEAgressao(true);
+
+  //SinalCandleVolumeMedia17Agressao(false);
+  //SinalCandleVolumeEAgressaoEMediaAgressao(false);
+  //SinalMedia17EAgressao(false);
+  //SinalMedia80EAgressaoEMediaAgressao(false);
+  //SinalMediaCruzamentoEAgressao(false);
+  //SinalPrecoCandleVolumeAgressao(false);
+  NiveisGradiente(20);
+  DistanciaGrid(50);
+
+var
+  //Variáveis CMF Agressão
+  volTotal,delta,cmfReal,maior_agress                                             : float;
+  somaDelta,somaVolume                                                            : float;
+
+  agress_pos,agress_neg: float;
+  media_agress_pos,media_agress_neg : float;
+  //media_longa,media_curta : float;
+
+  //media_media_compra,media_media_venda                                            : float;
+  range,tendencia_compra,tendencia_venda                                          : boolean;
+
+  //Variáveis condicionais
+  //price_buy,price_sell                                                            : boolean;
+  //avg_cross_buy,avg_cross_sell                                                    : boolean;
+  //avg17_buy,avg17_sell                                                            : boolean;
+  //avg80_buy,avg80_sell                                                            : boolean;
+  agress_buy,agress_sell                                                          : boolean;
+  avg_agress_buy,avg_agress_sell                                                  : boolean;
+
+  sinal_entrada_compra,sinal_entrada_venda                                        : boolean;
+  sinal_saida_venda_compra,sinal_saida_compra_venda                               : boolean;
+
+  //Variáveis HC Candle Volume
+  max_candle,min_candle,media_candle                                              : float;
+  max_candle_anterior,min_candle_anterior,media_candle_anterior                   : float;
+  candle_volume_compra                                                            : boolean;
+  candle_volume_venda                                                             : boolean;
+  d_menos_um,maior_volume                                                         : integer;
+
+  //Variáveis do gradiente
+  distancia_grid,preco_entrada,posicao                                            : float;
+
+  contador : integer;
+  niveis: integer;
+
+  begin
+  d_menos_um := Date[1];
+  begin
+    // ======= HC CANDLE VOLUME =======
+    if DiaAtual then
+      If (Date <> d_menos_um) Then
+        maior_volume := 0;
+    if not DiaAtual then
+      If (Date = DataInicio) Then
+        maior_volume := 0;
+    if (Volume > maior_volume) then
+      begin
+        maior_volume := Volume;
+        min_candle_anterior := min_candle;
+        max_candle_anterior := max_candle;
+        media_candle_anterior := (min_candle_anterior + max_candle_anterior) / 2;
+        min_candle := Low;
+        max_candle := High;
+        media_candle := (min_candle + max_candle) / 2;
+      end;
+    // ======= CMF COM AGRESSÃO REAL =======
+    volTotal := AgressionVolBuy + AgressionVolSell;
+    delta := AgressionVolBuy - AgressionVolSell;
+    somaDelta := Summation(delta,Periodo);
+    somaVolume := Summation(volTotal,Periodo);
+    if (somaVolume > 0) then
+      cmfReal := (somaDelta / somaVolume) * 1000
+    else
+      cmfReal := 0;
+    if (cmfReal > 0) then
+      agress_pos := abs(cmfReal)
+    else if (cmfReal > 0) and (Close < Close[1]) then
+      begin
+        agress_pos := abs(cmfReal);
+        agress_neg := abs(0.01);
+      end
+    else
+      agress_pos := 0;
+    if (cmfReal < 0) then
+      agress_neg := abs(cmfReal)
+    else if (cmfReal < 0) and (Close > Close[1]) then
+      begin
+        agress_neg := abs(cmfReal);
+        agress_pos := abs(0.01);
+      end
+    else
+      agress_neg := 0;
+
+    //media_longa := Media(PeriodoMediaLonga,Close);
+    //media_curta := Media(PeriodoMediaCurta,Close);
+
+    media_agress_pos := MediaExp(Periodo,agress_pos);
+    media_agress_neg := MediaExp(Periodo,agress_neg);
+
+    //media_media_compra := Media(3,media_agress_pos);
+    //media_media_venda := Media(3,media_agress_neg);
+
+    candle_volume_compra := (Low > max_candle);
+    candle_volume_venda := (High < min_candle);
+
+    avg_agress_buy := (media_agress_pos > media_agress_neg);
+    avg_agress_sell := (media_agress_neg > media_agress_pos);
+
+    agress_buy := (agress_pos >= 0.05);
+    agress_sell := (agress_neg >= 0.05);
+
+
+
+
+
+
+    if (High > High[1]) and (agress_neg > 1) then
+      tendencia_compra := true
+    else if (Low < Low[1]) and (agress_pos > 1) then
+      tendencia_venda := true
+    else
+      begin
+        tendencia_venda := false;
+        tendencia_compra := false;
+      end;
+    //sinal_entrada_compra := candle_volume_compra and agress_buy ;
+    //sinal_entrada_venda := candle_volume_venda and agress_sell;
+    //if (sinal_entrada_compra = false) and (sinal_entrada_venda = false) then
+    //  begin
+    //  if avg_buy and (agress_pos > 10) then
+    //    sinal_entrada_compra := true
+    //  else if avg_sell and (agress_neg > 10) then
+    //    sinal_entrada_venda := true;
+    //  end;
+    //  if (sinal_entrada_compra = false) and (sinal_entrada_venda = false) then
+    //  begin
+    //      sinal_entrada_compra := price_buy;
+    //      sinal_entrada_venda :=  price_sell;
+    //  end;
+
+    if SinalCandleVolume then
+      begin
+        sinal_entrada_compra := candle_volume_compra;
+        sinal_entrada_venda := candle_volume_venda;
+      end
+    else if SinalCandleVolumeEAgressao then
+      begin
+        sinal_entrada_compra := candle_volume_compra and  avg_agress_buy;
+        sinal_entrada_venda := candle_volume_venda and avg_agress_sell;     
+      end;
+
+    //  end;
+
+
+    sinal_saida_compra_venda := agress_neg[1] < 50;
+    sinal_saida_venda_compra := agress_pos[1] < 50;
+
+    // --- Critério de Entrada e Saída do Mercado Compra/Venda ---
+    if (SellPosition = QuantidadePorOrdem) and (preco_entrada = 0) then
+      preco_entrada := Close;
+    if (BuyPosition = QuantidadePorOrdem) and (preco_entrada = 0) then
+      preco_entrada := Close;
+
+
+    If (sinal_entrada_compra = false) and (BuyPosition > 0) then ClosePosition();
+    If (sinal_entrada_compra = false) and (SellPosition > 0) then ClosePosition();
+
+    // --- Fim Critério de saída Compra/Venda ---
+
+    if sinal_entrada_compra and (HasPosition = false) then
+      BuyAtMarket(QuantidadePorOrdem)
+    else if sinal_entrada_venda and (HasPosition = false) then
+      SellShortAtMarket(QuantidadePorOrdem);
+
+
+    if (BuyPosition > 0) or (SellPosition > 0) then
+    begin
+
+      if IsSold then
+        begin
+          niveis := SellPosition / QuantidadePorOrdem;
+          // --- Monstagem do grid do Gradiente Linear ---
+          if (niveis <= NiveisGradiente) then
+              for contador := (niveis) to NíveisGradiente do
+                begin
+                  posicao := preco_entrada + (contador * DistanciaGrid);
+                  if (Close < posicao) then SellShortLimit(posicao,QuantidadePorOrdem);
+                end;
+           end;
+
+
+
+        if IsBought then
+            begin
+            niveis := BuyPosition / QuantidadePorOrdem;
+            // --- Monstagem do grid do Gradiente Linear ---
+            if (niveis <= NiveisGradiente) then
+                for contador := (niveis) to NíveisGradiente do
+                  begin
+                    posicao := preco_entrada - (contador * DistanciaGrid);
+                    if (Close > posicao) then BuyLimit(posicao,QuantidadePorOrdem);
+                  end;
+            end;
+      end;         
+
+
+
+    if sinal_entrada_compra then
+    begin
+      PaintBar(ClGreen);
+      Alert(ClGreen);
+      end
+    else if sinal_entrada_venda then
+      begin
+      PaintBar(255);
+      Alert(ClRed);
+      end
+    else
+      PaintBar(CLWhite);
+
+
+    //if range then PaintBar(ClYellow)
+    //if tendencia_compra then
+    //  PaintBar(ClPurple);
+    //if tendencia_venda then
+    //  PaintBar(CLYellow);
+
+    Plot(media_agress_pos);
+    Plot2(media_agress_neg);
+    //Plot3(media_media_compra);
+    //Plot4(media_media_venda);
+  end;
+end;

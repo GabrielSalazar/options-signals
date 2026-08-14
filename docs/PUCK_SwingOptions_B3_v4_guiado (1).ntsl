@@ -1,0 +1,1227 @@
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║          PUCK SWING OPTIONS B3 — v3.1 GUIADO                           ║
+// ║          HC Volume + MFV + ATR + Painel de Posicionamento               ║
+// ╠══════════════════════════════════════════════════════════════════════════╣
+// ║  Plataforma : ProfitChart / Nelogica (NTSL)                             ║
+// ║  Timeframe  : Diário (swing 5-15 dias) ou 60 min (swing 2-5 dias)      ║
+// ╠══════════════════════════════════════════════════════════════════════════╣
+// ║                                                                          ║
+// ║  COMO LER ESTE ARQUIVO                                                   ║
+// ║  ─────────────────────────────────────────────────────────────────────   ║
+// ║  Cada seção tem um número §XX e um PASSO correspondente.                ║
+// ║  Leia de cima para baixo: o algoritmo executa nessa mesma ordem         ║
+// ║  a cada nova barra do gráfico.                                           ║
+// ║                                                                          ║
+// ║  Use Ctrl+F com "PASSO" para navegar entre as etapas, ou com "§"        ║
+// ║  para ir direto a uma seção.                                             ║
+// ║                                                                          ║
+// ╠══════════════════════════════════════════════════════════════════════════╣
+// ║  ÍNDICE — 16 PASSOS DE EXECUÇÃO                                          ║
+// ║                                                                          ║
+// ║  §01 PASSO  1 — Parâmetros configuráveis pelo usuário                   ║
+// ║  §02 PASSO  2 — Declaração de todas as variáveis internas               ║
+// ║  §03 PASSO  3 — Reset do High Candle (HC)                               ║
+// ║  §04 PASSO  4 — Atualização do HC com filtro de volume [FIX 1]          ║
+// ║  §05 PASSO  5 — Cálculo da agressão real via MFV      [FIX 2]          ║
+// ║  §06 PASSO  6 — CMF real e componentes direcionais    [FIX 3]          ║
+// ║  §07 PASSO  7 — Normalização cross-asset do CMF       [NEW 1]          ║
+// ║  §08 PASSO  8 — Detecção de divergências de fluxo     [NEW 3]          ║
+// ║  §09 PASSO  9 — Filtro de tendência pelas EMAs        [NEW 2]          ║
+// ║  §10 PASSO 10 — Geração dos sinais CALL e PUT         [FIX 4]          ║
+// ║  §11 PASSO 11 — Sinais antecipados de divergência     [NEW 3]          ║
+// ║  §12 PASSO 12 — Cálculo do ATR e níveis Stop/Gain    [NEW 4]          ║
+// ║  §13 PASSO 13 — Classificação da qualidade A/B/C      [NEW 5]          ║
+// ║  §14 PASSO 14 — Exibição do painel de posicionamento  [NEW 6]          ║
+// ║  §15 PASSO 15 — Coloração das barras                  [FIX 5]          ║
+// ║  §16 PASSO 16 — Plots de referência no gráfico        [NEW 4]          ║
+// ║                                                                          ║
+// ╠══════════════════════════════════════════════════════════════════════════╣
+// ║  HISTÓRICO COMPLETO DE ALTERAÇÕES (v1.4 → v3.1)                         ║
+// ║                                                                          ║
+// ║  [FIX 1] HC sem critério → Volume > Media(20) × FatorVolumeHC          ║
+// ║          Por quê: HC só deve refletir candles institucionais reais.      ║
+// ║          Antes: qualquer volume crescente atualizava o HC.              ║
+// ║          Depois: exige volume genuinamente anômalo (1.5× a média).      ║
+// ║                                                                          ║
+// ║  [FIX 2] AgressionVolBuy/Sell nunca atribuídos → MFV via OHLCV         ║
+// ║          Por quê: as variáveis originais nunca recebiam valores          ║
+// ║          (cmfReal = 0 sempre). MFV usa apenas dados nativos OHLCV.      ║
+// ║                                                                          ║
+// ║  [FIX 3] Dead code (else if duplicado) removido                         ║
+// ║          Por quê: else if cmfReal > 0 após if cmfReal > 0 era           ║
+// ║          inacessível. Divergência reimplementada corretamente.           ║
+// ║                                                                          ║
+// ║  [FIX 4] Filtro de agressão reativado + tendência adicionada            ║
+// ║          Por quê: sinal era puramente geométrico (sem fluxo).           ║
+// ║          Agora exige 3 confirmações: geometria + fluxo + contexto.      ║
+// ║                                                                          ║
+// ║  [FIX 5] Bloco begin...end órfão corrigido                              ║
+// ║          Por quê: plots sempre executavam, sobrepondo coloração.         ║
+// ║          Agora cada estado de exibição é mutuamente exclusivo.           ║
+// ║                                                                          ║
+// ║  [NEW 1] Normalização cross-asset do CMF                                 ║
+// ║          Por quê: CMF bruto varia conforme liquidez do ativo.            ║
+// ║          cmf_norm torna o threshold comparável em qualquer papel.        ║
+// ║                                                                          ║
+// ║  [NEW 2] Filtro de tendência EMA21/50                                    ║
+// ║          Por quê: sinais contra a tendência primária têm menor           ║
+// ║          taxa de acerto. Filtro opcional (retrocompatível com v1.4).     ║
+// ║                                                                          ║
+// ║  [NEW 3] Detecção de divergências de fluxo                               ║
+// ║          Por quê: divergência entre fluxo e preço antecipa reversões    ║
+// ║          em 1-3 barras, permitindo preparo antes do sinal principal.     ║
+// ║                                                                          ║
+// ║  [NEW 4] ATR dinâmico para Stop Loss e Take Profit                       ║
+// ║          Por quê: stops fixos não se adaptam à volatilidade do ativo.   ║
+// ║          ATR garante R:R 2:1 ajustado ao regime atual do mercado.        ║
+// ║                                                                          ║
+// ║  [NEW 5] Classificação de qualidade A/B/C                                ║
+// ║          Por quê: nem todo sinal tem a mesma confiabilidade.             ║
+// ║          O grau guia o tamanho de posição e escolha da opção.            ║
+// ║                                                                          ║
+// ║  [NEW 6] Painel completo de posicionamento no gráfico                    ║
+// ║          Por quê: o operador precisa saber exatamente onde entrar,       ║
+// ║          onde sair com prejuízo e onde sair com lucro.                   ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// §01  PASSO 1 — PARÂMETROS CONFIGURÁVEIS PELO USUÁRIO
+// ════════════════════════════════════════════════════════════════════════════
+//
+// O QUE ACONTECE NESTE PASSO:
+//   Antes de qualquer cálculo, o algoritmo lê os valores que você definiu
+//   na tela de propriedades do indicador. Esses valores controlam o
+//   comportamento de todas as etapas seguintes.
+//
+// COMO AJUSTAR:
+//   Clique com botão direito no indicador → Propriedades → Entradas
+//   Cada linha abaixo corresponde a um campo nessa tela.
+//
+// DICA DE INÍCIO RÁPIDO:
+//   Deixe tudo no padrão e mude apenas ThresholdAgress.
+//   Comece com 0.0, observe os sinais históricos e suba gradualmente
+//   até encontrar o nível que filtra os sinais ruins no seu ativo.
+// ────────────────────────────────────────────────────────────────────────────
+input
+
+  // ── GRUPO 1: Controle do High Candle (HC) ───────────────────────────────
+  //
+  // DiaAtual controla quando o HC é zerado para recomeçar:
+  //
+  //   true  → Zera a cada troca de data.
+  //           Use em gráficos intraday (60 min, 15 min).
+  //           O HC captura o player dominante do dia corrente.
+  //
+  //   false → Zera apenas uma vez, na data configurada em DataInicio.
+  //           Use no gráfico diário (swing trade).
+  //           O HC acumula o maior candle desde o início da análise.
+  //
+  DiaAtual(false);
+
+  // Data de início do acúmulo do HC (formato AAAAMMDD em EasyLanguage).
+  // 1250901 = 01/09/2025. Mude para a data em que quer começar a análise.
+  DataInicio(1250901);
+
+  // Período base de lookback para o cálculo do MFV (agressão) e normalização.
+  // 21 = aproximadamente 1 mês útil. Recomendado para swing trade.
+  Periodo(21);
+
+  // [FIX 1] Fator de volume mínimo para o HC ser reconhecido como institucional.
+  // O HC só atualiza quando: Volume > Media(20, Volume) × FatorVolumeHC
+  //
+  //   1.2 → Volume 20% acima da média → menos seletivo (small caps)
+  //   1.5 → Volume 50% acima da média → padrão recomendado
+  //   2.0 → Volume 100% acima da média → mais seletivo (PETR4, VALE3)
+  //
+  // Por que isso importa? Sem este filtro (bug v1.4), qualquer barra com
+  // volume levemente maior que a anterior atualizava o HC — perdendo o
+  // significado institucional que é o coração da estratégia.
+  FatorVolumeHC(1.5);
+
+  // ── GRUPO 2: Filtro de Tendência [NEW 2] ────────────────────────────────
+  //
+  // Períodos das médias exponenciais usadas para confirmar a tendência.
+  // EMA21 = tendência de médio prazo | EMA50 = tendência de longo prazo.
+  PeriodoEMA21(21);
+  PeriodoEMA50(50);
+
+  // Controla se o indicador filtra sinais contra a tendência principal:
+  //
+  //   true  → Só gera CALL quando Close > EMA21 > EMA50 (uptrend confirmado)
+  //           Só gera PUT  quando Close < EMA21 < EMA50 (downtrend confirmado)
+  //           Elimina entradas em bear market para CALL e vice-versa.
+  //
+  //   false → Qualquer direção aceita (comportamento original v1.4).
+  //           Use false apenas para backtesting comparativo.
+  UsarFiltroTendencia(true);
+
+  // ── GRUPO 3: Threshold de Agressão [FIX 4] ──────────────────────────────
+  //
+  // Valor mínimo (absoluto) que o cmfReal precisa ter para validar o sinal.
+  // cmfReal está na escala -1000 a +1000.
+  //
+  //   0.0  → Qualquer fluxo direcional ativa o sinal (mais sensível, mais sinais)
+  //   5.0  → Fluxo leve necessário
+  //   10.0 → Fluxo moderado (recomendado para PETR4, ITUB4, VALE3)
+  //   20.0 → Apenas fluxo forte (ativos muito líquidos)
+  //
+  // Por que isso importa? Em v1.4, este filtro estava comentado — o sinal
+  // era puramente geométrico, sem qualquer confirmação de fluxo.
+  ThresholdAgress(0.0);
+
+  // ── GRUPO 4: ATR — Base para Stop e Gain [NEW 4] ────────────────────────
+  //
+  // PeriodoATR: quantas barras usar para calcular a volatilidade média.
+  // 14 é o padrão Wilder — funciona bem na maioria dos ativos da B3.
+  PeriodoATR(14);
+
+  // Multiplicadores do ATR para dimensionar os níveis de saída:
+  //
+  //   Stop Loss = Close ± (MultStop × ATR)
+  //   TP1       = Close ± (MultTP1  × ATR)  → alvo 1, fechar 50%
+  //   TP2       = Close ± (MultTP2  × ATR)  → alvo 2, fechar 50% restante
+  //
+  // Com os valores padrão (Stop=1.5, TP2=3.0): R:R = 3.0/1.5 = 2:1
+  // Mínimo recomendado para opções é R:R 2:1 para compensar o prêmio pago.
+  //
+  //   MultStop 1.5 → stop mais próximo → swing de 5-10 dias úteis
+  //   MultStop 2.0 → stop mais largo   → swing de 10-20 dias úteis
+  MultStop(1.5);
+  MultTP1(1.5);
+  MultTP2(3.0);
+
+  // ── GRUPO 5: Qualidade do Sinal [NEW 5] ─────────────────────────────────
+  //
+  // Threshold do cmf_norm para classificar o sinal como grau A.
+  // cmf_norm >= 1.5 significa que o fluxo atual é 50% acima da média
+  // histórica do próprio ativo — evento relevante, player grande.
+  ThresholdGrauA(1.5);
+
+  // ── GRUPO 6: Exibição ───────────────────────────────────────────────────
+  //
+  // true  → Painel completo: direção + grau + entrada + stop + TP1 + TP2
+  // false → Simplificado: apenas "CALL ▲" ou "PUT ▼"
+  MostrarPainelCompleto(true);
+
+  // Tamanho da fonte dos labels. 9 funciona bem no gráfico diário.
+  // Diminua para 7-8 em timeframes menores com muitas barras visíveis.
+  TamanhoFonte(9);
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// §02  PASSO 2 — DECLARAÇÃO DE VARIÁVEIS INTERNAS
+// ════════════════════════════════════════════════════════════════════════════
+//
+// O QUE ACONTECE NESTE PASSO:
+//   Todas as variáveis de trabalho do algoritmo são declaradas aqui.
+//   Nenhum cálculo é feito ainda — apenas reserva de memória.
+//
+// REGRA DO NTSL:
+//   float  → inicializado automaticamente com 0.0
+//   integer → inicializado automaticamente com 0
+//   boolean → inicializado automaticamente com false
+//   string  → inicializado automaticamente com ""
+//
+// As variáveis estão agrupadas conforme a seção que as utiliza,
+// facilitando a leitura paralela entre §02 e os passos de cálculo.
+// ────────────────────────────────────────────────────────────────────────────
+var
+
+  // ── Grupo HC (usadas nos Passos 3 e 4) ─────────────────────────────────
+  // max_candle / min_candle = extremos do High Candle atual
+  // _ant = extremos do HC anterior (referência do plot de linha)
+  // media_candle = ponto médio do HC (midpoint institucional)
+  // maior_volume = volume máximo visto até agora no período
+  // media_vol    = média simples de volume dos últimos 20 candles
+  // d_menos_um   = data da barra anterior (usado para detectar troca de dia)
+  max_candle, min_candle, media_candle     : float;
+  max_candle_ant, min_candle_ant           : float;
+  media_candle_ant                         : float;
+  maior_volume, media_vol                  : float;
+  d_menos_um                               : integer;
+
+  // ── Grupo MFV — Money Flow Volume (usadas no Passo 5) ──────────────────
+  // mfv_atual    = MFV calculado para cada barra dentro do loop de Periodo
+  // mfv_soma_pos = soma acumulada do MFV positivo (pressão compradora total)
+  // mfv_soma_neg = soma acumulada do MFV negativo (pressão vendedora total)
+  // soma_vol_total = soma do volume total do período (denominador do CMF)
+  // i = contador do loop (barra 0 = atual, barra Periodo-1 = mais antiga)
+  mfv_atual                                : float;
+  mfv_soma_pos, mfv_soma_neg               : float;
+  soma_vol_total                           : float;
+  i                                        : integer;
+
+  // ── Grupo CMF (usadas no Passo 6) ─────────────────────────────────────
+  // cmfReal     = Chaikin Money Flow calculado via MFV (-1000 a +1000)
+  // cmfReal_ant = valor do CMF na barra anterior (para detectar divergência)
+  // agress_pos  = parcela compradora do fluxo (0 a 1000)
+  // agress_neg  = parcela vendedora do fluxo  (0 a 1000)
+  cmfReal, cmfReal_ant                     : float;
+  agress_pos, agress_neg                   : float;
+
+  // ── Grupo Normalização (usadas no Passo 7) ─────────────────────────────
+  // media_cmf_pos/neg = EMA histórica de cada componente (base de comparação)
+  // cmf_norm = CMF dividido pela própria média → adimensional, cross-asset
+  media_cmf_pos, media_cmf_neg             : float;
+  cmf_norm                                 : float;
+
+  // ── Grupo Divergências (usadas nos Passos 8 e 11) ──────────────────────
+  // divergencia_alta  = CMF negativo + preço subiu → compradores absorveram
+  // divergencia_baixa = CMF positivo + preço caiu  → vendedores absorveram
+  divergencia_alta, divergencia_baixa      : boolean;
+
+  // ── Grupo Tendência (usadas no Passo 9) ────────────────────────────────
+  // ema21 / ema50 = médias exponenciais para filtro de tendência primária
+  // tendencia_alta  = estrutura bullish  (Close > EMA21 > EMA50)
+  // tendencia_baixa = estrutura bearish  (Close < EMA21 < EMA50)
+  ema21, ema50                             : float;
+  tendencia_alta, tendencia_baixa          : boolean;
+
+  // ── Grupo Sinais (usadas nos Passos 10 e 11) ───────────────────────────
+  // sinal_call / sinal_put        = sinais principais de entrada
+  // sinal_diverg_alta/baixa       = alertas antecipados de reversão
+  sinal_call, sinal_put                    : boolean;
+  sinal_diverg_alta, sinal_diverg_baixa    : boolean;
+
+  // ── Grupo ATR e Níveis (usadas no Passo 12) ────────────────────────────
+  // atr_tr    = True Range de cada barra individual no loop ATR
+  // atr_soma  = acumulador da soma dos True Ranges
+  // atr_val   = ATR final = média dos True Ranges do período
+  // j         = contador do loop ATR (separado de i para não conflitar)
+  //
+  // entrada      = Close da barra de sinal (preço de entrada sugerido)
+  // stop_loss    = nível de invalidação da tese (fechar 100% se atingido)
+  // take_profit_1 = alvo parcial (fechar 50% da posição em opções)
+  // take_profit_2 = alvo final   (fechar 50% restante, R:R 2:1)
+  // risco_val    = distância em pontos do stop (= MultStop × ATR)
+  // ganho_val    = distância em pontos do TP2  (= MultTP2  × ATR)
+  atr_tr, atr_soma, atr_val               : float;
+  j                                        : integer;
+  entrada                                  : float;
+  stop_loss                                : float;
+  take_profit_1                            : float;
+  take_profit_2                            : float;
+  risco_val, ganho_val                     : float;
+
+  // ── Grupo Qualidade e Labels (usadas nos Passos 13 e 14) ───────────────
+  // grau_sinal    = "A", "B" ou "C" conforme a força do fluxo normalizado
+  // linha_*       = strings montadas para exibição no painel
+  // offset_label  = espaçamento vertical entre os labels (proporcional ao ATR)
+  grau_sinal                               : string;
+  linha_direcao, linha_entrada             : string;
+  linha_stop, linha_tp1, linha_tp2         : string;
+  offset_label                             : float;
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// INÍCIO DA EXECUÇÃO — a partir daqui o código roda uma vez por barra
+// ════════════════════════════════════════════════════════════════════════════
+begin
+
+  // Lê a data da barra anterior — comparada com Date atual no Passo 3
+  d_menos_um := Date[1];
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §03  PASSO 3 — RESET DO HIGH CANDLE
+  // ════════════════════════════════════════════════════════════════════════
+  //
+  // O QUE ACONTECE NESTE PASSO:
+  //   Decide se o maior_volume deve ser zerado.
+  //   Quando maior_volume = 0, a próxima barra que passar pelo filtro
+  //   de volume do Passo 4 se tornará o novo High Candle.
+  //
+  // POR QUE PRECISA DE RESET?
+  //   Sem reset, maior_volume só cresce ao longo do tempo.
+  //   O HC ficaria "congelado" no maior candle de meses atrás,
+  //   sem refletir o contexto atual do mercado.
+  //
+  // LÓGICA:
+  //   Modo DiaAtual = true (intraday):
+  //     A cada troca de data (Date ≠ Date[1]), zera o maior_volume.
+  //     → O HC começa do zero todo pregão.
+  //     → Ideal para capturar o player dominante do dia corrente.
+  //
+  //   Modo DiaAtual = false (swing):
+  //     Zera apenas quando a barra está na data configurada em DataInicio.
+  //     → O HC acumula desde aquela data até hoje.
+  //     → Ideal para identificar o maior candle institucional do período.
+  // ────────────────────────────────────────────────────────────────────────
+  if DiaAtual then
+  begin
+    if (Date <> d_menos_um) then
+      maior_volume := 0;  // Novo pregão detectado → reseta o teto de volume
+  end
+  else
+  begin
+    if (Date = DataInicio) then
+      maior_volume := 0;  // Data de início encontrada → reseta o teto
+  end;
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §04  PASSO 4 — ATUALIZAÇÃO DO HIGH CANDLE   [FIX 1]
+  // ════════════════════════════════════════════════════════════════════════
+  //
+  // O QUE ACONTECE NESTE PASSO:
+  //   Verifica se a barra atual deve se tornar o novo High Candle.
+  //   Se sim, salva o HC atual como "anterior" e define o novo HC.
+  //
+  // O QUE É O HIGH CANDLE?
+  //   O candle de maior volume do período — representa o momento em que
+  //   um player institucional (fundo, banco, HFT) moveu posição relevante.
+  //   Sua máxima e mínima formam uma "zona de interesse" que serve como
+  //   referência de suporte e resistência dinâmicos.
+  //
+  // ALTERAÇÃO [FIX 1] — Filtro de volume mínimo:
+  //
+  //   ANTES (v1.4):
+  //     if (Volume > maior_volume) then
+  //     → Qualquer volume levemente acima do anterior atualizava o HC.
+  //     → O HC se tornava apenas o "último topo de volume histórico"
+  //       sem significado institucional.
+  //
+  //   DEPOIS (v3.1):
+  //     if (Volume > maior_volume) AND (Volume > media_vol × FatorVolumeHC)
+  //     → Duplo critério: novo máximo histórico E volume anômalo.
+  //     → Garante que apenas barras genuinamente institucionais
+  //       (volume 50%+ acima da média) definem o HC.
+  //     → O HC reflete escolhas de players relevantes, não ruído.
+  // ────────────────────────────────────────────────────────────────────────
+
+  // Calcula a média simples de volume dos últimos 20 períodos
+  // Serve como referência de volume "normal" para o filtro do HC
+  media_vol := Media(20, Volume);
+
+  // Verifica se a barra atual deve se tornar o novo HC
+  if (Volume > maior_volume) and (Volume > media_vol * FatorVolumeHC) then
+  begin
+    // ── Passo 4a: Promove o HC atual para "anterior" ──────────────────────
+    // Mantemos a referência do HC anterior para:
+    //   - Plotar as faixas antigas no gráfico (Plot3, Plot4)
+    //   - Permitir análise de dois níveis históricos de interesse
+    min_candle_ant   := min_candle;
+    max_candle_ant   := max_candle;
+    media_candle_ant := (min_candle_ant + max_candle_ant) / 2;
+
+    // ── Passo 4b: Define o novo HC com a barra atual ──────────────────────
+    // Low e High da barra atual se tornam os novos extremos de referência.
+    // Qualquer rompimento futuro acima de max_candle = sinal CALL potencial.
+    // Qualquer rompimento futuro abaixo de min_candle = sinal PUT potencial.
+    min_candle   := Low;
+    max_candle   := High;
+    media_candle := (min_candle + max_candle) / 2;
+
+    // ── Passo 4c: Atualiza o teto de volume ──────────────────────────────
+    // O próximo HC precisa superar este volume para substituir o atual.
+    maior_volume := Volume;
+  end;
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §05  PASSO 5 — CÁLCULO DA AGRESSÃO VIA MFV   [FIX 2]
+  // ════════════════════════════════════════════════════════════════════════
+  //
+  // O QUE ACONTECE NESTE PASSO:
+  //   Para cada uma das últimas [Periodo] barras, calcula o Money Flow
+  //   Volume (MFV) e acumula separadamente as pressões compradora e vendedora.
+  //
+  // ALTERAÇÃO [FIX 2] — AgressionVolBuy/Sell substituídos por MFV nativo:
+  //
+  //   ANTES (v1.4):
+  //     volTotal := AgressionVolBuy + AgressionVolSell;
+  //     → AgressionVolBuy e AgressionVolSell NUNCA eram atribuídos.
+  //     → São variáveis do módulo Tape Reading (plugin pago, não universal).
+  //     → Resultado: volTotal=0, cmfReal=0 sempre.
+  //     → Todo o bloco de fluxo era código morto — não fazia nada.
+  //
+  //   DEPOIS (v3.1):
+  //     MFV calculado via loop usando apenas Open, High, Low, Close, Volume.
+  //     Disponível em 100% das versões do Profit, sem plugins adicionais.
+  //
+  // FÓRMULA DO MFV (Money Flow Volume):
+  //
+  //   CLV = ((Close - Low) - (High - Close)) / (High - Low)
+  //         ┌─────────────────────────────────────────────────────────────┐
+  //         │ CLV vai de -1 a +1:                                         │
+  //         │  +1 = fechamento exato na máxima (compradores dominaram)    │
+  //         │  -1 = fechamento exato na mínima (vendedores dominaram)     │
+  //         │   0 = fechamento exato no meio (equilíbrio)                 │
+  //         └─────────────────────────────────────────────────────────────┘
+  //
+  //   MFV[i] = CLV[i] × Volume[i]
+  //   → Volume pondera o CLV: barras com mais volume têm mais peso.
+  //   → MFV grande positivo = muito volume + fechamento forte = compra
+  //   → MFV grande negativo = muito volume + fechamento fraco = venda
+  //
+  // COMO INTERPRETAR:
+  //   mfv_soma_pos / soma_vol_total × 1000 = % do volume que foi comprador
+  //   mfv_soma_neg / soma_vol_total × 1000 = % do volume que foi vendedor
+  // ────────────────────────────────────────────────────────────────────────
+
+  // ── Passo 5a: Reinicia acumuladores a cada barra ─────────────────────
+  // São recalculados do zero para as últimas [Periodo] barras.
+  mfv_soma_pos   := 0;
+  mfv_soma_neg   := 0;
+  soma_vol_total := 0;
+
+  // ── Passo 5b: Loop sobre as últimas [Periodo] barras ─────────────────
+  // i=0 = barra atual (mais recente)
+  // i=Periodo-1 = barra mais antiga do período
+  for i := 0 to Periodo - 1 do
+  begin
+    // Calcula o MFV da barra [i]
+    // Se High = Low (candle sem range, ex: leilão): MFV = 0
+    // Isso evita divisão por zero e faz sentido: sem amplitude = sem pressão
+    if (High[i] - Low[i]) > 0 then
+      mfv_atual := ((Close[i] - Low[i]) - (High[i] - Close[i]))
+                   / (High[i] - Low[i]) * Volume[i]
+    else
+      mfv_atual := 0;
+
+    // Acumula na componente correta
+    if mfv_atual > 0 then
+      mfv_soma_pos := mfv_soma_pos + mfv_atual        // Compradores dominaram
+    else
+      mfv_soma_neg := mfv_soma_neg + Abs(mfv_atual);  // Vendedores dominaram
+
+    // Soma o volume total (denominador do CMF)
+    soma_vol_total := soma_vol_total + Volume[i];
+  end;
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §06  PASSO 6 — CMF REAL E COMPONENTES   [FIX 3]
+  // ════════════════════════════════════════════════════════════════════════
+  //
+  // O QUE ACONTECE NESTE PASSO:
+  //   Com os acumuladores do Passo 5, calcula o CMF final e separa as
+  //   componentes compradora/vendedora para uso nos passos seguintes.
+  //
+  // ALTERAÇÃO [FIX 3] — Dead code removido e divergência corrigida:
+  //
+  //   ANTES (v1.4) — código morto:
+  //     if (cmfReal > 0) then
+  //       agress_pos := ...              ← captura TODOS os cmfReal > 0
+  //     else if (cmfReal > 0) and (...)  ← NUNCA executa: cmfReal ≤ 0 aqui
+  //
+  //   O segundo bloco era inacessível — quando o fluxo chegava ao else if,
+  //   cmfReal era obrigatoriamente ≤ 0 (o if anterior já havia capturado
+  //   todos os casos onde cmfReal > 0). Código sem efeito algum.
+  //
+  //   DEPOIS (v3.1):
+  //   A divergência foi separada do bloco CMF e implementada no Passo 8,
+  //   onde faz sentido lógico: comparando cmfReal com movimento de preço.
+  //
+  // FÓRMULA DO CMF:
+  //   cmfReal = (MFV_positivo - MFV_negativo) / VolumeTotal × 1000
+  //   Escala: -1000 (100% venda) a +1000 (100% compra)
+  //
+  //   Exemplos de leitura:
+  //   cmfReal = +350 → 35% do fluxo líquido foi comprador
+  //   cmfReal = -200 → 20% do fluxo líquido foi vendedor
+  //   cmfReal =   0  → equilíbrio perfeito entre compradores e vendedores
+  // ────────────────────────────────────────────────────────────────────────
+
+  // ── Passo 6a: Salva o CMF anterior ANTES de recalcular ───────────────
+  // Necessário para a detecção de divergência no Passo 8.
+  // Se salvar depois, cmfReal_ant = cmfReal e a comparação perde sentido.
+  cmfReal_ant := cmfReal;
+
+  // ── Passo 6b: Calcula o CMF final ────────────────────────────────────
+  if soma_vol_total > 0 then
+    cmfReal := ((mfv_soma_pos - mfv_soma_neg) / soma_vol_total) * 1000
+  else
+    cmfReal := 0;  // Sem volume no período → CMF indefinido → neutro
+
+  // ── Passo 6c: Extrai as componentes direcionais separadas ─────────────
+  // agress_pos: quanto % do volume total foi comprador × 1000 (0 a 1000)
+  // agress_neg: quanto % do volume total foi vendedor  × 1000 (0 a 1000)
+  // MaxValue(..., 1) previne divisão por zero
+  agress_pos := mfv_soma_pos / MaxValue(soma_vol_total, 1) * 1000;
+  agress_neg := mfv_soma_neg / MaxValue(soma_vol_total, 1) * 1000;
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §07  PASSO 7 — NORMALIZAÇÃO CROSS-ASSET DO CMF   [NEW 1]
+  // ════════════════════════════════════════════════════════════════════════
+  //
+  // O QUE ACONTECE NESTE PASSO:
+  //   Divide o CMF pela sua própria média histórica para torná-lo
+  //   adimensional e comparável entre ativos de liquidez diferente.
+  //
+  // POR QUE NORMALIZAR? — Problema do CMF bruto:
+  //   PETR4 (volume 80M/dia): agress_pos pode chegar a 600-800
+  //   MGLU3 (volume 5M/dia):  agress_pos raramente passa de 80
+  //   → Com ThresholdAgress = 50, seria inútil em PETR4 e restritivo em MGLU3.
+  //   → Impossível usar o mesmo indicador em múltiplos ativos.
+  //
+  // SOLUÇÃO — Normalização por EMA própria:
+  //   media_cmf_pos = EMA(Periodo, agress_pos) = "média histórica" da compra
+  //   cmf_norm = agress_pos / media_cmf_pos
+  //
+  //   Interpretação do cmf_norm:
+  //   = 1.0 → Fluxo exatamente igual à média histórica (dia comum)
+  //   = 1.5 → Fluxo 50% acima da média (evento relevante) → Grau A
+  //   = 2.0 → Fluxo 100% acima da média (evento forte)
+  //   = 0.5 → Fluxo metade da média (fraco, mas positivo) → Grau C
+  //
+  //   O mesmo cmf_norm = 1.5 é igualmente significativo em PETR4 e MGLU3.
+  // ────────────────────────────────────────────────────────────────────────
+
+  // ── Passo 7a: Calcula as EMAs das componentes ─────────────────────────
+  // Estas EMAs funcionam como "baseline" de cada componente ao longo do tempo.
+  media_cmf_pos := MediaExp(Periodo, agress_pos);
+  media_cmf_neg := MediaExp(Periodo, agress_neg);
+
+  // ── Passo 7b: Calcula o CMF normalizado ──────────────────────────────
+  if (cmfReal > 0) and (media_cmf_pos > 0) then
+    cmf_norm := agress_pos / media_cmf_pos        // Positivo: compra relativa
+  else if (cmfReal < 0) and (media_cmf_neg > 0) then
+    cmf_norm := -(agress_neg / media_cmf_neg)     // Negativo: venda relativa
+  else
+    cmf_norm := 0;                                 // Neutro: sem fluxo relevante
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §08  PASSO 8 — DETECÇÃO DE DIVERGÊNCIAS DE FLUXO   [NEW 3]
+  // ════════════════════════════════════════════════════════════════════════
+  //
+  // O QUE ACONTECE NESTE PASSO:
+  //   Compara o sinal do CMF com o movimento de preço para detectar
+  //   situações em que fluxo e preço estão se contradizendo.
+  //
+  // ALTERAÇÃO [NEW 3] — Divergências implementadas corretamente:
+  //
+  //   ANTES (v1.4): Tentativa falha com dead code (ver Passo 6).
+  //   DEPOIS (v3.1): Implementação independente, fora do bloco CMF,
+  //   comparando o sinal do cmfReal com a variação de preço da barra.
+  //
+  // DIVERGÊNCIA DE ALTA (bullish divergence):
+  //   CMF < 0  AND  Close > Close[1]
+  //   → Vendedores empurraram dinheiro para fora, mas o preço SUBIU.
+  //   → Interpretação: compradores absorveram toda a pressão vendedora
+  //     E ainda fecharam o preço acima. Isso é "força oculta".
+  //   → O que esperar: potencial reversão de alta nos próximos 1-3 candles.
+  //
+  // DIVERGÊNCIA DE BAIXA (bearish divergence):
+  //   CMF > 0  AND  Close < Close[1]
+  //   → Compradores empurraram dinheiro para dentro, mas o preço CAIU.
+  //   → Interpretação: vendedores absorveram toda a pressão compradora
+  //     E ainda fecharam o preço abaixo. Isso é "fraqueza oculta".
+  //   → O que esperar: potencial reversão de baixa nos próximos 1-3 candles.
+  //
+  // IMPORTANTE: Divergências são alertas de preparação, não entradas.
+  //   Quando aparecer DIVERG ▲ ou DIVERG ▼, monitore o próximo candle.
+  //   Se o próximo candle confirmar (sinal_call ou sinal_put), entre.
+  // ────────────────────────────────────────────────────────────────────────
+
+  // Força oculta: vendedores dominaram o fluxo mas o preço subiu
+  divergencia_alta  := (cmfReal < 0) and (Close > Close[1]);
+
+  // Fraqueza oculta: compradores dominaram o fluxo mas o preço caiu
+  divergencia_baixa := (cmfReal > 0) and (Close < Close[1]);
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §09  PASSO 9 — FILTRO DE TENDÊNCIA EMA21/50   [NEW 2]
+  // ════════════════════════════════════════════════════════════════════════
+  //
+  // O QUE ACONTECE NESTE PASSO:
+  //   Verifica se o mercado está em tendência primária e qual a direção.
+  //   Esta informação será usada no Passo 10 para filtrar sinais contra-tendência.
+  //
+  // ALTERAÇÃO [NEW 2] — Adição do filtro de tendência (opcional):
+  //
+  //   ANTES (v1.4): Sem filtro de tendência.
+  //     Em bear market profundo, sinais CALL no HC eram frequentemente
+  //     armadilhas: o preço rompia, mas o mercado maior forçava retorno.
+  //
+  //   DEPOIS (v3.1): Filtro de tendência via alinhamento de EMAs.
+  //     tendencia_alta  = Close > EMA21 > EMA50 (as 3 partes alinhadas para cima)
+  //     tendencia_baixa = Close < EMA21 < EMA50 (as 3 partes alinhadas para baixo)
+  //
+  //   Por que exigir os 3 alinhados e não apenas EMA21 > EMA50?
+  //   → Exigir o Close acima das duas médias confirma que o PREÇO atual
+  //     também está na estrutura bullish, não apenas as médias.
+  //   → Médias podem estar alinhadas mas o preço estar em correção —
+  //     nesses casos, aguardar o Close retornar acima das EMAs.
+  //
+  //   UsarFiltroTendencia = false:
+  //   → tendencia_alta = true (sempre)
+  //   → tendencia_baixa = true (sempre)
+  //   → Exatamente o comportamento do v1.4: qualquer rompimento aceito.
+  //   → Use para backtesting comparativo ou em mercados laterais.
+  // ────────────────────────────────────────────────────────────────────────
+
+  // ── Passo 9a: Calcula as EMAs de tendência ───────────────────────────
+  ema21 := MediaExp(PeriodoEMA21, Close);
+  ema50 := MediaExp(PeriodoEMA50, Close);
+
+  // ── Passo 9b: Classifica a tendência primária ─────────────────────────
+  if UsarFiltroTendencia then
+  begin
+    // Uptrend: preço e médias alinhados para cima — estrutura bullish limpa
+    tendencia_alta  := (Close > ema21) and (ema21 > ema50);
+    // Downtrend: preço e médias alinhados para baixo — estrutura bearish limpa
+    tendencia_baixa := (Close < ema21) and (ema21 < ema50);
+  end
+  else
+  begin
+    // Sem filtro: aceita qualquer direção (retrocompatível com v1.4)
+    tendencia_alta  := true;
+    tendencia_baixa := true;
+  end;
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §10  PASSO 10 — GERAÇÃO DOS SINAIS CALL E PUT   [FIX 4]
+  // ════════════════════════════════════════════════════════════════════════
+  //
+  // O QUE ACONTECE NESTE PASSO:
+  //   Combina as 3 confirmações para decidir se há sinal de entrada.
+  //   Os 3 critérios devem ser verdadeiros simultaneamente.
+  //
+  // ALTERAÇÃO [FIX 4] — Filtro de agressão reativado:
+  //
+  //   ANTES (v1.4):
+  //     // sinal_call := (agress_pos > 10) and (Low > max_candle); ← COMENTADO
+  //     sinal_call := (Low > max_candle);   ← apenas geometria
+  //     → O filtro de fluxo estava comentado. O sinal era puramente
+  //       geométrico: qualquer rompimento do HC gerava CALL, mesmo
+  //       sem nenhum volume ou fluxo comprador. Muitos falsos positivos.
+  //
+  //   DEPOIS (v3.1) — 3 confirmações obrigatórias simultâneas:
+  //
+  //   ┌─────────────────────────────────────────────────────────────────────┐
+  //   │  CONFIRMAÇÃO 1 — GEOMETRIA (rompimento do HC)                       │
+  //   │    CALL: Low > max_candle   → toda a barra acima do HC              │
+  //   │    PUT:  High < min_candle  → toda a barra abaixo do HC             │
+  //   │    Por quê usar Low/High e não Close?                               │
+  //   │    → Exige que nem o pior preço da barra ficou dentro do HC.        │
+  //   │      Se o Low de uma barra de alta ainda tocou o HC, pode ser       │
+  //   │      um rompimento fraco com possível retorno. Low > max_candle     │
+  //   │      garante rompimento limpo em toda a amplitude da barra.         │
+  //   ├─────────────────────────────────────────────────────────────────────┤
+  //   │  CONFIRMAÇÃO 2 — FLUXO (CMF direcional)                             │
+  //   │    CALL: cmfReal > +ThresholdAgress                                 │
+  //   │    PUT:  cmfReal < -ThresholdAgress                                 │
+  //   │    Por quê? Geometria sem fluxo = rompimento falso (sem convicção). │
+  //   │    O fluxo confirma que dinheiro está entrando na direção do trade.  │
+  //   ├─────────────────────────────────────────────────────────────────────┤
+  //   │  CONFIRMAÇÃO 3 — CONTEXTO (tendência primária)                      │
+  //   │    CALL: tendencia_alta  = Close > EMA21 > EMA50                    │
+  //   │    PUT:  tendencia_baixa = Close < EMA21 < EMA50                    │
+  //   │    Por quê? Um sinal excelente contra a tendência maior ainda        │
+  //   │    tem taxa de acerto inferior. Este filtro garante que o trade      │
+  //   │    está a favor do fluxo de longo prazo do mercado.                 │
+  //   └─────────────────────────────────────────────────────────────────────┘
+  // ────────────────────────────────────────────────────────────────────────
+
+  // Sinal CALL: rompimento acima do HC + fluxo comprador + uptrend
+  sinal_call := (Low  > max_candle)
+                and (cmfReal > ThresholdAgress)
+                and tendencia_alta;
+
+  // Sinal PUT: rompimento abaixo do HC + fluxo vendedor + downtrend
+  sinal_put  := (High < min_candle)
+                and (cmfReal < -ThresholdAgress)
+                and tendencia_baixa;
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §11  PASSO 11 — SINAIS ANTECIPADOS DE DIVERGÊNCIA   [NEW 3]
+  // ════════════════════════════════════════════════════════════════════════
+  //
+  // O QUE ACONTECE NESTE PASSO:
+  //   Combina as divergências do Passo 8 com a geometria do HC para
+  //   gerar alertas 1-3 barras antes do sinal principal potencial.
+  //
+  // ATENÇÃO: Estes sinais NÃO são entradas. São avisos de "preparo".
+  //
+  //   sinal_diverg_alta:
+  //   → Divergência bullish (força oculta) + preço já acima do HC
+  //   → "Vendedores foram absorvidos E a geometria já está rompendo"
+  //   → O que fazer: monitore o próximo candle.
+  //     Se cmfReal virar positivo na próxima barra = CALL confirmado.
+  //
+  //   sinal_diverg_baixa:
+  //   → Divergência bearish (fraqueza oculta) + preço já abaixo do HC
+  //   → "Compradores foram absorvidos E a geometria já está rompendo"
+  //   → O que fazer: monitore o próximo candle.
+  //     Se cmfReal virar negativo na próxima barra = PUT confirmado.
+  // ────────────────────────────────────────────────────────────────────────
+
+  // Força oculta + rompimento de alta já em curso
+  sinal_diverg_alta  := divergencia_alta  and (Low  > max_candle);
+
+  // Fraqueza oculta + rompimento de baixa já em curso
+  sinal_diverg_baixa := divergencia_baixa and (High < min_candle);
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §12  PASSO 12 — ATR E NÍVEIS DE STOP / TAKE PROFIT   [NEW 4]
+  // ════════════════════════════════════════════════════════════════════════
+  //
+  // O QUE ACONTECE NESTE PASSO:
+  //   Calcula a volatilidade média (ATR) e usa ela para definir
+  //   automaticamente os níveis de Stop Loss e Take Profit.
+  //
+  // ALTERAÇÃO [NEW 4] — Stop e Gain dinâmicos via ATR:
+  //
+  //   ANTES: Sem níveis de saída — o operador definia manualmente.
+  //   DEPOIS: Calculados a cada sinal com base na volatilidade atual.
+  //
+  // POR QUE ATR E NÃO VALOR FIXO?
+  //   Um stop de R$0.50 é muito apertado para uma ação de R$40 com ATR de R$1.20.
+  //   O mesmo stop de R$0.50 é absurdamente largo para uma ação de R$5 com ATR de R$0.15.
+  //   O ATR adapta os níveis à volatilidade real e atual do ativo.
+  //
+  // CÁLCULO DO TRUE RANGE (TR):
+  //   TR = máximo entre:
+  //     (a) High - Low         → amplitude da barra (range normal)
+  //     (b) |High - Close[ant]|→ gap de alta (barra abre acima do fechamento anterior)
+  //     (c) |Low  - Close[ant]|→ gap de baixa (barra abre abaixo do fechamento anterior)
+  //   ATR = média dos TR dos últimos PeriodoATR barras
+  //
+  // NÍVEIS PARA CALL (compra):
+  //   Entrada   = Close            (comprar próximo ao fechamento)
+  //   Stop Loss = Close - 1.5×ATR  (invalidação: abaixo do suporte de volatilidade)
+  //   TP1       = Close + 1.5×ATR  (alvo 1: fechar 50% → mesmo que o risco)
+  //   TP2       = Close + 3.0×ATR  (alvo 2: fechar 50% restante → R:R 2:1)
+  //
+  // NÍVEIS PARA PUT (venda):
+  //   Entrada   = Close            (comprar a put próximo ao fechamento)
+  //   Stop Loss = Close + 1.5×ATR  (invalidação: acima da resistência de volatilidade)
+  //   TP1       = Close - 1.5×ATR  (mesmo distância mas para baixo)
+  //   TP2       = Close - 3.0×ATR  (alvo final, R:R 2:1)
+  //
+  // COMO USAR OS NÍVEIS NA OPÇÃO:
+  //   Os níveis se referem ao ATIVO SUBJACENTE, não à opção.
+  //   • Se o ativo fechar ABAIXO do Stop Loss (CALL): zerar 100% das opções.
+  //   • Se o ativo chegar no TP1: vender 50% das opções, mover stop p/ entrada.
+  //   • Se o ativo chegar no TP2: vender os 50% restantes.
+  // ────────────────────────────────────────────────────────────────────────
+
+  // ── Passo 12a: Calcula o ATR via loop manual ──────────────────────────
+  atr_soma := 0;
+  for j := 0 to PeriodoATR - 1 do
+  begin
+    // Amplitude básica da barra j
+    atr_tr := High[j] - Low[j];
+
+    // Ajusta para gaps em relação ao fechamento anterior
+    // CurrentBar previne acesso a barras inexistentes no início da série
+    if (j + 1) <= CurrentBar then
+    begin
+      if Abs(High[j] - Close[j + 1]) > atr_tr then
+        atr_tr := Abs(High[j] - Close[j + 1]);  // Gap de alta
+      if Abs(Low[j]  - Close[j + 1]) > atr_tr then
+        atr_tr := Abs(Low[j]  - Close[j + 1]);  // Gap de baixa
+    end;
+
+    atr_soma := atr_soma + atr_tr;
+  end;
+
+  // ATR = média dos True Ranges
+  if PeriodoATR > 0 then
+    atr_val := atr_soma / PeriodoATR
+  else
+    atr_val := High - Low;  // Fallback de segurança: range da barra atual
+
+  // ── Passo 12b: Calcula os níveis de saída ────────────────────────────
+  entrada := Close;  // Entrada sugerida = fechamento da barra de sinal
+
+  // Níveis para sinal CALL
+  if sinal_call then
+  begin
+    stop_loss     := entrada - (MultStop * atr_val);  // Abaixo da entrada
+    take_profit_1 := entrada + (MultTP1  * atr_val);  // Acima: parcial (50%)
+    take_profit_2 := entrada + (MultTP2  * atr_val);  // Acima: final  (50%)
+  end;
+
+  // Níveis para sinal PUT (espelho: acima/abaixo invertidos)
+  if sinal_put then
+  begin
+    stop_loss     := entrada + (MultStop * atr_val);  // Acima da entrada
+    take_profit_1 := entrada - (MultTP1  * atr_val);  // Abaixo: parcial (50%)
+    take_profit_2 := entrada - (MultTP2  * atr_val);  // Abaixo: final  (50%)
+  end;
+
+  // Distâncias em pontos (para referência do R:R)
+  risco_val := MultStop * atr_val;
+  ganho_val := MultTP2  * atr_val;
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §13  PASSO 13 — CLASSIFICAÇÃO DE QUALIDADE A/B/C   [NEW 5]
+  // ════════════════════════════════════════════════════════════════════════
+  //
+  // O QUE ACONTECE NESTE PASSO:
+  //   Atribui um grau ao sinal baseado na força do fluxo normalizado.
+  //   O grau é exibido no painel e guia o operador na escolha da opção.
+  //
+  // ALTERAÇÃO [NEW 5] — Classificação de qualidade do sinal:
+  //   ANTES: Todos os sinais tinham o mesmo peso visual.
+  //   DEPOIS: 3 graus que refletem a confiabilidade do setup.
+  //
+  // ┌─────────┬────────────────┬────────────────┬──────────────────────────┐
+  // │  Grau   │  cmf_norm      │  Significado   │  Como operar             │
+  // ├─────────┼────────────────┼────────────────┼──────────────────────────┤
+  // │    A    │  ≥ 1.5         │ Fluxo 50% acima│ Delta 0.40-0.55 (ITM)   │
+  // │         │ (threshold A)  │ da média → inst.│ Venc. 30-45 dias úteis  │
+  // │         │                │ entrando forte  │ Posição maior            │
+  // ├─────────┼────────────────┼────────────────┼──────────────────────────┤
+  // │    B    │  ≥ 1.0         │ Fluxo acima da │ Delta 0.30-0.45 (ATM)   │
+  // │         │ (< threshold A)│ média, relevante│ Venc. 21-35 dias úteis  │
+  // │         │                │ mas não excep.  │ Posição padrão           │
+  // ├─────────┼────────────────┼────────────────┼──────────────────────────┤
+  // │    C    │  < 1.0         │ Fluxo positivo │ Delta 0.25-0.35 (OTM)   │
+  // │         │ (mas > thresh.)│ mas comum para  │ Venc. 15-25 dias úteis  │
+  // │         │                │ o ativo          │ Posição menor / cautela  │
+  // └─────────┴────────────────┴────────────────┴──────────────────────────┘
+  // ────────────────────────────────────────────────────────────────────────
+
+  // Classifica somente se há sinal ativo (sem sinal, grau não importa)
+  if sinal_call or sinal_put then
+  begin
+    if Abs(cmf_norm) >= ThresholdGrauA then
+      grau_sinal := "A"   // Fluxo institucional forte — alta qualidade
+    else if Abs(cmf_norm) >= 1.0 then
+      grau_sinal := "B"   // Fluxo acima da média — qualidade padrão
+    else
+      grau_sinal := "C";  // Fluxo fraco — cautela na posição
+  end;
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §14  PASSO 14 — PAINEL DE POSICIONAMENTO   [NEW 6]
+  // ════════════════════════════════════════════════════════════════════════
+  //
+  // O QUE ACONTECE NESTE PASSO:
+  //   Exibe no gráfico, na barra de sinal, o painel completo com
+  //   todas as informações necessárias para a operação.
+  //
+  // ALTERAÇÃO [NEW 6] — Painel completo de posicionamento:
+  //   ANTES: Apenas label "COMPRE" ou "VENDA" em texto simples.
+  //   DEPOIS: Painel em 5 linhas com grau, entrada, stop e 2 alvos.
+  //
+  // REGRA ANTI-SPAM (sinal[1] = false):
+  //   Sem esta verificação, o label seria redesenhado em cada barra
+  //   enquanto o sinal permanecesse ativo — poluindo o gráfico com
+  //   dezenas de labels idênticos no mesmo ponto.
+  //   Com a verificação, o label aparece APENAS na transição false→true,
+  //   ou seja, exatamente no primeiro candle de cada setup.
+  //
+  // ESTRUTURA DO PAINEL CALL:
+  //   ↑ CALL [A] ▲          ← direção + grau (cor varia com o grau)
+  //     ENTRADA : 36.42     ← Close da barra = preço de compra do ativo
+  //     STOP    : 35.10     ← Se o ativo fechar abaixo: zerar opções
+  //     TP1     : 37.74     ← Ao atingir: vender 50% das opções
+  //     TP2     : 39.06     ← Ao atingir: vender 50% restante
+  //
+  // OFFSET DINÂMICO:
+  //   offset_label = ATR × 0.5
+  //   → O espaçamento entre os labels é proporcional à escala do ativo.
+  //   → Em PETR4 (R$36) o espaçamento será em reais; em VALE3 (R$65) idem.
+  //   → Evita sobreposição de labels em qualquer ativo ou timeframe.
+  //   → Multiplicado progressivamente: 1×, 2.2×, 3.4×, 4.6×, 5.8×
+  //     para criar espaçamento uniforme entre as 5 linhas do painel.
+  //
+  // ALERTA SONORO/VISUAL:
+  //   Alert(clGreen) e Alert(clRed) disparam o alerta configurado pelo
+  //   usuário nas preferências do Profit (som, pop-up, email, etc.).
+  //   Divergências NÃO disparam alerta — são apenas visuais informativos.
+  // ────────────────────────────────────────────────────────────────────────
+
+  // ── Passo 14a: Calcula o offset base dos labels ───────────────────────
+  // Proporcional ao ATR para funcionar em qualquer escala de preço
+  offset_label := atr_val * 0.5;
+
+  // ── Passo 14b: Exibe o painel para sinal CALL ─────────────────────────
+  if sinal_call and (sinal_call[1] = false) then
+  begin
+    // Dispara alerta sonoro/visual configurado pelo usuário no Profit
+    Alert(clGreen);
+
+    if MostrarPainelCompleto then
+    begin
+      // Linha 1: Direção + Grau (fonte ligeiramente maior para destaque)
+      // Cor varia conforme o grau: Verde escuro (A), Verde (B), Verde claro (C)
+      // Posição 0 = abaixo da mínima da barra
+      if grau_sinal = "A" then
+        PlotText("CALL [A] ▲", clGreen, 0, TamanhoFonte + 1, Low - offset_label)
+      else if grau_sinal = "B" then
+        PlotText("CALL [B] ▲", clLime, 0, TamanhoFonte + 1, Low - offset_label)
+      else
+        PlotText("CALL [C] ▲", clMoneyGreen, 0, TamanhoFonte + 1, Low - offset_label);
+
+      // Linha 2: Preço de entrada (amarelo = atenção, ação necessária)
+      // Comprar a opção CALL quando o ativo estiver próximo deste preço.
+      PlotText("ENTRADA : " + FloatToStr(entrada),
+               clYellow, 0, TamanhoFonte, Low - offset_label * 2.2);
+
+      // Linha 3: Stop Loss (vermelho = perda máxima aceita)
+      // Se o ATIVO fechar ABAIXO deste nível: a tese está errada → zerar.
+      // Nunca use o preço DA OPÇÃO como referência de stop — use o ativo.
+      PlotText("STOP    : " + FloatToStr(stop_loss),
+               clRed, 0, TamanhoFonte, Low - offset_label * 3.4);
+
+      // Linha 4: Take Profit 1 — alvo parcial (ciano claro)
+      // Ao atingir TP1 no ativo: venda 50% das opções e mova stop p/ entrada.
+      // Isso "paga" o trade: mesmo que reverta, você já lucrou na metade.
+      PlotText("TP1     : " + FloatToStr(take_profit_1),
+               clAqua, 0, TamanhoFonte, Low - offset_label * 4.6);
+
+      // Linha 5: Take Profit 2 — alvo final R:R 2:1 (ciano escuro)
+      // Ao atingir TP2 no ativo: venda os 50% restantes.
+      // Distância = 2× o risco inicial → mínimo recomendado para opções.
+      PlotText("TP2     : " + FloatToStr(take_profit_2),
+               clAqua, 0, TamanhoFonte, Low - offset_label * 5.8);
+    end
+    else
+    begin
+      // Modo simplificado: apenas a seta com a direção
+      PlotText("CALL ▲", clGreen, 0, TamanhoFonte + 2, Low - offset_label);
+    end;
+  end;
+
+  // ── Passo 14c: Exibe o painel para sinal PUT ──────────────────────────
+  if sinal_put and (sinal_put[1] = false) then
+  begin
+    Alert(clRed);
+
+    if MostrarPainelCompleto then
+    begin
+      // Linha 1: Direção + Grau
+      // Posição -1 = acima da máxima da barra
+      // Cor varia com o grau: Vermelho (A), Magenta/Fúcsia (B), Marrom (C)
+      if grau_sinal = "A" then
+        PlotText("PUT [A] ▼", clRed, -1, TamanhoFonte + 1, High + offset_label)
+      else if grau_sinal = "B" then
+        PlotText("PUT [B] ▼", clFuchsia, -1, TamanhoFonte + 1, High + offset_label)
+      else
+        PlotText("PUT [C] ▼", clMaroon, -1, TamanhoFonte + 1, High + offset_label);
+
+      // Linha 2: Entrada (comprar a opção PUT próximo ao Close atual)
+      PlotText("ENTRADA : " + FloatToStr(entrada),
+               clYellow, -1, TamanhoFonte, High + offset_label * 2.2);
+
+      // Linha 3: Stop Loss para PUT (acima da entrada)
+      // Se o ATIVO fechar ACIMA deste nível: tese inválida → zerar PUTs.
+      PlotText("STOP    : " + FloatToStr(stop_loss),
+               clRed, -1, TamanhoFonte, High + offset_label * 3.4);
+
+      // Linha 4: TP1 para PUT (abaixo da entrada — o ativo precisa cair)
+      PlotText("TP1     : " + FloatToStr(take_profit_1),
+               clAqua, -1, TamanhoFonte, High + offset_label * 4.6);
+
+      // Linha 5: TP2 para PUT — alvo final R:R 2:1
+      PlotText("TP2     : " + FloatToStr(take_profit_2),
+               clAqua, -1, TamanhoFonte, High + offset_label * 5.8);
+    end
+    else
+    begin
+      PlotText("PUT ▼", clRed, -1, TamanhoFonte + 2, High + offset_label);
+    end;
+  end;
+
+  // ── Passo 14d: Labels de divergência (sem alerta — apenas informativos) ─
+  // Aparecem também somente na transição false→true para evitar spam.
+  // Sem Alert sonoro: divergência é aviso, não entrada.
+  if sinal_diverg_alta and (sinal_diverg_alta[1] = false) then
+    PlotText("DIVERG ▲", clFuchsia, 0, TamanhoFonte - 1, Low - offset_label);
+
+  if sinal_diverg_baixa and (sinal_diverg_baixa[1] = false) then
+    PlotText("DIVERG ▼", clPurple, -1, TamanhoFonte - 1, High + offset_label);
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §15  PASSO 15 — COLORAÇÃO DAS BARRAS   [FIX 5]
+  // ════════════════════════════════════════════════════════════════════════
+  //
+  // O QUE ACONTECE NESTE PASSO:
+  //   Define a cor da barra atual baseada no estado do mercado.
+  //
+  // ALTERAÇÃO [FIX 5] — Bloco begin...end órfão corrigido:
+  //   ANTES (v1.4): O bloco com Plot() estava FORA de qualquer if/else,
+  //   executando sempre e se sobrepondo à coloração.
+  //   DEPOIS (v3.1): Toda exibição em if/else mutuamente exclusivos.
+  //   A cada barra, exatamente UM bloco de coloração executa.
+  //
+  // PALETA — 9 estados em ordem de prioridade:
+  //
+  //   Verde escuro (clGreen)    → CALL grau A: fluxo forte + tendência + geometria
+  //   Verde limão  (clLime)     → CALL grau B/C: menor intensidade de fluxo
+  //   Vermelho     (clRed)      → PUT grau A: fluxo vendedor forte
+  //   Fúcsia       (clFuchsia)  → PUT grau B/C: menor intensidade de fluxo
+  //   Oliva        (clOlive)    → DIVERG ▲: força oculta, possível CALL em breve
+  //   Roxo         (clPurple)   → DIVERG ▼: fraqueza oculta, possível PUT em breve
+  //   Ciano        (clAqua)     → Fluxo comprador, sem rompimento do HC ainda
+  //   Marrom       (clMaroon)   → Fluxo vendedor, sem rompimento do HC ainda
+  //   Branco       (clWhite)    → Neutro: mercado sem pressão direcional
+  // ────────────────────────────────────────────────────────────────────────
+  if sinal_call then
+  begin
+    if grau_sinal = "A" then
+      PaintBar(clGreen)    // Verde escuro: máxima qualidade, fluxo forte
+    else
+      PaintBar(clLime);    // Verde limão: sinal válido, fluxo moderado/fraco
+  end
+  else if sinal_put then
+  begin
+    if grau_sinal = "A" then
+      PaintBar(clRed)      // Vermelho: máxima qualidade, fluxo vendedor forte
+    else
+      PaintBar(clFuchsia); // Fúcsia: sinal válido, fluxo moderado/fraco
+  end
+  else if sinal_diverg_alta then
+    PaintBar(clOlive)      // Oliva: força oculta detectada → monitorar CALL
+  else if sinal_diverg_baixa then
+    PaintBar(clPurple)     // Roxo: fraqueza oculta detectada → monitorar PUT
+  else if cmfReal > ThresholdAgress then
+    PaintBar(clAqua)       // Ciano: dinheiro entrando, aguardando rompimento
+  else if cmfReal < -ThresholdAgress then
+    PaintBar(clMaroon)     // Marrom: dinheiro saindo, aguardando rompimento
+  else
+    PaintBar(clWhite);     // Branco: neutro, sem direção definida
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §16  PASSO 16 — PLOTS DE REFERÊNCIA NO GRÁFICO   [NEW 4]
+  // ════════════════════════════════════════════════════════════════════════
+  //
+  // O QUE ACONTECE NESTE PASSO:
+  //   Plota as linhas de referência visíveis no gráfico principal.
+  //   Estes plots são o "esqueleto visual" do indicador.
+  //
+  // PLOTS ATIVOS (sempre calculados):
+  //   Plot1: Mínima do HC atual     → suporte institucional de referência
+  //   Plot2: Máxima do HC atual     → resistência institucional de referência
+  //   Plot3: Mínima do HC anterior  → suporte da "geração" anterior do HC
+  //   Plot4: Máxima do HC anterior  → resistência da "geração" anterior
+  //   Plot5: Centro do HC atual     → midpoint (linha de equilíbrio do HC)
+  //
+  // PLOTS CONDICIONAIS (só nas barras de sinal — [NEW 4]):
+  //   Plot6: Stop Loss  → linha vermelha piscando no candle de entrada
+  //   Plot7: TP1        → linha ciano piscando no candle de entrada
+  //   Plot8: TP2        → linha ciano piscando no candle de entrada
+  //
+  // Como desativar linhas que você não quer ver:
+  //   Clique com botão direito no indicador → Propriedades → Plots
+  //   Desmarque cada linha ou mude sua cor/espessura individualmente.
+  //
+  // PLOTS OPCIONAIS para janela separada (descomente para ativar):
+  //   Plot9:  CMF bruto (-1000 a +1000) → histograma de fluxo direcional
+  //   Plot10: CMF normalizado → relativo à média do próprio ativo
+  //   Plot11: Componente compradora (agress_pos)
+  //   Plot12: Componente vendedora  (-agress_neg, invertida p/ histograma)
+  //   Plot13: EMA21 de tendência
+  //   Plot14: EMA50 de tendência
+  // ────────────────────────────────────────────────────────────────────────
+
+  // ── Passo 16a: Faixas do HC (sempre plotadas) ─────────────────────────
+  Plot(min_candle);            // Plot1: Mínima HC atual
+  Plot2(max_candle);           // Plot2: Máxima HC atual
+  Plot3(min_candle_ant);       // Plot3: Mínima HC anterior
+  Plot4(max_candle_ant);       // Plot4: Máxima HC anterior
+  Plot5(media_candle);         // Plot5: Centro HC atual
+
+  // ── Passo 16b: Níveis de Stop e TP (apenas nas barras de sinal) ───────
+  if sinal_call or sinal_put then
+  begin
+    Plot6(stop_loss);          // Plot6: Stop Loss (configure em vermelho)
+    Plot7(take_profit_1);      // Plot7: TP1 (configure em ciano)
+    Plot8(take_profit_2);      // Plot8: TP2 (configure em ciano mais escuro)
+  end;
+
+  // ── Passo 16c: Plots opcionais — descomente o que quiser ver ──────────
+  // Plot9(cmfReal);              // CMF bruto
+  // Plot10(cmf_norm);            // CMF normalizado
+  // Plot11(agress_pos);          // Pressão compradora
+  // Plot12(agress_neg * -1);     // Pressão vendedora (invertida)
+  // Plot13(ema21);               // EMA21
+  // Plot14(ema50);               // EMA50
+
+end;
+
+
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  RESUMO DAS CONDIÇÕES — LÓGICA PARA GERAR ALERTA DE COMPRA OU VENDA    ║
+// ╠══════════════════════════════════════════════════════════════════════════╣
+// ║                                                                          ║
+// ║  ALERTA DE COMPRA — sinal_call = true quando TODOS abaixo forem true:   ║
+// ║                                                                          ║
+// ║  [1] GEOMETRIA — Passo 10                                                ║
+// ║      Low > max_candle                                                    ║
+// ║      O preço INTEIRO da barra (incluindo mínima) está acima do HC.      ║
+// ║      Significa: rompimento limpo, sem toque na zona de interesse.        ║
+// ║                                                                          ║
+// ║  [2] FLUXO — Passos 5 e 6                                                ║
+// ║      cmfReal > ThresholdAgress  (padrão: > 0)                           ║
+// ║      O fluxo direcional do período é comprador.                          ║
+// ║      Significa: dinheiro está entrando no ativo na direção de alta.      ║
+// ║                                                                          ║
+// ║  [3] CONTEXTO — Passo 9                                                   ║
+// ║      Close > EMA21  E  EMA21 > EMA50  (quando UsarFiltroTendencia=true) ║
+// ║      O ativo está em estrutura bullish no curto e médio prazo.           ║
+// ║      Significa: o sinal está a favor do fluxo de longo prazo.            ║
+// ║                                                                          ║
+// ╠══════════════════════════════════════════════════════════════════════════╣
+// ║                                                                          ║
+// ║  ALERTA DE VENDA — sinal_put = true quando TODOS abaixo forem true:     ║
+// ║                                                                          ║
+// ║  [1] GEOMETRIA — Passo 10                                                ║
+// ║      High < min_candle                                                   ║
+// ║      O preço INTEIRO da barra (incluindo máxima) está abaixo do HC.     ║
+// ║      Significa: rompimento de baixa limpo, sem toque na zona de suporte. ║
+// ║                                                                          ║
+// ║  [2] FLUXO — Passos 5 e 6                                                ║
+// ║      cmfReal < -ThresholdAgress  (padrão: < 0)                          ║
+// ║      O fluxo direcional do período é vendedor.                           ║
+// ║      Significa: dinheiro está saindo do ativo, pressão vendedora domina. ║
+// ║                                                                          ║
+// ║  [3] CONTEXTO — Passo 9                                                   ║
+// ║      Close < EMA21  E  EMA21 < EMA50  (quando UsarFiltroTendencia=true) ║
+// ║      O ativo está em estrutura bearish no curto e médio prazo.           ║
+// ║      Significa: o sinal está a favor do fluxo de longo prazo.            ║
+// ║                                                                          ║
+// ╠══════════════════════════════════════════════════════════════════════════╣
+// ║                                                                          ║
+// ║  ALERTAS DE ATENÇÃO — sem entrada imediata, monitorar próximo candle:   ║
+// ║                                                                          ║
+// ║  DIVERG ▲ — Passo 11 (preparação para CALL)                              ║
+// ║    Low > max_candle  E  cmfReal < 0  E  Close > Close[1]                ║
+// ║    Rompimento de alta com fluxo vendedor sendo absorvido pelos comp.     ║
+// ║    → Aguardar cmfReal virar positivo na próxima barra para entrar.       ║
+// ║                                                                          ║
+// ║  DIVERG ▼ — Passo 11 (preparação para PUT)                               ║
+// ║    High < min_candle  E  cmfReal > 0  E  Close < Close[1]               ║
+// ║    Rompimento de baixa com fluxo comprador sendo absorvido pelos vend.   ║
+// ║    → Aguardar cmfReal virar negativo na próxima barra para entrar.       ║
+// ║                                                                          ║
+// ╠══════════════════════════════════════════════════════════════════════════╣
+// ║                                                                          ║
+// ║  GRAU DO SINAL — como escolher a opção:                                  ║
+// ║                                                                          ║
+// ║  [A] cmf_norm ≥ 1.5  →  Fluxo 50% acima da média do ativo              ║
+// ║      Delta 0.40-0.55 (levemente ITM) | Vencimento 30-45 dias úteis      ║
+// ║                                                                          ║
+// ║  [B] cmf_norm ≥ 1.0  →  Fluxo acima da média do ativo                  ║
+// ║      Delta 0.30-0.45 (ATM padrão)    | Vencimento 21-35 dias úteis      ║
+// ║                                                                          ║
+// ║  [C] cmf_norm < 1.0  →  Fluxo positivo mas comum para o ativo           ║
+// ║      Delta 0.25-0.35 (levemente OTM) | Vencimento 15-25 dias úteis      ║
+// ║                                                                          ║
+// ╠══════════════════════════════════════════════════════════════════════════╣
+// ║                                                                          ║
+// ║  GESTÃO APÓS O SINAL:                                                    ║
+// ║  1. Compre a opção próximo ao preço de ENTRADA exibido no painel         ║
+// ║  2. Defina o stop no ATIVO (não na opção) no nível STOP do painel        ║
+// ║  3. Ao atingir TP1 no ATIVO → venda 50% das opções                      ║
+// ║  4. Mova o stop para o preço de ENTRADA (operação no zero a zero)        ║
+// ║  5. Ao atingir TP2 no ATIVO → venda os 50% restantes                   ║
+// ║  6. Se a barra de sinal mudar de cor (saiu do estado verde/vermelho)     ║
+// ║     → reavalie: o sinal pode ter sido cancelado                          ║
+// ╚══════════════════════════════════════════════════════════════════════════╝

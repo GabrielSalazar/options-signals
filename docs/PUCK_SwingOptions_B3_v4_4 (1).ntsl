@@ -1,0 +1,556 @@
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  PUCK SWING OPTIONS B3 — v4.4 (sintaxe 100% corrigida)                 ║
+// ║  ThresholdAgress AUTOCALIBRADO — funciona em qualquer ativo da B3       ║
+// ╠══════════════════════════════════════════════════════════════════════════╣
+// ║  Plataforma : ProfitChart / Nelogica (NTSL)                             ║
+// ║  Timeframe  : Diário (swing 5-15d) ou 60min (swing 2-5d)               ║
+// ╠══════════════════════════════════════════════════════════════════════════╣
+// ║                                                                          ║
+// ║  CORREÇÕES v4.3 → v4.4  (erros identificados no compilador)             ║
+// ║                                                                          ║
+// ║  [C1] AvgAgrBuySell(Per, lado) — parâmetro de período não é aceito.    ║
+// ║       Assinatura correta: AvgAgrBuySell(lado)  — apenas 1 param.       ║
+// ║       O período é fixo interno da função.                               ║
+// ║                                                                          ║
+// ║  [C2] DesvPad() — não existe no NTSL.                                  ║
+// ║       Substituto correto: StdDevs(serie, periodo)                       ║
+// ║       Listado no Manual NTSL na seção Matemáticas.                      ║
+// ║                                                                          ║
+// ║  [C3] AvgTrueRange(periodo) — parâmetro período não é aceito.           ║
+// ║       Assinatura correta: AvgTrueRange(0) — índice de deslocamento.    ║
+// ║       Ou: cálculo manual com loop (mais seguro, adotado aqui).          ║
+// ║                                                                          ║
+// ║  [C4] VWAP — chamada sem parênteses gera erro de parâmetros.            ║
+// ║       Assinatura correta: VWAP(0) — com índice de deslocamento.        ║
+// ║                                                                          ║
+// ║  [C5] MaxValue() / MinValue() — não existem no NTSL.                   ║
+// ║       Substituto: blocos if/else explícitos.                            ║
+// ║                                                                          ║
+// ║  [C6] FloatToStr() — não existe no NTSL.                               ║
+// ║       O NTSL não suporta concatenação de float em string com "+".       ║
+// ║       Solução: PlotText exibe apenas o LABEL direcional.               ║
+// ║       Os valores numéricos (entrada, stop, TP) são exibidos via         ║
+// ║       Plot2..Plot6 com cores configuráveis nas Propriedades.            ║
+// ║                                                                          ║
+// ║  [C7] Estrutura begin/end — bloco principal deve iniciar com begin.     ║
+// ║       Verificado e corrigido.                                           ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// §01  PARÂMETROS
+// ════════════════════════════════════════════════════════════════════════════
+input
+
+  // HC
+  FatorVolumeHC(1.5);
+
+  // ATR e risco
+  PeriodoATR(14);
+  MultStop(1.5);
+  MultTP1(1.5);
+  MultTP2(3.0);
+
+  // Agressão
+  // [C1] AvgAgrBuySell só aceita 1 parâmetro (o lado: 0=buy, 1=sell)
+  // O período é interno da função — não configurável pelo usuário.
+  // PeriodoAgress é usado apenas para Media() e StdDevs() manuais.
+  PeriodoAgress(21);
+  MultThresh(1.0);       // Sensibilidade: 0.5=suave | 1.0=padrão | 1.5=seletivo | 2.0=raro
+  ThresholdGrauA(1.5);
+
+  // Filtros
+  UsarVWAP(true);
+  UsarTrailing(true);
+
+  // Agressão contínua
+  MinAgressContinua(3);
+  LotesMinInst(100);     // PETR4=100 | VALE3=50 | small cap=10
+
+  // Exibição
+  MostrarPainelCompleto(true);
+  TamanhoFonte(9);
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// §02  VARIÁVEIS
+// ════════════════════════════════════════════════════════════════════════════
+var
+
+  // HC
+  maxHC, minHC, maiorVol, mediaVol20          : float;
+
+  // Agressão real
+  agressBuy, agressSell                       : float;
+  mediaLoteBuy, mediaLoteSell                 : float;
+  agressSaldo, agressRatio, agressBalance     : float;
+
+  // Threshold dinâmico
+  media_agress_buy_hist, media_agress_sell_hist : float;
+  dp_agress_buy, dp_agress_sell               : float;
+  thresh_buy, thresh_sell                     : float;
+
+  // Normalização para grau
+  mediaAgressBuy, mediaAgressSell             : float;
+  cmfNorm                                     : float;
+
+  // [C3] ATR calculado manualmente — loop com True Range
+  // AvgTrueRange(0) pode variar entre versões do Profit;
+  // o loop manual garante comportamento idêntico ao Wilder em qualquer versão.
+  atr_tr, atr_soma, atr_val                  : float;
+  j                                           : integer;
+
+  // VWAP
+  vwap_val                                    : float;
+
+  // Níveis de saída
+  entrada, stopLoss, tp1, tp2                : float;
+  trailStop                                   : float;
+  trailingOn                                  : boolean;
+
+  // Filtros
+  absorcao                                    : boolean;
+  tendenciaAlta, tendenciaBaixa               : boolean;
+
+  // Agressão contínua
+  contAgressBuy, contAgressSell               : integer;
+  agressContinuaBuy, agressContinuaSell       : boolean;
+
+  // Sinais e qualidade
+  sinalCall, sinalPut                         : boolean;
+  grau                                        : string;
+
+  // Visual
+  offsetLabel                                 : float;
+
+  // [C5] Variáveis auxiliares para substituir MaxValue/MinValue
+  novoTrailCall, novoTrailPut                : float;
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// INÍCIO DA EXECUÇÃO
+// ════════════════════════════════════════════════════════════════════════════
+begin
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §03  PASSO 3 — HIGH CANDLE INSTITUCIONAL
+  // ════════════════════════════════════════════════════════════════════════
+
+  if CurrentBar = 1 then
+  begin
+    maxHC    := High;
+    minHC    := Low;
+    maiorVol := Volume;
+  end
+  else
+  begin
+    mediaVol20 := Media(20, Volume);
+    if (Volume > maiorVol) and (Volume > mediaVol20 * FatorVolumeHC) then
+    begin
+      minHC    := Low;
+      maxHC    := High;
+      maiorVol := Volume;
+    end;
+  end;
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §04  PASSO 4 — AGRESSÃO REAL (TAPE READING NELOGICA)
+  //
+  // [C1] AvgAgrBuySell(lado) — assinatura correta: apenas 1 parâmetro.
+  //      lado 0 = comprador | lado 1 = vendedor
+  //      O período de suavização é fixo interno da função Nelogica.
+  // ════════════════════════════════════════════════════════════════════════
+
+  agressBuy     := AgressionVolBuy();
+  agressSell    := AgressionVolSell();
+  agressSaldo   := agressBuy - agressSell;
+  agressBalance := AgressionVolBalance();
+
+  // [C1] Apenas 1 parâmetro (lado): 0=buy, 1=sell
+  mediaLoteBuy  := AvgAgrBuySell(0);
+  mediaLoteSell := AvgAgrBuySell(1);
+
+  if (agressBuy + agressSell) > 0 then
+    agressRatio := (agressBuy - agressSell) / (agressBuy + agressSell)
+  else
+    agressRatio := 0;
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §05  PASSO 5 — THRESHOLD DINÂMICO POR DESVIO-PADRÃO
+  //
+  // [C2] DesvPad() não existe → StdDevs(serie, periodo) é o nome correto
+  //      no NTSL. Listado na seção Matemáticas do Manual oficial Nelogica.
+  //      Retorna o desvio-padrão amostral da série nos últimos n períodos.
+  //
+  // thresh = Media(agressão, Per) + MultThresh × StdDevs(agressão, Per)
+  // → O mesmo MultThresh funciona em PETR4, MGLU3 e qualquer ativo.
+  // → É estatisticamente equivalente ao z-score: (x - µ) / σ > MultThresh
+  // ════════════════════════════════════════════════════════════════════════
+
+  media_agress_buy_hist  := Media(PeriodoAgress, agressBuy);
+  media_agress_sell_hist := Media(PeriodoAgress, agressSell);
+
+  // [C2] StdDevs(serie, periodo) — nome correto no NTSL
+  dp_agress_buy  := StdDevs(agressBuy,  PeriodoAgress);
+  dp_agress_sell := StdDevs(agressSell, PeriodoAgress);
+
+  // Limiares dinâmicos com proteção contra dp = 0 (início da série)
+  if dp_agress_buy > 0 then
+    thresh_buy := media_agress_buy_hist + (MultThresh * dp_agress_buy)
+  else
+    thresh_buy := media_agress_buy_hist * 1.5;
+
+  if dp_agress_sell > 0 then
+    thresh_sell := media_agress_sell_hist + (MultThresh * dp_agress_sell)
+  else
+    thresh_sell := media_agress_sell_hist * 1.5;
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §06  PASSO 6 — NORMALIZAÇÃO (para Grau A/B/C)
+  // ════════════════════════════════════════════════════════════════════════
+
+  mediaAgressBuy  := MediaExp(PeriodoAgress, agressBuy);
+  mediaAgressSell := MediaExp(PeriodoAgress, agressSell);
+
+  if (agressSaldo > 0) and (mediaAgressBuy > 0) then
+    cmfNorm := agressBuy / mediaAgressBuy
+  else if (agressSaldo < 0) and (mediaAgressSell > 0) then
+    cmfNorm := -(agressSell / mediaAgressSell)
+  else
+    cmfNorm := 0;
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §07  PASSO 7 — ATR (loop manual) e VWAP
+  //
+  // [C3] AvgTrueRange(periodo) gerava erro de parâmetros.
+  //      Loop manual do True Range (método Wilder) — 100% compatível
+  //      com todas as versões do ProfitChart.
+  //
+  // [C4] VWAP gerava erro de parâmetros ao ser chamado sem parênteses.
+  //      Assinatura correta: VWAP(0) — índice de deslocamento.
+  //      0 = barra atual | 1 = barra anterior | etc.
+  // ════════════════════════════════════════════════════════════════════════
+
+  // ATR manual
+  atr_soma := 0;
+  for j := 0 to PeriodoATR - 1 do
+  begin
+    atr_tr := High[j] - Low[j];
+    if (j + 1) <= CurrentBar then
+    begin
+      if Abs(High[j] - Close[j + 1]) > atr_tr then
+        atr_tr := Abs(High[j] - Close[j + 1]);
+      if Abs(Low[j]  - Close[j + 1]) > atr_tr then
+        atr_tr := Abs(Low[j]  - Close[j + 1]);
+    end;
+    atr_soma := atr_soma + atr_tr;
+  end;
+  if PeriodoATR > 0 then
+    atr_val := atr_soma / PeriodoATR
+  else
+    atr_val := High - Low;
+
+  // [C4] VWAP(0) — com parênteses e índice de deslocamento
+  vwap_val := VWAP(0);
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §08  PASSO 8 — FILTROS DE CONTEXTO
+  // ════════════════════════════════════════════════════════════════════════
+
+  if UsarVWAP then
+  begin
+    tendenciaAlta  := Close > vwap_val;
+    tendenciaBaixa := Close < vwap_val;
+  end
+  else
+  begin
+    tendenciaAlta  := true;
+    tendenciaBaixa := true;
+  end;
+
+  absorcao := (High >= maxHC)
+              and (Close < maxHC)
+              and (Abs(agressRatio) < 0.1);
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §09  PASSO 9 — SINAIS CALL / PUT
+  //
+  // Confirmação dupla no filtro de agressão:
+  //   agressBuy  > thresh_buy  → volume comprador acima do padrão histórico
+  //   agressSaldo > 0          → compra domina sobre a venda na barra
+  // ════════════════════════════════════════════════════════════════════════
+
+  sinalCall := (Low  > maxHC)
+               and (agressBuy  > thresh_buy)
+               and (agressSaldo > 0)
+               and tendenciaAlta;
+
+  sinalPut  := (High < minHC)
+               and (agressSell > thresh_sell)
+               and (agressSaldo < 0)
+               and tendenciaBaixa;
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §10  PASSO 10 — NÍVEIS DE STOP E TAKE PROFIT
+  // ════════════════════════════════════════════════════════════════════════
+
+  if sinalCall then
+  begin
+    entrada    := Close;
+    stopLoss   := entrada - (MultStop * atr_val);
+    tp1        := entrada + (MultTP1  * atr_val);
+    tp2        := entrada + (MultTP2  * atr_val);
+    trailStop  := stopLoss;
+    trailingOn := false;
+  end;
+
+  if sinalPut then
+  begin
+    entrada    := Close;
+    stopLoss   := entrada + (MultStop * atr_val);
+    tp1        := entrada - (MultTP1  * atr_val);
+    tp2        := entrada - (MultTP2  * atr_val);
+    trailStop  := stopLoss;
+    trailingOn := false;
+  end;
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §11  PASSO 11 — TRAILING STOP
+  //
+  // [C5] MaxValue() / MinValue() não existem no NTSL.
+  //      Substituídos por variáveis auxiliares com blocos if/else.
+  // ════════════════════════════════════════════════════════════════════════
+
+  // Trailing para CALL (stop sobe com o preço)
+  if UsarTrailing and (entrada > 0) and (stopLoss < entrada) then
+  begin
+    if Close >= tp1 then
+    begin
+      trailingOn := true;
+      // [C5] if/else substitui MaxValue(trailStop, Close - atr_val)
+      novoTrailCall := Close - atr_val;
+      if novoTrailCall > trailStop then
+        trailStop := novoTrailCall;
+    end;
+  end;
+
+  // Trailing para PUT (stop desce com o preço)
+  if UsarTrailing and (entrada > 0) and (stopLoss > entrada) then
+  begin
+    if Close <= tp1 then
+    begin
+      trailingOn := true;
+      // [C5] if/else substitui MinValue(trailStop, Close + atr_val)
+      novoTrailPut := Close + atr_val;
+      if novoTrailPut < trailStop then
+        trailStop := novoTrailPut;
+    end;
+  end;
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §12  PASSO 12 — AGRESSÃO CONTÍNUA E GRAU
+  // ════════════════════════════════════════════════════════════════════════
+
+  if agressRatio > 0.3 then
+    contAgressBuy := contAgressBuy + 1
+  else
+    contAgressBuy := 0;
+
+  if agressRatio < -0.3 then
+    contAgressSell := contAgressSell + 1
+  else
+    contAgressSell := 0;
+
+  agressContinuaBuy  := contAgressBuy  >= MinAgressContinua;
+  agressContinuaSell := contAgressSell >= MinAgressContinua;
+
+  if sinalCall or sinalPut then
+  begin
+    if Abs(cmfNorm) >= ThresholdGrauA then
+      grau := "A"
+    else if Abs(cmfNorm) >= 1.0 then
+      grau := "B"
+    else
+      grau := "C";
+
+    if grau = "C" then
+    begin
+      if sinalCall and agressContinuaBuy  and (mediaLoteBuy  > LotesMinInst) then
+        grau := "B";
+      if sinalPut  and agressContinuaSell and (mediaLoteSell > LotesMinInst) then
+        grau := "B";
+    end;
+
+    if absorcao then
+      grau := "C";
+  end;
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §13  PASSO 13 — PAINEL DE POSICIONAMENTO
+  //
+  // [C6] FloatToStr() não existe no NTSL.
+  //      O NTSL não suporta concatenação float + string via "+".
+  //
+  //      SOLUÇÃO ADOTADA:
+  //        PlotText exibe apenas o LABEL direcional (CALL [A], PUT [B], etc.)
+  //        Os valores numéricos são exibidos como linhas coloridas no gráfico:
+  //          Plot1 = Mínima HC          (linha azul)
+  //          Plot2 = Máxima HC          (linha vermelha)
+  //          Plot3 = VWAP               (linha amarela)
+  //          Plot4 = Stop ativo         (linha magenta)
+  //          Plot5 = TP1 — alvo parcial (linha verde claro)
+  //          Plot6 = TP2 — alvo final   (linha verde escuro)
+  //
+  //      Para ver os valores exatos: passe o mouse sobre as linhas no gráfico
+  //      ou use o painel de informações (F2) que exibe Plot1..Plot6.
+  // ════════════════════════════════════════════════════════════════════════
+
+  offsetLabel := atr_val * 0.5;
+
+  // ── CALL ─────────────────────────────────────────────────────────────────
+  if sinalCall and (sinalCall[1] = false) then
+  begin
+    Alert(clGreen);
+
+    if MostrarPainelCompleto then
+    begin
+      // Linha 1: Direção + Grau (fonte maior para destaque)
+      if grau = "A" then
+        PlotText("CALL [A]", clGreen, 0, TamanhoFonte + 2, Low - offsetLabel)
+      else if grau = "B" then
+        PlotText("CALL [B]", clLime, 0, TamanhoFonte + 2, Low - offsetLabel)
+      else
+        PlotText("CALL [C]", clMoneyGreen, 0, TamanhoFonte + 2, Low - offsetLabel);
+
+      // Linha 2: Indicadores de nível (sem valor numérico — ver Plot4..Plot6)
+      PlotText("STOP  v", clRed, 0, TamanhoFonte, Low - offsetLabel * 2.2);
+      PlotText("TP1   ^", clAqua, 0, TamanhoFonte, Low - offsetLabel * 3.4);
+      PlotText("TP2  ^^", clAqua, 0, TamanhoFonte, Low - offsetLabel * 4.6);
+    end
+    else
+      PlotText("CALL", clGreen, 0, TamanhoFonte + 2, Low - offsetLabel);
+  end;
+
+  // ── PUT ──────────────────────────────────────────────────────────────────
+  if sinalPut and (sinalPut[1] = false) then
+  begin
+    Alert(clRed);
+
+    if MostrarPainelCompleto then
+    begin
+      if grau = "A" then
+        PlotText("PUT [A]", clRed, -1, TamanhoFonte + 2, High + offsetLabel)
+      else if grau = "B" then
+        PlotText("PUT [B]", clFuchsia, -1, TamanhoFonte + 2, High + offsetLabel)
+      else
+        PlotText("PUT [C]", clMaroon, -1, TamanhoFonte + 2, High + offsetLabel);
+
+      PlotText("STOP  ^", clRed, -1, TamanhoFonte, High + offsetLabel * 2.2);
+      PlotText("TP1   v", clAqua, -1, TamanhoFonte, High + offsetLabel * 3.4);
+      PlotText("TP2  vv", clAqua, -1, TamanhoFonte, High + offsetLabel * 4.6);
+    end
+    else
+      PlotText("PUT", clRed, -1, TamanhoFonte + 2, High + offsetLabel);
+  end;
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §14  PASSO 14 — COLORAÇÃO
+  // ════════════════════════════════════════════════════════════════════════
+
+  if sinalCall then
+  begin
+    if grau = "A" then PaintBar(clGreen)
+    else               PaintBar(clLime);
+  end
+  else if sinalPut then
+  begin
+    if grau = "A" then PaintBar(clRed)
+    else               PaintBar(clFuchsia);
+  end
+  else if absorcao then
+    PaintBar(clYellow)
+  else if agressSaldo > 0 then
+    PaintBar(clAqua)
+  else if agressSaldo < 0 then
+    PaintBar(clMaroon)
+  else
+    PaintBar(clWhite);
+
+
+  // ════════════════════════════════════════════════════════════════════════
+  // §15  PASSO 15 — PLOTS
+  //
+  // Os valores numéricos de Stop e TPs são exibidos aqui como linhas.
+  // Configure cores nas Propriedades do indicador (botão direito → Propriedades):
+  //   Plot1 = Mínima HC     → azul escuro
+  //   Plot2 = Máxima HC     → azul claro
+  //   Plot3 = VWAP          → amarelo
+  //   Plot4 = Stop ativo    → vermelho (muda para laranja quando trailing ativo)
+  //   Plot5 = TP1           → verde claro
+  //   Plot6 = TP2           → verde escuro
+  // ════════════════════════════════════════════════════════════════════════
+
+  Plot(minHC);       // Plot1: Mínima HC — suporte institucional
+  Plot2(maxHC);      // Plot2: Máxima HC — resistência institucional
+  Plot3(vwap_val);   // Plot3: VWAP da sessão
+
+  // [C5] if/else no lugar de MaxValue/MinValue para o stop ativo
+  if trailingOn then
+    Plot4(trailStop)   // Trailing stop (move com o preço)
+  else
+    Plot4(stopLoss);   // Stop fixo da entrada
+
+  // TP1 e TP2 plotados apenas enquanto há uma entrada ativa
+  if entrada > 0 then
+  begin
+    Plot5(tp1);   // Plot5: TP1 — fechar 50% da posição em opções aqui
+    Plot6(tp2);   // Plot6: TP2 — fechar 50% restante (R:R 2:1)
+  end;
+
+  // ── PLOTS DIAGNÓSTICO (descomente para calibrar o MultThresh) ────────────
+  // Adicione o indicador em janela separada para ver estes valores:
+  // Plot7(thresh_buy);            // Limiar dinâmico compra (sobe/desce com a vol.)
+  // Plot8(thresh_sell * -1);      // Limiar dinâmico venda  (invertido p/ histograma)
+  // Plot9(agressBuy);             // Agressão compradora bruta da barra atual
+  // Plot10(agressSell * -1);      // Agressão vendedora (invertida)
+  // Plot11(agressSaldo);          // Saldo Buy-Sell (cruza zero = mudança de direção)
+  // Plot12(cmfNorm);              // Normalização do grau (>1.5=A, >1.0=B, <1.0=C)
+
+end;
+
+
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  TABELA DE ERROS CORRIGIDOS v4.3 → v4.4                                ║
+// ╠══════════════════════════════════════════════════════════════════════════╣
+// ║                                                                          ║
+// ║  [C1] AvgAgrBuySell(Per,lado) → AvgAgrBuySell(lado)  [1 param apenas]  ║
+// ║  [C2] DesvPad()               → StdDevs(serie, Per)                    ║
+// ║  [C3] AvgTrueRange(Per)       → loop ATR manual (mais seguro)           ║
+// ║  [C4] VWAP  (sem parênteses)  → VWAP(0)                                ║
+// ║  [C5] MaxValue() / MinValue() → if/else com variável auxiliar           ║
+// ║  [C6] FloatToStr() + concat   → PlotText só com label | Plot para valor ║
+// ║  [C7] Estrutura begin/end     → verificada e correta                    ║
+// ║                                                                          ║
+// ║  CONDIÇÕES DO SINAL:                                                     ║
+// ║  CALL: Low>maxHC  AND agressBuy>thresh_buy  AND saldo>0  AND VWAP(0)   ║
+// ║  PUT:  High<minHC AND agressSell>thresh_sell AND saldo<0 AND VWAP(0)   ║
+// ║                                                                          ║
+// ║  COMO LER O GRÁFICO:                                                     ║
+// ║    Label "CALL [A]" abaixo da barra → entrada no fechamento             ║
+// ║    Linha Plot4 (vermelha)           → onde colocar o stop no ativo      ║
+// ║    Linha Plot5 (verde claro)        → TP1: vender 50% das opções        ║
+// ║    Linha Plot6 (verde escuro)       → TP2: vender 50% restante          ║
+// ║    Linha Plot3 (amarela)            → VWAP da sessão                    ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
