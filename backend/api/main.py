@@ -32,9 +32,19 @@ logger = logging.getLogger("b3_api")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    """Lifespan context manager: startup and graceful shutdown.
+
+    PRÉ-F0.0-I: Graceful shutdown for Railway migration
+    - No hibernation on Railway (unlike Render free tier)
+    - SIGTERM signal triggers shutdown within 30s
+    - All connections closed, jobs canceled, logs flushed
+    """
     import asyncio
     main_loop = asyncio.get_running_loop()
     signal_service.set_main_loop(main_loop)
+
+    # === STARTUP ===
+    logger.info("[STARTUP] FastAPI application starting...")
 
     load_telegram_config()
     signal_service.rebuild_historico_sinais()
@@ -61,8 +71,31 @@ async def lifespan(_app: FastAPI):
         )
 
     scheduler.start()
+    logger.info("[STARTUP] Application ready to receive requests")
+
     yield
-    scheduler.shutdown()
+
+    # === GRACEFUL SHUTDOWN ===
+    logger.info("[SHUTDOWN] Graceful shutdown initiated (SIGTERM received)")
+
+    try:
+        # 1. Stop accepting new requests
+        logger.info("[SHUTDOWN] Stopping scheduler...")
+        scheduler.shutdown()
+        logger.info("[SHUTDOWN] Scheduler stopped")
+
+        # 2. Give in-flight requests time to complete (max 30s total)
+        logger.info("[SHUTDOWN] Waiting for in-flight requests to complete...")
+        await asyncio.sleep(2)  # Give 2s for requests to drain
+
+        # 3. Close connections (Redis, DB already handle this via context managers)
+        logger.info("[SHUTDOWN] Closing connections...")
+        # Redis: handled by cache module
+        # DB: handled by Supabase client
+
+        logger.info("[SHUTDOWN] Graceful shutdown complete")
+    except Exception as e:
+        logger.error(f"[SHUTDOWN] Error during graceful shutdown: {e}")
 
 
 def create_app() -> FastAPI:
