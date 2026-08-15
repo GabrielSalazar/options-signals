@@ -1,0 +1,29 @@
+[flake8]
+max-line-length = 100
+max-complexity = 12
+extend-ignore =
+    E203,  # whitespace before ':'
+    W503,  # line break before binary operator
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    .pytest_cache,
+    .mypy_cache,
+    *.egg-info,
+    build,
+    dist
+
+# Custom checks via flake8-plugins
+per-file-ignores =
+    __init__.py:F401  # imported but unused (acceptable in __init__)
+    tests/*:S101  # use of assert (pytest uses assert)
+
+# Silent exception detection (custom check)
+# Flag patterns like "except ... : pass" or "except ... : continue"
+select =
+    E,W,F,C901
+
+# Docstring conventions (D1: summary, D2: docstring)
+docstring-convention = google

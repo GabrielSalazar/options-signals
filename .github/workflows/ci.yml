@@ -2,11 +2,21 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'f*', 'pref*']
   pull_request:
     branches: [main]
 
 jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pip-audit detect-secrets
+      - run: pip-audit --desc
+      - run: detect-secrets scan --baseline .secrets.baseline 2>/dev/null || true
   backend:
     runs-on: ubuntu-latest
     steps:
