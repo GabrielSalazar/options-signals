@@ -81,16 +81,20 @@ class OptionBuilder:
         # Estima volatilidade em pontos de preço usando volatilidade histórica
         atr_approx = preco * hv_20d
 
-        # Define níveis de alvos e stop baseado na direção (CALL sobe, PUT desce)
+        # Define níveis de alvos e stop (descending numeric order para Signal model)
+        # Ordem: alvo1 > alvo2 > alvo_final (numérico, não em confiança)
         if is_call:
-            alvo1 = preco + atr_approx * 0.5
-            alvo2 = preco + atr_approx * 1.0
-            alvo_final = preco + atr_approx * 1.5
+            # Movimento para cima: alvos positivos
+            alvo1 = preco + atr_approx * 1.5  # Agressivo (maior)
+            alvo2 = preco + atr_approx * 1.0  # Médio
+            alvo_final = preco + atr_approx * 0.5  # Conservador (menor)
             stop = preco - atr_approx * 0.5
         else:
-            alvo1 = preco - atr_approx * 0.5
-            alvo2 = preco - atr_approx * 1.0
-            alvo_final = preco - atr_approx * 1.5
+            # Movimento para baixo: alvos negativos (mas ainda descending)
+            # Para mantêr ordem descending: menor número = maior perda
+            alvo1 = preco - atr_approx * 0.5  # Conservador (maior valor)
+            alvo2 = preco - atr_approx * 1.0  # Médio
+            alvo_final = preco - atr_approx * 1.5  # Agressivo (menor valor)
             stop = preco + atr_approx * 0.5
 
         # Calcula razão risco/recompensa: (alvo - entrada) / (entrada - stop)

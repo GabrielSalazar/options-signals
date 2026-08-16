@@ -307,7 +307,7 @@ class TestSignalMotorAdapterIntegration:
     """Integration tests with realistic motor outputs."""
 
     def test_adapt_realistic_motor_output(self):
-        """Test with realistic motor output structure."""
+        """Test with realistic motor output structure (descending targets)."""
         motor_output = {
             "emoji": "📈",
             "ticker": "PETR4",
@@ -328,9 +328,10 @@ class TestSignalMotorAdapterIntegration:
             "preco_tela": 1.60,
             "entrada_min": 1.45,
             "entrada_max": 1.75,
-            "alvo1": 27.50,
-            "alvo2": 28.00,
-            "alvo_final": 29.00,
+            # Alvos em ordem descending (alvo1 > alvo2 > alvo_final)
+            "alvo1": 29.00,  # Agressivo (maior)
+            "alvo2": 28.00,  # Médio
+            "alvo_final": 27.50,  # Conservador (menor)
             "stop": 26.50,
             "score": 85,
             "score_ponderado": 82,
@@ -344,9 +345,11 @@ class TestSignalMotorAdapterIntegration:
         assert signal is not None
         assert signal.ticker == "PETR4"
         assert signal.tipo_sinal == SignalType.CALL_ALTA
-        assert signal.alvo1 == 27.50
+        # Verifica ordem descending
+        assert signal.alvo1 == 29.00
         assert signal.alvo2 == 28.00
-        assert signal.alvo3 == 29.00
+        assert signal.alvo3 == 27.50
+        assert signal.alvo1 > signal.alvo2 > signal.alvo3
         assert signal.stop_loss == 26.50
         assert signal.score_ponderado == 82
         # Confidence should use score_ponderado: 82/100 = 0.82

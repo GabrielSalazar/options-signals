@@ -180,7 +180,7 @@ class TestOptionBuilderIntegration:
         assert abs(result["moneyness"] - expected_moneyness) < 0.0001
 
     def test_targets_calculated_correctly(self):
-        """Targets should be above entry for CALL, below for PUT."""
+        """Targets should descend: alvo1 > alvo2 > alvo_final."""
         builder = OptionBuilder()
 
         call_result = builder.build(
@@ -195,15 +195,15 @@ class TestOptionBuilderIntegration:
             hv_20d=0.20,
         )
 
-        # Targets should progress: preco < alvo1 < alvo2 < alvo_final
+        # Alvos em ordem descendente (para Signal model)
         assert call_result["alvo1"] > 100.0
-        assert call_result["alvo2"] > call_result["alvo1"]
-        assert call_result["alvo_final"] > call_result["alvo2"]
+        assert call_result["alvo1"] > call_result["alvo2"]  # alvo1 é agressivo
+        assert call_result["alvo2"] > call_result["alvo_final"]  # alvo2 médio, alvo_final conservador
         # Stop should be below entry
         assert call_result["stop"] < 100.0
 
     def test_put_targets_inverted(self):
-        """PUT targets should be below entry."""
+        """PUT targets should still descend numerically: alvo1 > alvo2 > alvo_final."""
         builder = OptionBuilder()
 
         put_result = builder.build(
@@ -218,10 +218,11 @@ class TestOptionBuilderIntegration:
             hv_20d=0.20,
         )
 
-        # Targets should progress downward
-        assert put_result["alvo1"] < 100.0
-        assert put_result["alvo2"] < put_result["alvo1"]
-        assert put_result["alvo_final"] < put_result["alvo2"]
+        # Alvos em ordem descending (numericamente)
+        # Para PUT: alvo1 (conservador, menor queda) > alvo2 > alvo_final (agressivo, maior queda)
+        assert put_result["alvo1"] < 100.0  # Alvo1 ainda está abaixo do preço
+        assert put_result["alvo1"] > put_result["alvo2"]  # Descending numericamente
+        assert put_result["alvo2"] > put_result["alvo_final"]  # alvo2 > alvo_final
         # Stop should be above entry
         assert put_result["stop"] > 100.0
 
@@ -241,10 +242,13 @@ class TestOptionBuilderIntegration:
             hv_20d=0.20,
         )
 
-        # R/R should increase with target level
+        # R/R should be positive (alvo1 > alvo2 > alvo_final, então RR decresce)
         assert result["rr_alvo1"] > 0
-        assert result["rr_alvo2"] > result["rr_alvo1"]
-        assert result["rr_final"] > result["rr_alvo2"]
+        assert result["rr_alvo2"] > 0
+        assert result["rr_final"] > 0
+        # Maior alvo = maior recompensa = maior R/R
+        assert result["rr_alvo1"] > result["rr_alvo2"]  # alvo1 é maior
+        assert result["rr_alvo2"] > result["rr_final"]  # alvo2 > alvo_final
 
     def test_intrinsic_and_time_value(self):
         """Intrinsic + time = premium."""

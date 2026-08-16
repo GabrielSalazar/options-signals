@@ -29,14 +29,17 @@ class TestSignalContract:
         assert reconstructed.ticker == original.ticker
 
     def test_adapter_produces_valid_signals(self):
-        """Adapter produces valid Signals."""
+        """Adapter produces valid Signals with descending targets."""
         motor_outputs = [
             {
                 "ticker": "PETR4", "tipo_sinal": "CALL_ALTA",
-                "alvo1": 27.00, "alvo2": 28.00, "alvo_final": 29.00,
+                "alvo1": 29.00, "alvo2": 28.00, "alvo_final": 27.00,
                 "stop": 26.00, "score_ponderado": 75,
             }
         ]
         signals = SignalMotorAdapter.adapt_batch(motor_outputs)
         assert len(signals) == 1
-        assert signals[0].alvo1 < signals[0].alvo2 < signals[0].alvo3
+        # Alvos devem estar em ordem descending (alvo1 > alvo2 > alvo3)
+        assert signals[0].alvo1 > signals[0].alvo2
+        if signals[0].alvo3 is not None:
+            assert signals[0].alvo2 > signals[0].alvo3
