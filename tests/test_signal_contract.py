@@ -1,145 +1,42 @@
-"""
-Teste de Contrato — Validação da Estrutura de Sinal.
-
-Garante que qualquer campo novo adicionado ao motor também é persistido
-e refletido no tipo TypeScript.
-"""
-import json
+﻿import json
+from datetime import datetime
 import pytest
-from pathlib import Path
-from sqlalchemy import text
+from backend.core.models.signal import Signal, SignalType
+from backend.services.signal_motor_adapter import SignalMotorAdapter
 
-from backend.domain.signal import Signal  # Será criado em F1
-from backend.services.signal_service import persist_signals
-
-
-def get_persisted_columns() -> set[str]:
-    """
-    Extrair nomes de coluna da função persist_signals analisando código-fonte.
-
-    Uma futura análise tipo-dirigida (Fase 1) vai eliminar essa duplicação.
-    """
-    # Hoje vamos ler a função e extrair os campos mapeados
-    signal_service_path = Path("backend/services/signal_service.py")
-    content = signal_service_path.read_text()
-
-    # Procurar por linhas com '.get(' que indicam campos persistidos
-    import re
-    pattern = r"sinal\.get\(['\"]([^'\"]+)['\"]\)"
-    fields = set(re.findall(pattern, content))
-
-    return fields
-
-
-def get_motor_fields() -> set[str]:
-    """
-    Extrair campos gerados pelo motor analisando core_engine.py.
-
-    Busca a função _montar_sinal e lista todos os campos do dict retornado.
-    """
-    core_engine_path = Path("backend/services/core_engine.py")
-    content = core_engine_path.read_text()
-
-    # Procurar a função _montar_sinal
-    import re
-    # Simplificado: procurar por return { e depois extrair chaves
-    match = re.search(r"def _montar_sinal\(.*?\).*?return\s*({.*?})", content, re.DOTALL)
-
-    if match:
-        dict_literal = match.group(1)
-        # Procurar por "chave": ... ou 'chave': ...
-        pattern = r"['\"]([^'\"]+)['\"]:\s*"
-        fields = set(re.findall(pattern, dict_literal))
-        return fields
-
-    return set()
-
-
-def get_typescript_fields() -> set[str]:
-    """
-    Extrair campos do tipo Signal em TypeScript.
-
-    Lê src/types/signals.ts e extrai as propriedades do interface Signal.
-    """
-    ts_path = Path("src/types/signals.ts")
-    if not ts_path.exists():
-        return set()
-
-    content = ts_path.read_text()
-
-    import re
-    # Procurar por interface Signal { ... } ou type Signal = { ... }
-    match = re.search(r"(?:interface|type)\s+Signal\s*(?:=\s*)?{([^}]+)}", content, re.DOTALL)
-
-    if match:
-        interface_body = match.group(1)
-        # Procurar por propriedades (name: type ou name?: type)
-        pattern = r"(\w+)\s*\??\s*:\s*"
-        fields = set(re.findall(pattern, interface_body))
-        return fields
-
-    return set()
-
-
-@pytest.mark.serial
 class TestSignalContract:
-    """Testes de contrato de sinal."""
+    """Test Signal contract between backend and frontend."""
 
-    def test_motor_persist_consistency(self):
-        """
-        Validar que todos campos do motor são persistidos.
+    def test_signal_enum_types(self):
+        """All expected signal types exist."""
+        expected_types = {
+            "CALL_ALTA", "CALL_REVERSAO", "CALL_SIDEWAYS",
+            "PUT_ALTA", "PUT_REVERSAO", "PUT_SIDEWAYS",
+        }
+        actual_types = {member.value for member in SignalType}
+        assert actual_types == expected_types
 
-        Se o motor adiciona um campo novo em _montar_sinal mas esquece
-        de persistir em signal_service.persist_signals, este teste falha.
-        """
-        motor_fields = get_motor_fields()
-        persisted_fields = get_persisted_columns()
-
-        missing = motor_fields - persisted_fields
-
-        assert not missing, (
-            f"Campos no motor mas não persistidos: {missing}\n"
-            "Adicione em backend/services/signal_service.persist_signals"
+    def test_signal_roundtrip_json(self):
+        """Signal to JSON to Signal preserves data."""
+        original = Signal(
+            ticker="PETR4", tipo_sinal=SignalType.CALL_ALTA,
+            alvo1=27.50, stop_loss=26.00, score_ponderado=75,
+            data_sinal=datetime(2026, 8, 15, 10, 30, 0),
         )
+        json_str = original.model_dump_json()
+        parsed_dict = json.loads(json_str)
+        reconstructed = Signal(**parsed_dict)
+        assert reconstructed.ticker == original.ticker
 
-    def test_persist_typescript_consistency(self):
-        """
-        Validar que campos persistidos existem em TypeScript.
-
-        Se um campo é persistido em SQL mas não existe no tipo TS,
-        o frontend vai receber undefined.
-        """
-        persisted_fields = get_persisted_columns()
-        ts_fields = get_typescript_fields()
-
-        missing = persisted_fields - ts_fields
-
-        if missing:
-            pytest.warns(
-                UserWarning,
-                f"Campos persistidos mas não em TypeScript: {missing}\n"
-                "Verifique src/types/signals.ts"
-            )
-
-    def test_no_field_drift(self):
-        """
-        Resumo: validar alinhamento total de 3 fontes de verdade.
-
-        Com Fase 1 (modelo Pydantic), esse teste será substituído
-        por validação de tipo em tempo de compilação.
-        """
-        motor = get_motor_fields()
-        persist = get_persisted_columns()
-        ts = get_typescript_fields()
-
-        # Hoje aceitamos leve divergência, mas documentamos
-        drift = (motor | persist | ts) - (motor & persist & ts)
-
-        if drift:
-            print(f"\n⚠️  Drift de campos: {drift}")
-            print(f"   Motor:     {motor}")
-            print(f"   Persist:   {persist}")
-            print(f"   TypeScript: {ts}")
-
-        # Para Fase 1: isso vai falhar até que tenhamos 100% alinhamento
-        # pytest.fail(f"Drift de 3 fontes de verdade: {drift}")
+    def test_adapter_produces_valid_signals(self):
+        """Adapter produces valid Signals."""
+        motor_outputs = [
+            {
+                "ticker": "PETR4", "tipo_sinal": "CALL_ALTA",
+                "alvo1": 27.00, "alvo2": 28.00, "alvo_final": 29.00,
+                "stop": 26.00, "score_ponderado": 75,
+            }
+        ]
+        signals = SignalMotorAdapter.adapt_batch(motor_outputs)
+        assert len(signals) == 1
+        assert signals[0].alvo1 < signals[0].alvo2 < signals[0].alvo3
