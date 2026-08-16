@@ -1,4 +1,5 @@
-from fastapi import APIRouter
+from datetime import datetime
+from fastapi import APIRouter, HTTPException
 
 from backend.core.cache import redis_status
 from backend.services import signal_service
@@ -29,4 +30,27 @@ def health():
         },
         "redis": rs,
         "scheduler_jobs": jobs,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+@router.get("/health/ready")
+def readiness_check():
+    """Readiness check for K8s probes. Returns 503 if any critical dependency unavailable."""
+    rs = redis_status()
+    ready = rs.get("status") == "ok"
+
+    if not ready:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "not_ready",
+                "reason": "Redis unavailable",
+                "timestamp": datetime.utcnow().isoformat(),
+            },
+        )
+
+    return {
+        "status": "ready",
+        "timestamp": datetime.utcnow().isoformat(),
     }
