@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from fastapi import APIRouter, HTTPException
 
+from backend.core.constants import RSI_NEUTRAL_DEFAULT, STOCH_NEUTRAL_DEFAULT, EMA_SLOW_PERIOD
 from backend.domain.analytics import compute_statistical_indicators
 from backend.domain.greeks import implied_volatility
 from backend.domain.indicators import (  # noqa: F401
@@ -225,7 +226,7 @@ def get_market_analysis(ticker: str):
     # --- RSI₁₄ ---
     rsi14 = float(_self._rsi_manual(close, period=14).iloc[-1])
     if np.isnan(rsi14):
-        rsi14 = 50.0
+        rsi14 = RSI_NEUTRAL_DEFAULT
 
     # --- Faixa 52 semanas (252 pregões) ---
     ultimos_252 = close.tail(252)
@@ -246,8 +247,8 @@ def get_market_analysis(ticker: str):
     stoch_d_series = stoch_k_series.rolling(3).mean()
     stoch_k_val = float(stoch_k_series.iloc[-1])
     stoch_d_val = float(stoch_d_series.iloc[-1])
-    if np.isnan(stoch_k_val): stoch_k_val = 50.0
-    if np.isnan(stoch_d_val): stoch_d_val = 50.0
+    if np.isnan(stoch_k_val): stoch_k_val = STOCH_NEUTRAL_DEFAULT
+    if np.isnan(stoch_d_val): stoch_d_val = STOCH_NEUTRAL_DEFAULT
 
     # --- ADX (14) ---
     adx_val = float(_adx_manual(df["High"], df["Low"], close, period=14).iloc[-1])
@@ -411,9 +412,9 @@ def get_market_indicators(ticker: str):
     try:
         _, _, dte = mes_vencimento_ideal()  # dte em dias úteis
         if not dte or dte <= 0:
-            dte = 21
+            dte = EMA_SLOW_PERIOD  # Fallback: ~1 mês de dias úteis
     except Exception:
-        dte = 21
+        dte = EMA_SLOW_PERIOD  # Fallback: ~1 mês de dias úteis
     em = preco_atual * sigma_20 * math.sqrt(max(dte, 1) / 252)
     faixa_1sigma = [round(preco_atual - em, 2), round(preco_atual + em, 2)]
 

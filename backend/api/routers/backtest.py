@@ -6,6 +6,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, field_validator
 
 from backend.core.config import ATIVOS_B3
+from backend.core.constants import BACKTEST_INITIAL_EQUITY
 
 router = APIRouter(tags=["Backtest"])
 
@@ -55,7 +56,7 @@ def backtest_run(params: BacktestParams):
     win_rate = wins / total
 
     # Equity curve — 10% position sizing per trade
-    equity = 10000.0
+    equity = BACKTEST_INITIAL_EQUITY
     equity_curve = [round(equity, 2)]
     trade_returns = []
     for s in sinais:
